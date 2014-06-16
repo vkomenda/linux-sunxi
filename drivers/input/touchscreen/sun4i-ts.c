@@ -111,6 +111,8 @@ struct sun4i_ts_data {
 	unsigned int irq;
 	bool ignore_fifo_data;
 	int temp_data;
+	int temp_offset;
+	int temp_step;
 };
 
 static void sun4i_ts_irq_handle_input(struct sun4i_ts_data *ts, u32 reg_val)
@@ -189,7 +191,8 @@ static ssize_t show_temp(struct device *dev, struct device_attribute *devattr,
 	if (ts->temp_data == -1)
 		return -EAGAIN;
 
-	return sprintf(buf, "%d\n", (ts->temp_data - 1447) * 100);
+	return sprintf(buf, "%d\n",
+		       (ts->temp_data - ts->temp_offset) * ts->temp_step);
 }
 
 static ssize_t show_temp_label(struct device *dev,
@@ -224,6 +227,13 @@ static int sun4i_ts_probe(struct platform_device *pdev)
 	ts->dev = dev;
 	ts->ignore_fifo_data = true;
 	ts->temp_data = -1;
+	if (of_device_is_compatible(np, "allwinner,sun4i-a10-ts")) {
+		ts->temp_offset = 1900;
+		ts->temp_step = 100;
+	} else {
+		ts->temp_offset = 1447;
+		ts->temp_step = 100;
+	}
 
 	ts_attached = of_property_read_bool(np, "allwinner,ts-attached");
 	if (ts_attached) {
@@ -318,6 +328,7 @@ static int sun4i_ts_remove(struct platform_device *pdev)
 
 static const struct of_device_id sun4i_ts_of_match[] = {
 	{ .compatible = "allwinner,sun4i-a10-ts", },
+	{ .compatible = "allwinner,sun5i-a13-ts", },
 	{ /* sentinel */ }
 };
 MODULE_DEVICE_TABLE(of, sun4i_ts_of_match);
