@@ -206,34 +206,31 @@ __u32 fb_videomode_pixclock_to_hdmi_pclk(__u32 pixclock)
     return pclk * 50000;
 }
 
-void videomode_to_video_timing(struct __disp_video_timing *video_timing,
+void videomode_to_video_timing(struct __disp_video_timing *t,
 		const struct fb_videomode *mode)
 {
-	memset(video_timing, 0, sizeof(struct __disp_video_timing));
-	video_timing->VIC = 511;
-	video_timing->PCLK =
+	memset(t, 0, sizeof(struct __disp_video_timing));
+	t->VIC = 511;
+	t->PCLK =
 		fb_videomode_pixclock_to_hdmi_pclk(mode->pixclock);
-	video_timing->AVI_PR = 0;
-	video_timing->INPUTX = mode->xres;
-	video_timing->INPUTY = mode->yres;
-	video_timing->HT = mode->xres + mode->left_margin +
+	t->AVI_PR = 0;
+	t->INPUTX = mode->xres;
+	t->INPUTY = mode->yres;
+	t->HT = mode->xres + mode->left_margin +
 			mode->right_margin + mode->hsync_len;
-	video_timing->HBP = mode->left_margin + mode->hsync_len;
-	video_timing->HFP = mode->right_margin;
-	video_timing->HPSW =  mode->hsync_len;
-	video_timing->VT = mode->yres + mode->upper_margin +
+	t->HBP = mode->left_margin + mode->hsync_len;
+	t->HFP = mode->right_margin;
+	t->HPSW =  mode->hsync_len;
+	t->VT = mode->yres + mode->upper_margin +
 			mode->lower_margin + mode->vsync_len;
-	video_timing->VBP = mode->upper_margin + mode->vsync_len;
-	video_timing->VFP = mode->lower_margin;
-	video_timing->VPSW = mode->vsync_len;
-	if (mode->vmode & FB_VMODE_INTERLACED)
-		video_timing->I = true;
+	t->VBP = mode->upper_margin + mode->vsync_len;
+	t->VFP = mode->lower_margin;
+	t->VPSW = mode->vsync_len;
+	if (mode->vmode & FB_VMODE_INTERLACED) t->I = true;
 
-	if (mode->sync & FB_SYNC_HOR_HIGH_ACT)
-		video_timing->HSYNC = true;
+	if (mode->sync & FB_SYNC_HOR_HIGH_ACT) t->HSYNC = true;
 
-	if (mode->sync & FB_SYNC_VERT_HIGH_ACT)
-		video_timing->VSYNC = true;
+	if (mode->sync & FB_SYNC_VERT_HIGH_ACT) t->VSYNC = true;
 
     pr_debug ("[disp_hdmi] timing %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
               t->VIC, t->PCLK, t->AVI_PR, t->INPUTX, t->INPUTY, t->HT,
