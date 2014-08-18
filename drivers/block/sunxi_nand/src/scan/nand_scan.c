@@ -403,17 +403,16 @@ __s32  SCN_AnalyzeNandSystem(void)
 
 	PHY_ChangeMode(1);
 
-	if(SUPPORT_READ_RETRY)
-	{
-	    PHY_DBG("NFC Read Retry Init. \n");
-		NFC_ReadRetryInit(READ_RETRY_TYPE);
+    if(SUPPORT_READ_RETRY)
+    {
+        PHY_DBG("NFC Read Retry Init. \n");
+        NFC_ReadRetryInit(READ_RETRY_TYPE);
+    }
+    for(i=0; i<NandStorageInfo.ChipCnt; i++)
+    {
+        PHY_GetDefaultParam(i);
+    }
 
-		for(i=0; i<NandStorageInfo.ChipCnt;i++)
-	    {
-	        PHY_GetDefaultParam(i);
-	    }
-
-	}
     //print nand flash physical architecture parameter
     SCAN_DBG("\n\n");
     SCAN_DBG("[SCAN_DBG] ==============Nand Architecture Parameter==============\n");
@@ -459,4 +458,3 @@ __s32  SCN_AnalyzeNandSystem(void)
 
     return 0;
 }
-
