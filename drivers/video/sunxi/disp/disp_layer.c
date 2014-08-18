@@ -684,8 +684,8 @@ __s32 BSP_disp_layer_set_para(__u32 sel, __u32 hid,
 src.x %d src.y %d src.w %d src.h %d, \
 scn.x %d scn.y %d scn.w %d scn.h %d",
               player->mode, player->b_from_screen, player->pipe,
-              player->src_win.x, player->src_win.y, player->src_win.w, player->src_win.h,
-              player->scn_win.x, player->scn_win.y, player->scn_win.w, player->scn_win.h);
+              player->src_win.x, player->src_win.y, player->src_win.width, player->src_win.height,
+              player->scn_win.x, player->scn_win.y, player->scn_win.width, player->scn_win.height);
 
 	if (layer_man->status & LAYER_USED) {
 		BSP_disp_cfg_start(sel);
