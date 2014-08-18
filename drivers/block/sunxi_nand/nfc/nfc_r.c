@@ -30,13 +30,13 @@ __hdle 	dma_hdle;
 volatile __u32 irq_value;
 
 
-__u8 read_retry_reg_adr[READ_RETRY_MAX_REG_NUM];
-__u8 read_retry_default_val[8][READ_RETRY_MAX_REG_NUM];
-__s16 read_retry_val[READ_RETRY_MAX_CYCLE][READ_RETRY_MAX_REG_NUM];
-__u8 hynix_read_retry_otp_value[MAX_CHIP_SELECT_CNT][8][8];
-__u8 read_retry_mode;
-__u8 read_retry_cycle;
-__u8 read_retry_reg_num;
+__u8 read_retry_reg_adr[READ_RETRY_MAX_REG_NUM]={0};
+__u8 read_retry_default_val[MAX_CHIP_SELECT_CNT][READ_RETRY_MAX_REG_NUM]={{0}};
+__s16 read_retry_val[READ_RETRY_MAX_CYCLE][READ_RETRY_MAX_REG_NUM]={{0}};
+__u8 hynix_read_retry_otp_value[MAX_CHIP_SELECT_CNT][8][8]={{{0}}};
+__u8 read_retry_mode=0;
+__u8 read_retry_cycle=0;
+__u8 read_retry_reg_num=0;
 
 __u8 lsb_mode_reg_adr[LSB_MODE_MAX_REG_NUM];
 __u8 lsb_mode_default_val[LSB_MODE_MAX_REG_NUM];
@@ -1790,23 +1790,19 @@ __s32 NFC_SetDefaultParam(__u32 chip,__u8* default_value,__u32 read_retry_type)
     	return ret;
     }
 	else if((read_retry_mode>=0x30)&&(read_retry_mode<0x40))  //sandisk read retry mode
-	{
-	nand_clk_bak = get_nand_clk();
-	nand_clk_down();
+    {
+        nand_clk_bak = get_nand_clk();
+        nand_clk_down();
 
-		ret = _vender_pre_condition();
-		for(i=0; i<read_retry_reg_num; i++)
-	{
-		default_value[i] = 0x0;
-	}
+        ret = _vender_pre_condition();
+		for(i=0; i<read_retry_reg_num; i++) default_value[i] = 0;
+        if((NFC_READ_REG(NFC_REG_CTL)<<18)&0x3) //change to legacy mode from toggle mode
+        {
+            NFC_WRITE_REG(NFC_REG_CTL,NFC_READ_REG(NFC_REG_CTL)&(~(0x3<<18)));
+            toggle_mode_flag = 1;
+        }
 
-		if((NFC_READ_REG(NFC_REG_CTL)<<18)&0x3) //change to legacy mode from toggle mode
-		{
-			NFC_WRITE_REG(NFC_REG_CTL,NFC_READ_REG(NFC_REG_CTL)&(~(0x3<<18)));
-			toggle_mode_flag = 1;
-		}
-
-	ret |= _vender_set_param(default_value,&read_retry_reg_adr[0],read_retry_reg_num);
+        ret |= _vender_set_param(default_value,&read_retry_reg_adr[0],read_retry_reg_num);
 
 		if(toggle_mode_flag == 1) //change to toggle mode from legacy mode  after set param
 			NFC_WRITE_REG(NFC_REG_CTL,NFC_READ_REG(NFC_REG_CTL)|(0x3<<18));
@@ -1818,7 +1814,7 @@ __s32 NFC_SetDefaultParam(__u32 chip,__u8* default_value,__u32 read_retry_type)
 		ret |= _wait_cmdfifo_free();
 		ret |= _wait_cmd_finish();
 
-	nand_clk_recover(nand_clk_bak);
+        nand_clk_recover(nand_clk_bak);
 
 		if(ret)
 		{
@@ -1886,6 +1882,3 @@ __s32 NFC_ReadRetryExit(__u32 read_retry_type)
 
 	return 0;
 }
-
-
-

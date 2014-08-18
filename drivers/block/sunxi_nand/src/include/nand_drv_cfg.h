@@ -29,7 +29,7 @@
 //==============================================================================
 
 #define  NAND_VERSION_0                 0x02
-#define  NAND_VERSION_1                 0x09
+#define  NAND_VERSION_1                 0xF9
 
 
 //define the max value of the count of chip select
@@ -121,31 +121,31 @@
 //==============================================================================
 
 //define if need pr__s32 the physic operation module debug message
-#define PHY_DBG_MESSAGE_ON                  (0)
+#define PHY_DBG_MESSAGE_ON                  (1)
 
 //define if need pr__s32 the physic operation module error message
 #define PHY_ERR_MESSAGE_ON                  (1)
 
 //define if need pr__s32 the nand hardware scan module debug message
-#define SCAN_DBG_MESSAGE_ON                 (0)
+#define SCAN_DBG_MESSAGE_ON                 (1)
 
 //define if need pr__s32 the nand hardware scan module error message
 #define SCAN_ERR_MESSAGE_ON                 (1)
 
 //define if need pr__s32 the nand disk format module debug message
-#define FORMAT_DBG_MESSAGE_ON               (0)
+#define FORMAT_DBG_MESSAGE_ON               (1)
 
 //define if need pr__s32 the nand disk format module error message
 #define FORMAT_ERR_MESSAGE_ON               (1)
 
 //define if need pr__s32 the mapping manage module debug message
-#define MAPPING_DBG_MESSAGE_ON              (0)
+#define MAPPING_DBG_MESSAGE_ON              (1)
 
 //define if need pr__s32 the mapping manage module error message
 #define MAPPING_ERR_MESSAGE_ON              (1)
 
 //define if need pr__s32 the logic control layer debug message
-#define LOGICCTL_DBG_MESSAGE_ON             (0)
+#define LOGICCTL_DBG_MESSAGE_ON             (1)
 
 //define if need pr__s32 the logic control layer error message
 #define LOGICCTL_ERR_MESSAGE_ON             (1)
@@ -217,4 +217,3 @@
 
 
 #endif //ifndef __NAND_DRV_CFG_H
-

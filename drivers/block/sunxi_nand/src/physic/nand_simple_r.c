@@ -602,155 +602,131 @@ __s32 PHY_Init(void)
 
 __s32 PHY_GetDefaultParam(__u32 bank)
 {
-	__u32 i, j, chip = 0, rb = 0;
-	__u8 default_value[64];
-	__u8 oob_buf[64];
-	__u8 *oob, *pdata;
-	__s32 ret, otp_ok_flag = 0;
-	struct boot_physical_param nand_op;
+  __u32 i, j, chip = 0, rb = 0;
+  __u8 default_value[64];
+  __u8 oob_buf[64];
+  __u8 *oob, *pdata;
+  __s32 ret, otp_ok_flag = 0;
+  struct boot_physical_param nand_op;
 
-	chip = _cal_real_chip(bank);
-	NFC_SelectChip(chip);
-	rb = _cal_real_rb(chip);
-	NFC_SelectRb(rb);
-	oob = (__u8 *)(oob_buf);
+  chip = _cal_real_chip(bank);
+  NFC_SelectChip(chip);
+  rb = _cal_real_rb(chip);
+  NFC_SelectRb(rb);
+  oob = (__u8 *)(oob_buf);
 
-	if (!PageCachePool.PageCache0){
-		PageCachePool.PageCache0 = (__u8 *)MALLOC(SECTOR_CNT_OF_SUPER_PAGE * 512);
-		if (!PageCachePool.PageCache0)
-			return -1;
-	}
-	pdata = (__u8 *)(PHY_TMP_PAGE_CACHE);
+  if (!PageCachePool.PageCache0){
+    PageCachePool.PageCache0 = (__u8 *)MALLOC(SECTOR_CNT_OF_SUPER_PAGE * 512);
+    if (!PageCachePool.PageCache0)
+      return -1;
+  }
+  pdata = (__u8 *)(PHY_TMP_PAGE_CACHE);
 
-	if((READ_RETRY_MODE==2)||(READ_RETRY_MODE==3))
-	{
-	while(1)
-	{
-		otp_ok_flag = 0;
-		for(i = 8; i<12; i++)
-		{
-			nand_op.chip = chip;
-			nand_op.block = i;
-			nand_op.page = 0;
-			nand_op.mainbuf = PHY_TMP_PAGE_CACHE;
-			nand_op.oobbuf = oob_buf;
+  if((READ_RETRY_MODE==2)||(READ_RETRY_MODE==3)) {
+    for () {
+      otp_ok_flag = 0;
+      for(i = 8; i<12; i++) {
+        nand_op.chip = chip;
+        nand_op.block = i;
+        nand_op.page = 0;
+        nand_op.mainbuf = PHY_TMP_PAGE_CACHE;
+        nand_op.oobbuf = oob_buf;
 
-			ret = PHY_SimpleRead_1K(&nand_op);
-			PHY_DBG("chip %d, block %d, page 0, oob: 0x%x, 0x%x, 0x%x, 0x%x\n", nand_op.chip, nand_op.block, oob[0], oob[1], oob[2], oob[3]);
-			if((ret>=0)&&(oob[0] == 0x00)&&(oob[1] == 0x4F)&&(oob[2] == 0x4F)&&(oob[3] == 0x42))
-			{
-				otp_ok_flag = 1;
-				for(j=0;j<64;j++)
-				{
-					if((pdata[j] + pdata[64+j])!= 0xff)
-					{
-						PHY_DBG("otp data check error!\n");
-						otp_ok_flag = 0;
-						break;
-					}
-				}
-				if(otp_ok_flag == 1)
-				{
-					PHY_DBG("find good otp value in chip %d, block %d \n", nand_op.chip, nand_op.block);
-					break;
-				}
+        ret = PHY_SimpleRead_1K(&nand_op);
+        PHY_DBG("chip %d, block %d, page 0, oob: 0x%x, 0x%x, 0x%x, 0x%x\n", nand_op.chip, nand_op.block, oob[0], oob[1], oob[2], oob[3]);
+        if((ret>=0)&&(oob[0] == 0x00)&&(oob[1] == 0x4F)&&(oob[2] == 0x4F)&&(oob[3] == 0x42)) {
+          otp_ok_flag = 1;
+          for(j=0;j<64;j++) {
+            if((pdata[j] + pdata[64+j])!= 0xff) {
+              PHY_DBG("otp data check error!\n");
+              otp_ok_flag = 0;
+              break;
+            }
+          }
+          if(otp_ok_flag == 1) {
+            PHY_DBG("find good otp value in chip %d, block %d \n", nand_op.chip, nand_op.block);
+            break;
+          }
 
-			}
-		}
+        }
+      }
 
-		if(otp_ok_flag)
-		{
-			for(j=0;j<64;j++)
-				default_value[j] = pdata[j];
-			if((READ_RETRY_MODE==2)||(READ_RETRY_MODE==3))
-			{
-				PHY_DBG("Read Retry value Table from nand otp block:\n");
-				for(j = 0;j<64; j++)
-				{
-					PHY_DBG("0x%x ", pdata[j]);
-					if(j%8 == 7)
-						PHY_DBG("\n");
-				}
-			}
-			NFC_GetOTPValue(chip, default_value, READ_RETRY_TYPE);
-				NFC_SetDefaultParam(chip, default_value, READ_RETRY_TYPE);
-			break;
-		}
-		else
-		{
-			PHY_DBG("[PHY_DBG] can't get right otp value from nand otp blocks, then use otp command\n");
-			NFC_GetDefaultParam(chip, default_value, READ_RETRY_TYPE);
-				NFC_SetDefaultParam(chip, default_value, READ_RETRY_TYPE);
-				#if 0
-				if((READ_RETRY_MODE==2)||(READ_RETRY_MODE==3))
-			{
-				PHY_DBG("Read Retry value Table from otp area:\n");
-				for(i = 0;i<8; i++)
-				{
-					PHY_DBG("retry cycle %d: ", i);
-					for(j=0; j<8;j++)
-						PHY_DBG("0x%x ", default_value[8*i+j]);
-					PHY_DBG("\n");
-				}
-			}
-			#endif
+      if(otp_ok_flag) {
+        for(j=0;j<64;j++) default_value[j] = pdata[j];
+        if((READ_RETRY_MODE==2)||(READ_RETRY_MODE==3)) {
+          PHY_DBG("Read Retry value Table from nand otp block:\n");
+          for(j = 0;j<64; j++) {
+            PHY_DBG("0x%x ", pdata[j]);
+            if(j%8 == 7)
+              PHY_DBG("\n");
+          }
+        }
+        NFC_GetOTPValue(chip, default_value, READ_RETRY_TYPE);
+        NFC_SetDefaultParam(chip, default_value, READ_RETRY_TYPE);
+        break;
+      }
+      else {
+        PHY_DBG("[PHY_DBG] can't get right otp value from nand otp blocks, then use otp command\n");
+        NFC_GetDefaultParam(chip, default_value, READ_RETRY_TYPE);
+        NFC_SetDefaultParam(chip, default_value, READ_RETRY_TYPE);
+#if 0
+        if((READ_RETRY_MODE==2)||(READ_RETRY_MODE==3)) {
+          PHY_DBG("Read Retry value Table from otp area:\n");
+          for(i = 0;i<8; i++) {
+            PHY_DBG("retry cycle %d: ", i);
+            for(j=0; j<8;j++)
+              PHY_DBG("0x%x ", default_value[8*i+j]);
+            PHY_DBG("\n");
+          }
+        }
+#endif
 
-			for(j=0;j<64;j++)
-			{
-				pdata[j] = default_value[j];
-				pdata[64 + j] = 0xff - default_value[j];
-			}
-
-			oob[0] = 0x00;
-			oob[1] = 0x4F;
-			oob[2] = 0x4F;
-			oob[3] = 0x42;
-
-			NFC_LSBInit(READ_RETRY_TYPE);
-			NFC_LSBEnable(chip, READ_RETRY_TYPE);
-			for(i = 8; i<12; i++)
-			{
-				nand_op.chip = chip;
-				nand_op.block = i;
-				nand_op.page = 0;
-				nand_op.mainbuf = PHY_TMP_PAGE_CACHE;
-				nand_op.oobbuf = oob_buf;
-
-				ret = PHY_SimpleErase(&nand_op);
-				if(ret<0)
-				{
-					PHY_ERR("erase chip %d, block %d error\n", nand_op.chip, nand_op.block);
-					continue;
-				}
-				ret = PHY_SimpleWrite_1K(&nand_op);
-				if(ret<0)
-				{
-					PHY_ERR("write chip %d, block %d, page 0 error\n", nand_op.chip, nand_op.block);
-					continue;
-				}
-			}
-			NFC_LSBDisable(chip, READ_RETRY_TYPE);
-			NFC_LSBExit(READ_RETRY_TYPE);
-
-			PHY_DBG("[PHY_DBG] repair otp value end\n");
-		}
+        for(j=0;j<64;j++) {
+          pdata[j] = default_value[j];
+          pdata[64 + j] = 0xff - default_value[j];
         }
 
+        oob[0] = 0x00;
+        oob[1] = 0x4F;
+        oob[2] = 0x4F;
+        oob[3] = 0x42;
 
+        NFC_LSBInit(READ_RETRY_TYPE);
+        NFC_LSBEnable(chip, READ_RETRY_TYPE);
+        for(i = 8; i<12; i++) {
+          nand_op.chip = chip;
+          nand_op.block = i;
+          nand_op.page = 0;
+          nand_op.mainbuf = PHY_TMP_PAGE_CACHE;
+          nand_op.oobbuf = oob_buf;
+
+          ret = PHY_SimpleErase(&nand_op);
+          if(ret<0) {
+            PHY_ERR("erase chip %d, block %d error\n", nand_op.chip, nand_op.block);
+            continue;
+          }
+          ret = PHY_SimpleWrite_1K(&nand_op);
+          if(ret<0) {
+            PHY_ERR("write chip %d, block %d, page 0 error\n", nand_op.chip, nand_op.block);
+            continue;
+          }
+        }
+        NFC_LSBDisable(chip, READ_RETRY_TYPE);
+        NFC_LSBExit(READ_RETRY_TYPE);
+
+        PHY_DBG("[PHY_DBG] repair otp value end\n");
+      }
     }
-	else
-	{
-	NFC_GetDefaultParam(chip, default_value, READ_RETRY_TYPE);
-		NFC_SetDefaultParam(chip, default_value, READ_RETRY_TYPE);
-		if((READ_RETRY_MODE==0)||(READ_RETRY_MODE==1))  //hynix mode
-	{
-		PHY_DBG("PHY_SetDefaultParam: chip 0x%x, Read Retry Default Value is 0x%x, 0x%x, 0x%x, 0x%x\n", \
-		chip, default_value[0], default_value[1], default_value[2],default_value[3]);
-	}
-
-	}
-
-    return 0;
+  }
+  else {
+    NFC_GetDefaultParam(chip, default_value, READ_RETRY_TYPE);
+    NFC_SetDefaultParam(chip, default_value, READ_RETRY_TYPE);
+    if((READ_RETRY_MODE==0)||(READ_RETRY_MODE==1)) { //hynix mode
+      PHY_DBG("PHY_SetDefaultParam: chip 0x%x, Read Retry Default Value is 0x%x, 0x%x, 0x%x, 0x%x\n", \
+              chip, default_value[0], default_value[1], default_value[2],default_value[3]);
+    }
+  }
+  return 0;
 }
 
 __s32 PHY_SetDefaultParam(__u32 bank)
