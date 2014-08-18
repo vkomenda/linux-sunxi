@@ -962,7 +962,6 @@ __s32 disp_clk_cfg(__u32 sel, __u32 type, __u8 mode)
 			tve_freq = hdmi_freq;
 			pre_scale = 1;
 		}
-
 		if (disp_get_pll_freq(hdmi_freq, &pll_freq, &pll_2x) != 0)
 			return -1;
 

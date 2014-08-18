@@ -202,8 +202,8 @@ __u32 fb_videomode_pixclock_to_hdmi_pclk(__u32 pixclock)
 	if (pixclock == 0)
 		return 0;
 
-	pclk = (PICOS2HZ(pixclock) + 25000) / 50000;
-	return pclk * 50000;
+    pclk = (PICOS2HZ(pixclock) + 25000) / 50000;
+    return pclk * 50000;
 }
 
 void videomode_to_video_timing(struct __disp_video_timing *video_timing,
@@ -235,6 +235,10 @@ void videomode_to_video_timing(struct __disp_video_timing *video_timing,
 	if (mode->sync & FB_SYNC_VERT_HIGH_ACT)
 		video_timing->VSYNC = true;
 
+    pr_debug ("[disp_hdmi] timing %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+              t->VIC, t->PCLK, t->AVI_PR, t->INPUTX, t->INPUTY, t->HT,
+              t->HBP, t->HFP, t->HPSW, t->VT, t->VBP, t->VFP, t->VPSW, t->I,
+              t->HSYNC, t->VSYNC);
 }
 
 __s32 BSP_disp_set_videomode(__u32 sel, const struct fb_videomode *mode)
