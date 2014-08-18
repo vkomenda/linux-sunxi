@@ -680,6 +680,13 @@ __s32 BSP_disp_layer_set_para(__u32 sel, __u32 hid,
 	if (player->b_from_screen)
 		player->mode = DISP_LAYER_WORK_MODE_SCALER;
 
+    pr_debug ("[BSP_disp_layer_set_para] mode %d from_screen %b pipe %d \
+src.x %d src.y %d src.w %d src.h %d, \
+scn.x %d scn.y %d scn.w %d scn.h %d",
+              player->mode, player->b_from_screen, player->pipe,
+              player->src_win.x, player->src_win.y, player->src_win.w, player->src_win.h,
+              player->scn_win.x, player->scn_win.y, player->scn_win.w, player->scn_win.h);
+
 	if (layer_man->status & LAYER_USED) {
 		BSP_disp_cfg_start(sel);
 		if (player->mode != DISP_LAYER_WORK_MODE_NORMAL ||
