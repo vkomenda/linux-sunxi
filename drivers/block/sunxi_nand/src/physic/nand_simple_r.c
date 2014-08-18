@@ -606,8 +606,9 @@ __s32 PHY_GetDefaultParam(__u32 bank)
   __u8 default_value[64];
   __u8 oob_buf[64];
   __u8 *oob, *pdata;
-  __s32 ret, otp_ok_flag = 0;
+  __s32 ret;
   struct boot_physical_param nand_op;
+  __u8 retry, otp_ok_flag;
 
   chip = _cal_real_chip(bank);
   NFC_SelectChip(chip);
@@ -623,8 +624,7 @@ __s32 PHY_GetDefaultParam(__u32 bank)
   pdata = (__u8 *)(PHY_TMP_PAGE_CACHE);
 
   if((READ_RETRY_MODE==2)||(READ_RETRY_MODE==3)) {
-    for () {
-      otp_ok_flag = 0;
+    for (retry = 0, otp_ok_flag = 0; (!otp_ok_flag) && retry < 8; retry++) {
       for(i = 8; i<12; i++) {
         nand_op.chip = chip;
         nand_op.block = i;
@@ -643,11 +643,10 @@ __s32 PHY_GetDefaultParam(__u32 bank)
               break;
             }
           }
-          if(otp_ok_flag == 1) {
+          if(otp_ok_flag) {
             PHY_DBG("find good otp value in chip %d, block %d \n", nand_op.chip, nand_op.block);
             break;
           }
-
         }
       }
 
@@ -663,7 +662,7 @@ __s32 PHY_GetDefaultParam(__u32 bank)
         }
         NFC_GetOTPValue(chip, default_value, READ_RETRY_TYPE);
         NFC_SetDefaultParam(chip, default_value, READ_RETRY_TYPE);
-        break;
+        // break;   ...function returns the call
       }
       else {
         PHY_DBG("[PHY_DBG] can't get right otp value from nand otp blocks, then use otp command\n");
