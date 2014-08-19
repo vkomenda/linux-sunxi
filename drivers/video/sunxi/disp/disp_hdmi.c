@@ -226,16 +226,14 @@ void videomode_to_video_timing(struct __disp_video_timing *t,
 	t->VBP = mode->upper_margin + mode->vsync_len;
 	t->VFP = mode->lower_margin;
 	t->VPSW = mode->vsync_len;
-	if (mode->vmode & FB_VMODE_INTERLACED) t->I = true;
+	if (mode->vmode & FB_VMODE_INTERLACED)   t->I     = true;
+	if (mode->sync  & FB_SYNC_HOR_HIGH_ACT)  t->HSYNC = true;
+	if (mode->sync  & FB_SYNC_VERT_HIGH_ACT) t->VSYNC = true;
 
-	if (mode->sync & FB_SYNC_HOR_HIGH_ACT) t->HSYNC = true;
-
-	if (mode->sync & FB_SYNC_VERT_HIGH_ACT) t->VSYNC = true;
-
-    pr_debug ("[disp_hdmi] timing %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
-              t->VIC, t->PCLK, t->AVI_PR, t->INPUTX, t->INPUTY, t->HT,
-              t->HBP, t->HFP, t->HPSW, t->VT, t->VBP, t->VFP, t->VPSW, t->I,
-              t->HSYNC, t->VSYNC);
+	pr_info ("[disp_hdmi] timing %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+		 t->VIC, t->PCLK, t->AVI_PR, t->INPUTX, t->INPUTY, t->HT,
+		 t->HBP, t->HFP, t->HPSW, t->VT, t->VBP, t->VFP, t->VPSW, t->I,
+		 t->HSYNC, t->VSYNC);
 }
 
 __s32 BSP_disp_set_videomode(__u32 sel, const struct fb_videomode *mode)
