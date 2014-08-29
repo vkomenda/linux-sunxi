@@ -43,58 +43,61 @@
 #define CEC_TX     0x0200
 #define CEC_ENABLE 0x0800
 
-#define setl(bits, addr)   writel(readl(addr) | bits, addr)
-#define clearl(bits, addr) writel(readl(addr) & ~bits, addr)
+#define set32(bits, addr)   writel(readl(addr) | bits, addr)
+#define clear32(bits, addr) writel(readl(addr) & ~bits, addr)
 
 struct cec_priv {
 	void __iomem*		reg;
 	struct platform_device*	pdev;
 	int			irq;
+	u8                      irqCause;
+	u8                      addr;
+//	CecLAddr                laddr;
 	struct cec_driver	cec_drv;
 	struct completion	tx_complete;
 	spinlock_t		lock;
-	u8                      initiator;
+	CecMode                 mode;
 	u8                      sendFailed;
 };
 
 /* Enable software control. */
-static coid cecSoftwareEnable (struct cec_priv* priv)
+static coid cecSoftwareEnable (struct cec_priv* const priv)
 {
-	setl   (CEC_ENABLE, priv->reg);
+	set32   (CEC_ENABLE, priv->reg);
 }
 
 /* Disable software control. */
-static void cecSoftwareDisable (struct cec_priv* priv)
+static void cecSoftwareDisable (struct cec_priv* const priv)
 {
-	clearl (CEC_ENABLE, priv->reg);
+	clear32 (CEC_ENABLE, priv->reg);
 }
 
-static void cecPullLow (struct cec_priv* priv)
+static void cecPullLow (struct cec_priv* const priv)
 {
-	clearl (CEC_TX, priv->reg);
+	clear32 (CEC_TX, priv->reg);
 }
 
-static void cecPullHigh (struct cec_priv* priv)
+static void cecPullHigh (struct cec_priv* const priv)
 {
-	setl   (CEC_TX, priv->reg);
+	set32   (CEC_TX, priv->reg);
 }
 
-static u8 cecCheckLine (struct cec_priv* priv)
+static u8 cecCheckLine (struct cec_priv* const priv)
 {
-	return (u8) ((readl (priv->reg) >> 8) & 1);
+	return (readl (priv->reg) & CEC_RX) ? 1 : 0;
 }
 
 /*
 static void cec_write(struct cec_priv* priv, u8 bit)
 {
 	if (bit)
-		setl   (CEC_TX, priv->reg);
+		set32   (CEC_TX, priv->reg);
 	else
-		clearl (CEC_TX, priv->reg);
+		clear32 (CEC_TX, priv->reg);
 }
 */
 
-static void cecSendStart(struct cec_priv* priv)
+static void cecSendStart(struct cec_priv* const priv)
 {
 	cecPullLow  (priv);
 	udelay      (CEC_START_LOW);
@@ -102,7 +105,7 @@ static void cecSendStart(struct cec_priv* priv)
 	udelay      (CEC_START_HIGH);
 }
 
-static void cecSend0(struct cec_priv* priv)
+static void cecSend0(struct cec_priv* const priv)
 {
 	cecPullLow  (priv);
 	udelay      (CEC_0_LOW);
@@ -110,7 +113,7 @@ static void cecSend0(struct cec_priv* priv)
 	udelay      (CEC_0_HIGH);
 }
 
-static void cecSend1(struct cec_priv* priv)
+static void cecSend1(struct cec_priv* const priv)
 {
 	cecPullLow  (priv);
 	udelay      (CEC_1_LOW);
@@ -122,7 +125,7 @@ static void cecSend1(struct cec_priv* priv)
  * Request an acknowledgement from the recepient. Returns 0 iff the
  * acknowledgement is not received.
  */
-static u8 cecRequestAck (struct cec_priv* priv)
+static u8 cecRequestAck (struct cec_priv* const priv)
 {
 	u8 ackReceived = 0;
 	/* Assert bit 1. */
@@ -149,7 +152,7 @@ static void cecSendAck(struct cec_priv* priv)
 }
 */
 
-static u8 cecSendByte (struct cec_priv* priv, u8 payload, u8 eom)
+static u8 cecSendByte (struct cec_priv* const priv, u8 payload, u8 eom)
 {
 	u8 i;
 	/* 8 data payload bits */
@@ -171,19 +174,18 @@ static u8 cecSendByte (struct cec_priv* priv, u8 payload, u8 eom)
 
 /* Arbitration draft. TODO: Extend arbittration into the start pulse until the
  * end of the initiator address in the header frame. */
-static u8 cecArbitration (struct cec_priv* priv)
+static int cecArbitration (struct cec_priv* const priv)
 {
-	u8 lineFree = 1;
+	int lineFree = 1;
 	u32 freeTime = 0, elapsed = 0;
-	if (priv->initiator) {
+	if (priv->mode == CecModeInitiator) {
 		if (priv->sendFailed)
-			freeTime = CEC_SEND_FAILED;
+			freeTime = CEC_WAIT_SEND_FAILED;
 		else
-			freeTime = CEC_NEXT_FRAME;
+			freeTime = CEC_WAIT_NEXT_FRAME;
 	}
-	else {
-		freeTime = CEC_NEW_INITIATOR;
-	}
+	else
+		freeTime = CEC_WAIT_NEW_INITIATOR;
 	while (elapsed <= freeTime) {
 		if (cecCheckLine (priv) == 0) {
 			lineFree = 0;
@@ -198,127 +200,176 @@ static u8 cecArbitration (struct cec_priv* priv)
 	return lineFree;
 }
 
-/* Expects the start pulse. Returns 0 upon the end of the pulse or a status code
- * if an error occurred.*/
-static int cecExpectStart (struct cec_priv* priv)
+/* Polls the CEC line while it is equal to @target@, with a timeout. Returns the
+ * elapsed time in µs or an error code. */
+static inline int cecPoll (struct cec_priv* const priv, u8 target,
+			   u32 period, u32 timeout)
 {
-	int status = 0;
-	/* The number of periods to sample when high exceeds the max. time in
-	 * the specification to detect the presence of an error. */
-	u32 highPeriodsLeft = CEC_START_HIGH_MAX / FAST_SAMPLE_PERIOD + 1;
-	while (cecCheckLine (priv) == 1)
-		msleep (INTERFRAME_SAMPLE_PERIOD);
-	while (cecCheckLine (priv) == 0)
-		cpu_relax ();
-	while (cecCheckLine (priv) == 1 && highPeriodsLeft != 0) {
-		udelay (FAST_SAMPLE_PERIOD);
-		highPeriodsLeft--;
+        int result = 0;
+	u32 elapsed;
+	while (cecCheckLine (priv) == target && elapsed <= timeout) {
+		udelay (period);
+		elapsed = elapsed + period;
 	}
-	if (!highPeriodsLeft)
-		status = -EMSGSIZE;
-	return status;
-}
-
-static u8 cecReceiveBit (struct cec_priv* priv)
-{
-	u8 result;
-
-	while (cecCheckLine (priv) == 1) {
-		udelay (SAMPLE_PERIOD);
-	}
-	while (cecCheckLine (priv) == 0) {
-		udelay (SAMPLE_PERIOD);
-		elapsed = elapsed + SAMPLE_PERIOD;
-	}
-	if (elapsed <= CEC_1_LOW_MAX)       /* Received 1. */
-		result = 1;
-	else if (elapsed <= CEC_0_LOW_MAX)  /* Received 0. */
-		result = 0;
-	else                                /* An error occurred. */
-		result = 0xff;
+	if (elapsed > timeout)
+		result = -ETIME;  /* Timeout expired. */
+	else
+		result = elapsed;
 	return result;
 }
 
-static irqreturn_t cec_isr(int irq, void *dev_id)
+/* Expects the start pulse. Returns 0 upon the end of the pulse or a status code
+ * if an error occurred.
+ *
+ * FIXME: Cause a software interrupt.
+ */
+static int cecExpectStart (struct cec_priv* const priv)
+{
+	int result = 0;
+	u32 elapsed = 0, elapsed_high = 0;
+	while (cecCheckLine (priv) == 1)
+		msleep (INTERFRAME_SAMPLE_PERIOD);
+	elapsed_low = cecPoll (priv, 0, FAST_SAMPLE_PERIOD, CEC_START_LOW_MAX);
+	if (elapsed_low > CEC_START_LOW_MAX)
+		result = -ENOMSG;
+	else {
+		elapsed_high = cecPoll (priv, 1, FAST_SAMPLE_PERIOD,
+					CEC_START_MAX - elapsed_low);
+		if (elapsed_high < 0)
+			result = -ENOMSG;
+	}
+	return result;
+}
+
+static int cecReceiveBit (struct cec_priv* const priv)
+{
+	int result;
+	u32 elapsed_low = 0, elapsed_high = 0;
+	elapsed_low = cecPoll (priv, 0, SAMPLE_PERIOD, CEC_0_LOW_MAX);
+	if (elapsed_low <= CEC_1_LOW_MAX) {       /* Received 1. */
+		elapsed_high = cecPoll (priv, 1, SAMPLE_PERIOD,
+					CEC_BIT_MAX - elapsed_low);
+		if (elapsed_high >= 0)
+			result = 1;
+		else
+			result = -EBADMSG;
+	}
+	else if (elapsed_low <= CEC_0_LOW_MAX) {  /* Received 0. */
+		elapsed_high = cecPoll (priv, 0, SAMPLE_PERIOD,
+					CEC_BIT_MAX - elapsed_low);
+		if (elapsed_high >= 0)
+			result = 0;
+		else
+			result = -EBADMSG;
+	}
+	else                                      /* An error occurred. */
+		result = -EBADMSG;
+	/* FIXME: generate priv->irq */
+	return result;
+}
+
+/* FIXME: acknowledgement bit */
+static int cecReceiveBlock (struct cec_priv* const priv,
+			    u8* const payload, u8* const eom)
+{
+	int result = 0;
+	u8 i, bit = 0;
+	for (i = 0; i < 9; i++) {   /* receive including the EOM bit */
+		bit = cecReceiveBit (priv);
+		if (bit == 0 || bit == 1)
+			result = (result << 1) | bit;
+		else if (bit < 0) { /* error code */
+			result = bit;
+			break;
+		}
+		else {              /* wrong return value */
+			result = -ERANGE;
+			break;
+		}
+	}
+	if (result == 0 || result == 1) {
+		cecSendAck (priv);
+		*payload = result >> 1;
+		*eom     = result & 1;
+		result   = 0;
+	}
+	return result;
+}
+
+static int cecReceiveMessage (struct cec_priv* const priv,
+			      u8* const data, u8* const len)
+{
+	int result = 0;
+	struct CecBlock blk;
+	u8 i, payload, eom;
+	memset (msg, 0, sizeof (msg));
+	result = cecExpectStart (priv);
+	if (result == 0) {
+		for (i = 0; i < CEC_MAX_MSG_LEN; i++) {
+			result = cecReceiveBlock (priv, &payload, &eom);
+			if (result < 0)          /* error code */
+				break;
+			data[i] = payload;
+			if (eom)                 /* End of message. */
+				break;
+		}
+		*len = i;
+	}
+	return result;
+}
+
+static irqreturn_t cecSunxiIsr (int irq, void *dev_id)
 {
 	struct cec_priv *priv = dev_id;
-	u8 cause;
-	u8 msg[CEC_MAX_MSG_LEN], count;
+	int result = 0;
+	u8 msg[CEC_MAX_MSG_LEN], len;
+	unsigned long flags;
 
-	/* read cause and mask all other causes */
-	cause = ioread8(priv->reg);
-	iowrite8(0, priv->regs + CEC_EXAMPLE_IM_REG);
+	spin_lock_irqsave(&priv->lock, flags);
+	result = cecReceiveMessage (priv, data, &len);
+	spin_unlock_irqrestore(&priv->lock, flags);
 
-	if (cause & CEC_EXAMPLE_ISR_TX)
-		complete(&priv->tx_complete);
-
-	/* we should probably use a bottom-half here, but there is not
-	 * so much work to do */
-	if (cause & CEC_EXAMPLE_ISR_RX) {
-		count = cause >> CEC_EXAMPLE_ISR_MSG_CNT;
-		ioread8_rep(priv->regs + CEC_EXAMPLE_FIFO_REG,
-				msg, count);
-		cec_receive_message(&priv->cec_drv, msg, count);
-	}
-
+	if (result >= 0)
+		cec_receive_message(&priv->cec_drv, msg, len);
+	else
+		pr_err (PFX "CEC receive error %d\n", result);
 	return IRQ_HANDLED;
 }
 
-static int cec_example_set_addr(struct cec_driver *drv, const u8 addr)
+static int cec_set_addr(struct cec_driver *drv, const u8 addr)
 {
-	struct cec_example_priv *priv =
-		container_of(drv, struct cec_example_priv, cec_drv);
+	struct cec_priv *priv =
+		container_of(drv, struct cec_priv, cec_drv);
 
-	iowrite8(addr, priv->regs + CEC_EXAMPLE_ADDR_REG);
-
+	priv->addr = addr;
 	return 0;
 }
 
-static int
-cec_example_send(struct cec_driver *drv, const u8 *data, const u8 len)
+static int cec_send(struct cec_driver *drv, const u8 *data, const u8 len)
 {
-	struct cec_example_priv *priv =
-		container_of(drv, struct cec_example_priv, cec_drv);
-	unsigned int timeout;
-	u8 reg;
+	struct cec_priv *priv =
+		container_of(drv, struct cec_priv, cec_drv);
 	unsigned long flags;
 
-	init_completion(&priv->tx_complete);
-
 	spin_lock_irqsave(&priv->lock, flags);
-	/* enable TX completion interrupt */
-	reg = ioread8(priv->regs + CEC_EXAMPLE_ISR_REG);
-	reg |=  CEC_EXAMPLE_ISR_TX;
-	iowrite8(reg, priv->regs + CEC_EXAMPLE_ISR_REG);
-
-	/* write to the hardware fifo */
-	iowrite8_rep(priv->regs + CEC_EXAMPLE_FIFO_REG,
-			data, len);
-
+	result = cecSendMessage (priv, data, len);
 	spin_unlock_irqrestore(&priv->lock, flags);
-
-	/* ISR will complete our tx completion */
-	timeout = wait_for_completion_interruptible_timeout(
-				&priv->tx_complete, HZ / 2);
-
-	return !timeout ? -ETIMEDOUT : 0;
+	return result;
 }
 
-static int cec_example_reset(struct cec_driver *drv)
+static int cec_reset(struct cec_driver *drv)
 {
-	struct cec_example_priv *priv =
-		container_of(drv, struct cec_example_priv, cec_drv);
+//	struct cec_priv *priv =
+//		container_of(drv, struct cec_priv, cec_drv);
 
-	/* clear all registers */
-	iowrite8_rep(priv->regs, 0, 6 + CEC_MAX_MSG_LEN);
-
+	pr_info(PFX "reset is not implemented\n");
 	return 0;
 }
 
-static struct cec_driver_ops cec_example_ops = {
-	.set_logical_address	= cec_example_set_addr,
-	.send			= cec_example_send,
-	.reset			= cec_example_reset,
+static struct cec_driver_ops cec_ops = {
+	.set_logical_address	= cec_set_addr,
+	.send			= cec_send,
+	.reset			= cec_reset,
 };
 
 static int cec_probe(struct platform_device *pdev)
@@ -351,18 +402,15 @@ static int cec_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, priv);
 	priv->irq = irq;
 	priv->pdev = pdev;
-	priv->cec_drv.ops = &cec_example_ops;
+	priv->cec_drv.ops = &cec_ops;
 
 	ret = register_cec_driver(&priv->cec_drv);
 	if (ret)
 		goto out_iomem;
 
-	ret = request_irq(irq, cec_example_isr, 0, pdev->name, priv);
+	ret = request_irq(irq, cecSunxiIsr, 0, pdev->name, priv);
 	if (ret)
 		goto out_drv;
-
-	/* enable CEC RX completion (TX enabled later) */
-	iowrite8(CEC_EXAMPLE_ISR_RX, priv->regs + CEC_EXAMPLE_ISR_REG);
 
 	dev_info(&pdev->dev, "CEC SunXi driver registered");
 
@@ -377,12 +425,10 @@ out:
 	return ret;
 }
 
-static int cec_example_remove(struct platform_device *pdev)
+static int cec_remove(struct platform_device *pdev)
 {
 	struct cec_priv *priv = platform_get_drvdata(pdev);
 
-	/* disable all interrupts */
-	iowrite8(0, priv->regs + CEC_EXAMPLE_ISR_REG);
 	free_irq(priv->irq, priv);
 	unregister_cec_driver(&priv->cec_drv);
 	iounmap(priv->regs);
@@ -393,7 +439,7 @@ static int cec_example_remove(struct platform_device *pdev)
 
 static struct platform_driver cec_driver = {
 	.driver	= {
-		.name	= "cec-example",
+		.name	= "cec-sunxi",
 		.owner	= THIS_MODULE,
 	},
 	.probe	= cec_probe,
@@ -410,10 +456,10 @@ static void __exit cec_exit(void)
 	platform_driver_unregister(&cec_driver);
 }
 
-module_init(cec_example_init);
-module_exit(cec_example_exit);
+module_init(cec_init);
+module_exit(cec_exit);
 
 MODULE_AUTHOR("Hutchison Technologies");
-MODULE_DESCRIPTION("HDMI-CEC driver for SunXi");
+MODULE_DESCRIPTION("HDMI-CEC software emulation for Allwinner SunXi");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("platform:cec-sunxi");
