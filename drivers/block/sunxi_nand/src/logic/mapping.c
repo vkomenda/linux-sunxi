@@ -900,17 +900,15 @@ static __s32 _blk_map_tbl_cache_post(__u32 nZone)
 */
 __s32 BMM_SwitchMapTbl(__u32 nZone)
 {
-    __s32   result = NAND_OP_TRUE;
+	__s32   result = NAND_OP_TRUE;
 
-    if(NAND_OP_TRUE != _blk_map_tbl_cache_hit(nZone))
-    {
-        MAPPING_DBG("BMM_SwitchMapTbl : post zone %d cache\n",nZone);
-		result = (_blk_map_tbl_cache_post(nZone));
-    }
+	if (_blk_map_tbl_cache_hit(nZone) != NAND_OP_TRUE) {
+		MAPPING_DBG("BMM_SwitchMapTbl : post zone %d cache\n", nZone);
+		result = _blk_map_tbl_cache_post(nZone);
+	}
+	_CalBlkTblAccessCount();
 
-    _CalBlkTblAccessCount();
-
-    return result;
+	return result;
 }
 
 
@@ -1001,7 +999,3 @@ __s32 BMM_SetDirtyFlag(void)
 
     return NAND_OP_TRUE;
 }
-
-
-
-
