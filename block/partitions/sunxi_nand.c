@@ -11,7 +11,7 @@
 #define CRC_MAGIC 0xffffffff
 
 /* no indexes from 1 - 0 is invalid */
-static int sunxi_nand_validate_mbr(struct parsed_partitions *state, int no)
+static int sunxi_nand_validate_mbr(struct parsed_partitions *state, int num)
 {
 	__u32 iv = CRC_MAGIC;
 	__u32 crc;
@@ -32,18 +32,18 @@ static int sunxi_nand_validate_mbr(struct parsed_partitions *state, int no)
 
 	if (strncmp(MBR_MAGIC, mbr->tag.magic, 8)) {
 		printk(KERN_WARNING "Dev Sunxi %s %s magic does not match for MBR %d: %8.8s\n",
-				MBR_MAGIC, b, no, mbr->tag.magic);
+				MBR_MAGIC, b, num, mbr->tag.magic);
 		goto error;
 	}
 	if (MBR_VERSION != mbr->tag.version) {
 		printk(KERN_WARNING "Dev Sunxi %s %s version does not match for MBR %d: 0x%x != 0x%x\n",
-				MBR_MAGIC, b, no, mbr->tag.version,
+				MBR_MAGIC, b, num, mbr->tag.version,
 				MBR_VERSION);
 		goto error;
 	}
-	if (no - 1 != mbr->tag.index) {
+	if (num - 1 != mbr->tag.index) {
 		printk(KERN_WARNING "Dev Sunxi %s %s mbr number does not match for MBR %d: %d\n",
-				MBR_MAGIC, b, no, mbr->tag.index);
+				MBR_MAGIC, b, num, mbr->tag.index);
 	}
 	/* actual MBR sizes are either << PAGE_SIZE (all four copies in one
 	 * page) or multiple of page size so this should work regardless of
@@ -67,20 +67,20 @@ static int sunxi_nand_validate_mbr(struct parsed_partitions *state, int no)
 
 	if ((crc ^ CRC_MAGIC) != iv) {
 		printk(KERN_WARNING "Dev Sunxi %s %s header: CRC bad for MBR %d\n",
-				MBR_MAGIC, b, no);
+				MBR_MAGIC, b, num);
 		goto error;
 	}
 
 	goto done;
 
 error:
-	no = 0;
+	num = 0;
 done:
 	put_dev_sector(sect);
-	return no;
+	return num;
 }
 
-static void sunxi_nand_parse_mbr(struct parsed_partitions *state, int no)
+static void sunxi_nand_parse_mbr(struct parsed_partitions *state, int num)
 {
 	Sector sect;
 	int part_cnt;
@@ -113,26 +113,23 @@ static void sunxi_nand_parse_mbr(struct parsed_partitions *state, int no)
 
 int sunxi_nand_partition(struct parsed_partitions *state)
 {
-	int valid_mbr = 0;
-	int mbr;
-	int i;
+	int valid_mbr = 0, i;
+	int ret = 0;      // No valid MBR.
 
-	for (i = 1; i <= MBR_COPY_NUM; i++, mbr++) {
-		mbr = sunxi_nand_validate_mbr(state, i);
-		if (mbr)
-			valid_mbr = mbr;
+	for (i = 1; i <= MBR_COPY_NUM; i++) {
+		if (sunxi_nand_validate_mbr(state, i))
+			valid_mbr = i;
 	}
-
-	if (!valid_mbr) {
+	if (valid_mbr) {
+		sunxi_nand_parse_mbr(state, valid_mbr);
+		ret = 1;  // Valid MBR found.
+	}
+	else {
 		char b[BDEVNAME_SIZE];
 
 		bdevname(state->bdev, b);
-		printk(KERN_WARNING "Dev Sunxi %s %s header bad for all MBR copies, MBR corrupted or not present.\n",
-				MBR_MAGIC, b);
-		return 0;
+		printk(KERN_WARNING "No valid copy of Sunxi %s MBR found on %s\n",
+		       MBR_MAGIC, b);
 	}
-
-	sunxi_nand_parse_mbr(state, valid_mbr);
-
-	return 1;
+	return ret;
 }
