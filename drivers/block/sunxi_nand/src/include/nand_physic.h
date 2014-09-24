@@ -127,7 +127,7 @@ extern struct __NandPageCachePool_t PageCachePool;
 #define READ_RETRY_CYCLE                   ((READ_RETRY_TYPE>>8)&0xff)
 
 //define the ReadRetryType of the nand chip connect in the nand storage system
-#define READ_RETRY_REG_CNT                   ((READ_RETRY_TYPE>>0)&0xff)
+#define READ_RETRY_REG_CNT                  (READ_RETRY_TYPE & 0xff)
 
 //define the nand flash access frequence parameter
 #define NAND_ACCESS_FREQUENCE               (NandStorageInfo.FrequencePar)
@@ -330,7 +330,3 @@ __s32 PHY_SetDefaultParam(__u32 bank);
 __s32 PHY_ScanDDRParam(void);
 
 #endif  //ifnedf __NAND_PHYSIC_H__
-
-
-
-
