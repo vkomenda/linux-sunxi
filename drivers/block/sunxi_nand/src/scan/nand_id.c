@@ -281,7 +281,7 @@ struct __NandPhyInfoPar_t HynixNandTbl[] =
     { {0xad, 0xde, 0x94, 0xda, 0x74, 0xff, 0xff, 0xff }, 1,    16,     256,     4096,   0x0188,   918,    40,     4,  0x020708,      0,    &PhysicArchiPara3 },   // H27UCG8T2A 20nm 8G
     { {0xad, 0xd7, 0x94, 0x91, 0x60, 0xff, 0xff, 0xff }, 1,    16,     256,     2048,   0x0188,   918,    40,     4,  0x030708,      0,    &PhysicArchiPara3 },   // H27UBG8T2C 20nm 4G
     { {0xad, 0xde, 0x94, 0xeb, 0x74, 0xff, 0xff, 0xff }, 1,    32,     256,     2048,   0x0188,   918,    40,     4,  0x030708,      0,    &PhysicArchiPara3 },   // H27UCG8T2B 20nm 8Gb
-    { {0xad, 0xde, 0x14, 0xa7, 0x42, 0x4a, 0xff, 0xff }, 1,    32,     256,     2048,   0x0088,   918,    50,     4,      0,         0,    &PhysicArchiPara3 },   // H27UCG8T2ETR-BC, ECC 40-bit/1KB
+    { {0xad, 0xde, 0x14, 0xa7, 0x42, 0x4a, 0xff, 0xff }, 1,    32,     256,     2048,   0x0188,   918,    50,     4,  0x040708,      0,    &PhysicArchiPara3 },   // H27UCG8T2ETR-BC 16nm 8G, ECC 40-bit/1KB
     //---------------------------------------------------------------------------------------------------------------------------
     { {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff }, 0,     0,       0,        0,   0x0000,     0,     0,     0,      0,         0,   0                 },   // NULL
 };

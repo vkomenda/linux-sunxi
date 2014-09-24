@@ -37,9 +37,9 @@ extern __s32 _read_in_page_mode(NFC_CMD_LIST  *rcmd,void *mainbuf,void *sparebuf
 extern __s32 _read_in_normal_mode(NFC_CMD_LIST  *rcmd, __u8 *mainbuf, __u8 *sparebuf,__u8 dma_wait_mode);
 
 
-extern __u8 read_retry_reg_adr[READ_RETRY_MAX_REG_NUM];
-extern __u8 read_retry_default_val[8][READ_RETRY_MAX_REG_NUM];
-extern __s16 read_retry_val[READ_RETRY_MAX_CYCLE][READ_RETRY_MAX_REG_NUM];
+// extern __u8 read_retry_reg_adr[READ_RETRY_MAX_REG_NUM];
+// extern __u8 read_retry_default_val[8][READ_RETRY_MAX_REG_NUM];
+// extern __s16 read_retry_val[READ_RETRY_MAX_CYCLE][READ_RETRY_MAX_REG_NUM];
 extern __u8 read_retry_mode;
 extern __u8 read_retry_cycle;
 extern __u8 read_retry_reg_num;
@@ -950,4 +950,3 @@ __s32 NFC_LSBExit(__u32 read_retry_type)
 
 	return 0;
 }
-
