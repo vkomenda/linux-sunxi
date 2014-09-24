@@ -1344,7 +1344,7 @@ __s32 NFC_ReadRetry(__u32 chip, __u32 retry_count, __u32 read_retry_type)
 	if(retry_count >read_retry_cycle)
 		return -1;
 
-	/* Hynix read retry modes */
+	/* Hynix read retry modes BEGIN */
 	if((read_retry_mode == 0)||(read_retry_mode == 1)) {
 		if(retry_count == 0)
 			ret = _vender_set_param(&read_retry_default_val[chip][0], read_retry_reg_adr, read_retry_reg_num);
@@ -1371,11 +1371,12 @@ __s32 NFC_ReadRetry(__u32 chip, __u32 retry_count, __u32 read_retry_type)
 			ret =_vender_set_param(param, read_retry_reg_adr, read_retry_reg_num);
 		}
 	}
-	else if((read_retry_mode == 2)||(read_retry_mode == 3))	{
+	else if (read_retry_mode >= 2 && read_retry_mode <= 4) {
 		for(i=0; i<read_retry_reg_num; i++)
 			param[i] = hynix_read_retry_otp_value[chip][retry_count][i];
 		ret =_vender_set_param(param, read_retry_reg_adr, read_retry_reg_num);
 	}
+	/* Hynix read retry modes END */
 
 	else if((read_retry_mode>=0x10)&&(read_retry_mode<0x20)) { //for toshiba readretry mode
 		nand_clk_bak = get_nand_clk();
