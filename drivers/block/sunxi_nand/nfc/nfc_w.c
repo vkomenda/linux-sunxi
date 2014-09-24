@@ -867,9 +867,9 @@ __s32 NFC_Read_Spare(NFC_CMD_LIST  *rcmd, void *mainbuf, void *sparebuf, __u8 dm
 __s32 NFC_LSBInit(__u32 read_retry_type)
 {
 	//init
-	read_retry_mode = (read_retry_type>>16)&0xff;
-	read_retry_cycle =(read_retry_type>>8)&0xff;
-	read_retry_reg_num = (read_retry_type>>0)&0xff;
+	read_retry_mode    = (read_retry_type>>16) & 0xff;
+	read_retry_cycle   = (read_retry_type>>8)  & 0xff;
+	read_retry_reg_num =  read_retry_type      & 0xff;
 
 	if(read_retry_mode == 1) //mode1
 	{
