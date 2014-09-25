@@ -157,13 +157,13 @@
 #define NFC_PAGE_MODE  			0x1
 #define NFC_NORMAL_MODE  		0x0
 
-#define NFC_DATA_FETCH 			0x1
-#define NFC_NO_DATA_FETCH 		0x0
+#define NFC_DATA_FETCH 		0x1
+#define NFC_NO_DATA_FETCH 	0x0
 #define NFC_MAIN_DATA_FETCH 	0x1
 #define NFC_SPARE_DATA_FETCH	0X0
-#define NFC_WAIT_RB				0x1
-#define NFC_NO_WAIT_RB			0x0
-#define NFC_IGNORE				0x0
+#define NFC_WAIT_RB		0x1
+#define NFC_NO_WAIT_RB		0x0
+#define NFC_IGNORE		0x0
 
 #define NFC_INT_RB				0
 #define NFC_INT_CMD				1
