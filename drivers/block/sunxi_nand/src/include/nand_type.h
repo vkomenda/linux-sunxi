@@ -292,17 +292,17 @@ struct __NandDriverGlobal_t
 //==============================================================================
 
 //define the mask for the nand flash optional operation
-#define NAND_CACHE_READ         (1<<0)              //nand flash support cache read operation
-#define NAND_CACHE_PROGRAM      (1<<1)              //nand flash support page cache program operation
-#define NAND_MULTI_READ         (1<<2)              //nand flash support multi-plane page read operation
-#define NAND_MULTI_PROGRAM      (1<<3)              //nand flash support multi-plane page program operation
-#define NAND_PAGE_COPYBACK      (1<<4)              //nand flash support page copy-back command mode operation
-#define NAND_INT_INTERLEAVE     (1<<5)              //nand flash support internal inter-leave operation, it based multi-bank
-#define NAND_EXT_INTERLEAVE     (1<<6)              //nand flash support external inter-leave operation, it based multi-chip
-#define NAND_RANDOM		        (1<<7)			    //nand flash support RANDOMIZER
-#define NAND_READ_RETRY	        (1<<8)			    //nand falsh support READ RETRY
-#define NAND_READ_UNIQUE_ID	    (1<<9)			    //nand falsh support READ UNIQUE_ID
-#define NAND_PAGE_ADR_NO_SKIP	(1<<10)			    //nand falsh page adr no skip is requiered
+#define NAND_CACHE_READ         (1<<0)      // support cache read operation
+#define NAND_CACHE_PROGRAM      (1<<1)      // support page cache program operation
+#define NAND_MULTI_READ         (1<<2)      // support multi-plane page read operation
+#define NAND_MULTI_PROGRAM      (1<<3)      // support multi-plane page program operation
+#define NAND_PAGE_COPYBACK      (1<<4)      // support page copy-back command mode operation
+#define NAND_INT_INTERLEAVE     (1<<5)      // support internal inter-leave operation, it based multi-bank
+#define NAND_EXT_INTERLEAVE     (1<<6)      // support external inter-leave operation, it based multi-chip
+#define NAND_RANDOM             (1<<7)      // support RANDOMIZER
+#define NAND_READ_RETRY	        (1<<8)      // support READ RETRY
+#define NAND_READ_UNIQUE_ID     (1<<9)      // support READ UNIQUE_ID
+#define NAND_PAGE_ADR_NO_SKIP	(1<<10)     // page adr no skip is required
 
 
 //define the mask for the nand flash operation status
@@ -350,4 +350,3 @@ struct __NandDriverGlobal_t
 #define ERR_INVALIDPHYADDR		  21
 
 #endif //ifndef __NAND_TYPE_H
-
