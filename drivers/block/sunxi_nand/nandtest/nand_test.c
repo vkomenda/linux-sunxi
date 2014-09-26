@@ -50,7 +50,7 @@
 #include "../src/include/nand_simple.h"
 
 #include "../nfd/nand_blk.h"
-#include <plat/mbr.h>
+#include <plat/mbr411.h>
 
 #include "nand_test.h"
 
