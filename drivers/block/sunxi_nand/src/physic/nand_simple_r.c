@@ -596,7 +596,7 @@ __s32 PHY_GetDefaultParam(__u32 bank)
 	}
 	pdata = (__u8 *)(PHY_TMP_PAGE_CACHE);
 
-	if((READ_RETRY_MODE==2)||(READ_RETRY_MODE==3)) {
+	if((READ_RETRY_MODE >= 2) && (READ_RETRY_MODE < 0x10)) {
 		for (retry = 0, otp_ok_flag = 0; (!otp_ok_flag) && retry < 8; retry++) {
 			for(i = 8; i<12; i++) {
 				nand_op.chip = chip;
@@ -630,7 +630,7 @@ __s32 PHY_GetDefaultParam(__u32 bank)
 
 			if(otp_ok_flag) {
 				for(j=0;j<64;j++) default_value[j] = pdata[j];
-				if((READ_RETRY_MODE==2)||(READ_RETRY_MODE==3)) {
+				if((READ_RETRY_MODE >= 2) && (READ_RETRY_MODE < 0x10)) {
 					PHY_DBG("Read Retry value Table from nand otp block:\n");
 					for(j = 0;j<64; j++) {
 						PHY_DBG("0x%x ", pdata[j]);
@@ -648,7 +648,7 @@ __s32 PHY_GetDefaultParam(__u32 bank)
 				NFC_GetDefaultParam(chip, default_value, READ_RETRY_TYPE);
 				NFC_SetDefaultParam(chip, default_value, READ_RETRY_TYPE);
 #if 0
-				if((READ_RETRY_MODE==2)||(READ_RETRY_MODE==3)) {
+				if((READ_RETRY_MODE >= 2) && (READ_RETRY_MODE < 0x10)) {
 					PHY_DBG("Read Retry value Table from otp area:\n");
 					for(i = 0;i<8; i++) {
 						PHY_DBG("retry cycle %d: ", i);
@@ -717,21 +717,25 @@ __s32 PHY_SetDefaultParam(__u32 bank)
 	__u8 default_value[16];
 	__u8 temp_value[16];
 
-	if(SUPPORT_READ_RETRY)
-	{
-	     if(READ_RETRY_MODE<0x10)  //hynix mode
-	     {
-        	chip = _cal_real_chip(bank);
-            NFC_SelectChip(chip);
-            NFC_SetDefaultParam(chip, default_value, READ_RETRY_TYPE);
-        	PHY_DBG("PHY_SetDefaultParam: Read Retry Type is : 0x%x \n", READ_RETRY_TYPE);
-            PHY_DBG("PHY_SetDefaultParam: chip 0x%x, Read Retry Default Value is 0x%x, 0x%x, 0x%x, 0x%x \n", chip, default_value[0], default_value[1], default_value[2],default_value[3]);
-        	NFC_GetDefaultParam(chip, temp_value, READ_RETRY_TYPE);
-            PHY_DBG("PHY_SetDefaultParam: chip 0x%x, Read Default Value After Set value is 0x%x, 0x%x, 0x%x, 0x%x \n", chip, temp_value[0], temp_value[1], temp_value[2],temp_value[3]);
-
-        }
-    }
-    return 0;
+	if(SUPPORT_READ_RETRY) {
+		if(READ_RETRY_MODE<0x10) { //hynix mode
+			chip = _cal_real_chip(bank);
+			NFC_SelectChip(chip);
+			NFC_SetDefaultParam(chip, default_value, READ_RETRY_TYPE);
+			PHY_DBG("PHY_SetDefaultParam: Read Retry Type is : 0x%x \n",
+				READ_RETRY_TYPE);
+			PHY_DBG("PHY_SetDefaultParam: chip 0x%x, Read Retry Default Value"
+				" is 0x%x, 0x%x, 0x%x, 0x%x \n", chip,
+				default_value[0], default_value[1],
+				default_value[2], default_value[3]);
+			NFC_GetDefaultParam(chip, temp_value, READ_RETRY_TYPE);
+			PHY_DBG("PHY_SetDefaultParam: chip 0x%x, Read Default Value"
+				" After Set value is 0x%x, 0x%x, 0x%x, 0x%x \n", chip,
+				temp_value[0], temp_value[1],
+				temp_value[2], temp_value[3]);
+		}
+	}
+	return 0;
 }
 
 __s32 PHY_ChangeMode(__u8 serial_mode)
