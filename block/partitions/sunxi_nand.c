@@ -7,7 +7,7 @@
 #include <linux/crc32.h>
 
 #define sector_size 512
-#define mbr_sector  ((no-1) * MBR_SIZE / sector_size)
+#define mbr_sector  ((num-1) * MBR_SIZE / sector_size)
 #define CRC_MAGIC 0xffffffff
 
 /* no indexes from 1 - 0 is invalid */
