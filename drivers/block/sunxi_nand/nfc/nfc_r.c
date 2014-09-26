@@ -321,8 +321,7 @@ __s32 _read_in_page_mode(NFC_CMD_LIST  *rcmd,void *mainbuf,void *sparebuf,__u8 d
 //		attr = 0x2800293;
 	//printk("fill with: %x\n", 0xaaaaaaa);
 	//*((int*)mainbuf) = 0xaaaaaaa;
-	this_dma_handle = dma_map_single(NULL, mainbuf, pagesize,
-					 DMA_FROM_DEVICE);
+	this_dma_handle = dma_map_single(NULL, mainbuf, pagesize, DMA_FROM_DEVICE);
 
 	NAND_Config_Start_DMA(0, this_dma_handle, pagesize);
 
@@ -1210,26 +1209,26 @@ __s32 _vender_get_param_otp_hynix(__u8 *para, __u8 *addr, __u32 count)
 	__u8 reg_addr[2] = {0, 0};
 	__u8 w_data[2]   = {0, 0};
 
-	printk(KERNEL_INFO __FUNCTION__ "");
+	pr_info("DBG: %s", __FUNCTION__);
 
 	_enter_nand_critical();
 
 	switch (read_retry_mode) {
-	2:
+	case 2:
 		reg_addr[0] = 0xFF;
 		reg_addr[1] = 0xCC;
 		w_data[0] = 0x40;
 		w_data[1] = 0x4D;
 		break;
 
-	3:
+	case 3:
 		reg_addr[0] = 0xAE;
 		reg_addr[1] = 0xB0;
 		w_data[0] = 0x00;
 		w_data[1] = 0x4D;
 		break;
 
-	4:      /* Hynix 16nm */
+	case 4:      /* Hynix 16nm */
 		reg_addr[0] = 0x38;  // opening sequence prefix address
 		reg_addr[1] = 0x38;  // closing sequence prefix address
 		w_data[0]   = 0x52;  // opening sequence prefix data
@@ -1309,11 +1308,11 @@ __s32 _vender_get_param_otp_hynix(__u8 *para, __u8 *addr, __u32 count)
 			}
 		}
 		if(!error_flag) {
-			printk(KERNEL_INFO __FUNCTION__ ": OTP set %d OK\n", j);
+			pr_info("DBG: OTP set %d OK\n", j);
 			break;
 		}
 		else
-			printk(KERNEL_WARNING __FUNCTION__ ": OTP set %d MISMATCH", j);
+			pr_info("DBG: OTP set %d MISMATCH", j);
 	}
 
 	if(error_flag)
@@ -1535,7 +1534,7 @@ __s32 NFC_ReadRetryInit(__u32 read_retry_type)
 	read_retry_reg_num =  read_retry_type      & 0xff;
 
 	switch (read_retry_mode) {
-	0:  /* mode0  hynix readretry mode0 */
+	case 0:  /* mode0  hynix readretry mode0 */
 		read_retry_reg_adr[0] = 0xAC;
 		read_retry_reg_adr[1] = 0xAD;
 		read_retry_reg_adr[2] = 0xAE;
@@ -1547,7 +1546,7 @@ __s32 NFC_ReadRetryInit(__u32 read_retry_type)
 				read_retry_val[i][j] = para0[i][j];
 		break;
 
-	1:  /* mode1  hynix readretry mode */
+	case 1:  /* mode1  hynix readretry mode */
 		read_retry_reg_adr[0] = 0xA7;
 		read_retry_reg_adr[1] = 0xAD;
 		read_retry_reg_adr[2] = 0xAE;
@@ -1574,7 +1573,7 @@ __s32 NFC_ReadRetryInit(__u32 read_retry_type)
 		lsb_mode_val[4] = 0x1;
 		break;
 
-	2:  /* mode2  H27UCG8T2ATR */
+	case 2:  /* mode2  H27UCG8T2ATR */
 		read_retry_reg_adr[0] = 0xCC;
 		read_retry_reg_adr[1] = 0xBF;
 		read_retry_reg_adr[2] = 0xAA;
@@ -1585,7 +1584,7 @@ __s32 NFC_ReadRetryInit(__u32 read_retry_type)
 		read_retry_reg_adr[7] = 0xAF;
 		break;
 
-	3:  /* mode2  H27UCG8T2ATR */
+	case 3:  /* mode2  H27UCG8T2ATR */
 		read_retry_reg_adr[0] = 0xB0;
 		read_retry_reg_adr[1] = 0xB1;
 		read_retry_reg_adr[2] = 0xB2;
@@ -1596,14 +1595,14 @@ __s32 NFC_ReadRetryInit(__u32 read_retry_type)
 		read_retry_reg_adr[7] = 0xB7;
 		break;
 
-	4:  /* Hynix 16nm */
+	case 4:  /* Hynix 16nm */
 		read_retry_reg_adr[0] = 0x38;
 		read_retry_reg_adr[1] = 0x39;
 		read_retry_reg_adr[2] = 0x3A;
 		read_retry_reg_adr[3] = 0x3B;
 		break;
 
-	0x10:  /* mode0x10  toshiba readretry mode0 */
+	case 0x10:  /* mode0x10  toshiba readretry mode0 */
 		read_retry_reg_adr[0] = 0x04;
 		read_retry_reg_adr[1] = 0x05;
 		read_retry_reg_adr[2] = 0x06;
@@ -1615,7 +1614,7 @@ __s32 NFC_ReadRetryInit(__u32 read_retry_type)
 				read_retry_val[i][j] = para0x10[i];
 		break;
 
-	0x20:  /* mode0x10  Samsung mode0 */
+	case 0x20:  /* mode0x10  Samsung mode0 */
 		read_retry_reg_adr[0] = 0xA7;
 		read_retry_reg_adr[1] = 0xA4;
 		read_retry_reg_adr[2] = 0xA5;
@@ -1627,7 +1626,7 @@ __s32 NFC_ReadRetryInit(__u32 read_retry_type)
 				read_retry_val[i][j] = para0x20[i][j];
 		break;
 
-	0x30:  /* mode0x30 Sandisk mode */
+	case 0x30:  /* mode0x30 Sandisk mode */
 		read_retry_reg_adr[0] = 0x04;
 		read_retry_reg_adr[1] = 0x05;
 		read_retry_reg_adr[2] = 0x06;
@@ -1639,14 +1638,14 @@ __s32 NFC_ReadRetryInit(__u32 read_retry_type)
 		read_retry_reg_adr[8] = 0x0c;
 		break;
 
-	0x40:  /* mode 0x40 micron mode */
+	case 0x40:  /* mode 0x40 micron mode */
 		read_retry_reg_adr[0] = 0x89;
 		for(i=0;i<read_retry_cycle;i++)
 			for(j=0; j<read_retry_reg_num;j++)
 				read_retry_val[i][j] = param0x40[i];
 		break;
 
-	0x50:  /* mode 0x50 intel mode */
+	case 0x50:  /* mode 0x50 intel mode */
 		read_retry_reg_adr[0] = 0x89;
 		for(i=0;i<read_retry_cycle;i++)
 			for(j=0; j<read_retry_reg_num;j++)
@@ -1696,8 +1695,8 @@ __s32 NFC_GetDefaultParam(__u32 chip,__u8* default_value, __u32 read_retry_type)
 					break;
 			}
 			if(ret)
-				printk(KERNEL_WARNING __FUNCTION__ ": read OTP attempt #%d FAILED\n",
-				       Count+1);
+				pr_info("DBG: read OTP attempt #%d FAILED\n",
+					Count+1);
 
 			//set read retry level
 			for(i=0;i<8;i++)

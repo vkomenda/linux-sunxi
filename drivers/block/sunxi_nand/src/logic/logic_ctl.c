@@ -1105,7 +1105,7 @@ __s32 LML_Read(__u32 nSectNum, __u32 nSectorCnt, void* pBuf)
     __u8    *tmpBuf;
     struct __GlobalLogicPageType_t tmpHeadPage, tmpTailPage;
 
-    LOGICCTL_DBG("[LOGICCTL_DBG] LML_Read, sector number:0x%x, sector cnt:0x%x, Buffer:0x%x\n", nSectNum, nSectorCnt, pBuf);
+    LOGICCTL_DBG("[LOGICCTL_DBG] LML_Read, sector number:0x%x, sector cnt:0x%x, Buffer:0x%x\n", nSectNum, nSectorCnt, (unsigned int) pBuf);
 
 		if(((__u32)pBuf)&0x3)
 	  {
@@ -1442,4 +1442,3 @@ __u32 NAND_GetDiskSize(void)
 
     return disksize;
 }
-
