@@ -669,7 +669,7 @@ __s32 _read_sectors(struct boot_physical_param *readop,__u8 dma_wait_mode)
     		if(ret == -ERR_ECC)
 			 {
 				PHY_DBG("ecc error!\n");
-				if((READ_RETRY_MODE==0x2)||(READ_RETRY_MODE==0x3)) //hynix mode
+				if((READ_RETRY_MODE >= 2) && (READ_RETRY_MODE < 0x10)) //hynix mode
 				{
 					NFC_SetDefaultParam(readop->chip, default_value, READ_RETRY_TYPE);
 					RetryCount[readop->chip] = 0;
@@ -1174,7 +1174,7 @@ __s32 _read_sectors_for_spare(struct boot_physical_param *readop,__u8 dma_wait_m
             		if(ret1 == -ERR_ECC)
 					{
 						PHY_DBG("ecc error!\n");
-						if((READ_RETRY_MODE==0x2)||(READ_RETRY_MODE==0x3)) //hynix mode
+						if((READ_RETRY_MODE >= 2) && (READ_RETRY_MODE < 0x10)) //hynix mode
 						{
 							NFC_SetDefaultParam(readop->chip, default_value, READ_RETRY_TYPE);
 							RetryCount[readop->chip] = 0;
@@ -1435,7 +1435,7 @@ __s32  PHY_PageWrite(struct __PhysicOpPara_t  *pPageAdr)
 			program2 = 0x10;
 		}
 		//for hynix 20nm flash,retry value need to write default value before write
-		if((READ_RETRY_MODE==0x2)||(READ_RETRY_MODE==0x3)){
+		if((READ_RETRY_MODE >= 2) && (READ_RETRY_MODE < 0x10)){
 			if(RetryCount[writeop.chip] != 0){
 				rb = _cal_real_rb(writeop.chip);
 				NFC_SelectChip(writeop.chip);
