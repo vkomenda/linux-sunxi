@@ -24,6 +24,8 @@
 #include "../src/include/nand_drv_cfg.h"
 #include <linux/dma-mapping.h>
 
+extern void dump(void *buf, __u32 len , __u8 nbyte,__u8 linelen);
+
 __u32	nand_board_version;
 __u32 	pagesize;
 __hdle 	dma_hdle;
@@ -34,9 +36,9 @@ __u8 read_retry_reg_adr[READ_RETRY_MAX_REG_NUM];
 __u8 read_retry_default_val[MAX_CHIP_SELECT_CNT][READ_RETRY_MAX_REG_NUM];
 __s16 read_retry_val[READ_RETRY_MAX_CYCLE][READ_RETRY_MAX_REG_NUM];
 __u8 hynix_read_retry_otp_value[MAX_CHIP_SELECT_CNT][8][8];
-__u8 read_retry_mode;
-__u8 read_retry_cycle;
-__u8 read_retry_reg_num;
+__u8 read_retry_mode    = 0;
+__u8 read_retry_cycle   = 0;
+__u8 read_retry_reg_num = 0;
 
 __u8 lsb_mode_reg_adr[LSB_MODE_MAX_REG_NUM];
 __u8 lsb_mode_default_val[LSB_MODE_MAX_REG_NUM];
@@ -911,7 +913,7 @@ __s32 _vender_get_param(__u8 *para, __u8 *addr, __u32 count)
 
     _enter_nand_critical();
 
-    if(read_retry_mode <0x10) //hynix mode
+    if(read_retry_cycle != 0 && read_retry_reg_num != 0 && read_retry_mode < 0x10) //hynix mode
     {
         cmd_r = 0x37;
     }
@@ -957,7 +959,7 @@ __s32 _vender_set_param(__u8 *para, __u8 *addr, __u32 count)
 
 	_enter_nand_critical();
 
-	if(read_retry_mode < 0x10) { //hynix mode
+	if(read_retry_cycle != 0 && read_retry_reg_num != 0 && read_retry_mode < 0x10) { //hynix mode
 		cmd_w = 0x36;
 		cmd_end = 0x16;
 		cmd_done0 = 0xff;
@@ -1200,6 +1202,10 @@ inline void hynix_send_otp_rrt_prefix(__u8 addr, __u8 data)
 	_wait_cmd_finish();
 }
 
+/*
+ * count == 64 for Hynix types 2 and 3.
+ * count == 32 for Hynix type 4.
+ */
 __s32 _vender_get_param_otp_hynix(__u8 *para, __u8 *addr, __u32 count)
 {
 	__u32 i, j, cfg;
@@ -1208,8 +1214,6 @@ __s32 _vender_get_param_otp_hynix(__u8 *para, __u8 *addr, __u32 count)
 	__u8 para_inverse[64];
 	__u8 reg_addr[2] = {0, 0};
 	__u8 w_data[2]   = {0, 0};
-
-	pr_info("DBG: %s", __FUNCTION__);
 
 	_enter_nand_critical();
 
@@ -1290,6 +1294,8 @@ __s32 _vender_get_param_otp_hynix(__u8 *para, __u8 *addr, __u32 count)
 		      NFC_READ_RAM_B(NFC_RAM0_BASE+1));
 		ret = -1;
 	}
+	else
+		pr_info("%s: Read Retry OTP structure OK", __FUNCTION__);
 
 	_wait_cmdfifo_free();
 	NFC_WRITE_REG(NFC_REG_CNT, 1024);
@@ -1299,20 +1305,30 @@ __s32 _vender_get_param_otp_hynix(__u8 *para, __u8 *addr, __u32 count)
 
 	for(j=0;j<8;j++) {
 		error_flag = 0;
-		for(i=0;i<64;i++) {
-			para[i]         = NFC_READ_RAM_B(NFC_RAM0_BASE+128*j+i);
-			para_inverse[i] = NFC_READ_RAM_B(NFC_RAM0_BASE+128*j+64+i);
+		for(i=0;i<count;i++) {
+			para[i]         = NFC_READ_RAM_B(NFC_RAM0_BASE + count*2 *  j    + i);
+			para_inverse[i] = NFC_READ_RAM_B(NFC_RAM0_BASE + count*2 * (j+1) + i);
 			if((para[i]+para_inverse[i]) != 0xff) {
 				error_flag = 1;
-				break;
+//				break;
 			}
 		}
+
+		pr_info("RRT SET %d origin:",  j);
+		dump(para,         count, 4, 8);
+		pr_info("RRT SET %d inverse:", j);
+		dump(para_inverse, count, 4, 8);
+
 		if(!error_flag) {
 			pr_info("DBG: OTP set %d OK\n", j);
 			break;
 		}
-		else
-			pr_info("DBG: OTP set %d MISMATCH", j);
+		/*
+		else {
+			pr_info("DBG: OTP set %d MISMATCH at %d: origin %x, inverse %x", j, i,
+				para[i], para_inverse[i]);
+		}
+		*/
 	}
 
 	if(error_flag)
@@ -1322,22 +1338,18 @@ __s32 _vender_get_param_otp_hynix(__u8 *para, __u8 *addr, __u32 count)
 	nand_send_cmd(0xFF);
 
 	if (read_retry_mode == 2 || read_retry_mode == 3) {
-		// send 0x38 cmd
+		// send 0x38 cmd. Not present in the 16 nm MLC Application Note.
 		nand_send_cmd(0x38);
 	}
 	else if (read_retry_mode == 4) {
-		nand_send_cmd(0x36);
 		hynix_send_otp_rrt_prefix(reg_addr[1], w_data[1]);
-		nand_send_cmd_part(0x16); /* end of prefix */
-		/* dummy read from any address */
-		/*
+		nand_send_cmd_part(0x16); // end of prefix
+		// dummy read from any address
 		nand_send_cmd_part(0);
 		NFC_WRITE_REG(NFC_REG_ADDR_LOW,  0);
 		NFC_WRITE_REG(NFC_REG_ADDR_HIGH, 0);
 		nand_send_read_cmd(1);
-		*/
 	}
-
 	_exit_nand_critical();
 	return ret;
 }
@@ -1379,7 +1391,7 @@ __s32 NFC_ReadRetry(__u32 chip, __u32 retry_count, __u32 read_retry_type)
 		return -1;
 
 	/* Hynix read retry modes BEGIN */
-	if(read_retry_mode <= 1) {
+	if(read_retry_cycle != 0 && read_retry_reg_num != 0 && read_retry_mode <= 1) {
 		if(retry_count == 0)
 			ret = _vender_set_param(&read_retry_default_val[chip][0], read_retry_reg_adr, read_retry_reg_num);
 		else {
@@ -1659,25 +1671,12 @@ __s32 NFC_ReadRetryInit(__u32 read_retry_type)
 	return 0;
 }
 
-void NFC_GetOTPValue(__u32 chip, __u8* otp_value, __u32 read_retry_type)
-{
-	__u8 *pdata;
-	__u32 i;
-
-	if((read_retry_mode >= 2) && (read_retry_mode < 0x10))
-	{
-	pdata = (__u8 *)(&hynix_read_retry_otp_value[chip][0][0]);
-	for(i=0; i<64; i++)
-		pdata[i] = otp_value[i];
-	}
-}
-
 __s32 NFC_GetDefaultParam(__u32 chip,__u8* default_value, __u32 read_retry_type)
 {
 	__s32 ret;
-	__u32 i, j, Count;
+	__u32 i, j;
 
-	if(read_retry_mode<0x10) { //hynix read retry mode
+	if(read_retry_cycle != 0 && read_retry_reg_num != 0 && read_retry_mode < 0x10) { //hynix read retry mode
 		if(read_retry_mode <= 1) {
 			ret =_vender_get_param(read_retry_default_val[chip],
 					       read_retry_reg_adr,
@@ -1688,15 +1687,10 @@ __s32 NFC_GetDefaultParam(__u32 chip,__u8* default_value, __u32 read_retry_type)
 			return ret;
 		}
 		else {
-			for(Count =0; Count<5; Count++) {
-				ret = _vender_get_param_otp_hynix(hynix_read_retry_otp_value[chip][0],
-								  read_retry_reg_adr, 64);
-				if(!ret)
-					break;
-			}
+			ret = _vender_get_param_otp_hynix(hynix_read_retry_otp_value[chip][0],
+							  read_retry_reg_adr, read_retry_reg_num * 8);
 			if(ret)
-				pr_info("DBG: read OTP attempt #%d FAILED\n",
-					Count+1);
+				pr_info("DBG: read OTP attempt FAILED\n");
 
 			//set read retry level
 			for(i=0;i<8;i++)
@@ -1715,7 +1709,7 @@ __s32 NFC_SetDefaultParam(__u32 chip,__u8* default_value,__u32 read_retry_type)
 	__u32 i,cfg,nand_clk_bak;
 	__u32 toggle_mode_flag = 0;
 
-	if(read_retry_mode<0x10) {  //hynix read retry mode
+	if (read_retry_cycle != 0 && read_retry_reg_num != 0 && read_retry_mode<0x10) {  //hynix read retry mode
 		for(i=0; i<read_retry_reg_num; i++) {
 			if(read_retry_mode <= 1)
 				default_value[i] = read_retry_default_val[chip][i];
