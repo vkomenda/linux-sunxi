@@ -1416,20 +1416,24 @@ __s32 LML_Init(void)
 */
 __s32 LML_Exit(void)
 {
-     //flush page cache to nand flash
-    LML_FlushPageCache();
+	pr_info(__FUNCTION__ ": start\n");
 
-    //write all mapping table to nand flash
-    BMM_WriteBackAllMapTbl();
+	//flush page cache to nand flash
+	LML_FlushPageCache();
 
-    //free the mapping module
-    PMM_ExitMapTblCache();
-    BMM_ExitMapTblCache();
+	//write all mapping table to nand flash
+	BMM_WriteBackAllMapTbl();
 
-    FREE(NandDriverInfo.PageCachePool->PageCache1,SECTOR_CNT_OF_LOGIC_PAGE * SECTOR_SIZE);
+	//free the mapping module
+	PMM_ExitMapTblCache();
+	BMM_ExitMapTblCache();
+
+	FREE(NandDriverInfo.PageCachePool->PageCache1,SECTOR_CNT_OF_LOGIC_PAGE * SECTOR_SIZE);
 	FREE(NandDriverInfo.PageCachePool->PageCache2,SECTOR_CNT_OF_LOGIC_PAGE * SECTOR_SIZE);
 
-    return 0;
+	pr_info(__FUNCTION__ ": end\n");
+
+	return 0;
 }
 
 // 2010-12-04 modified

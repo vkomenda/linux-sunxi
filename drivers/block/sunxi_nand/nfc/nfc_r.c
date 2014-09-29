@@ -1295,7 +1295,7 @@ __s32 _vender_get_param_otp_hynix(__u8 *para, __u8 *addr, __u32 count)
 		ret = -1;
 	}
 	else
-		pr_info("%s: Read Retry OTP structure OK", __FUNCTION__);
+		pr_info("%s: Read Retry OTP structure OK\n", __FUNCTION__);
 
 	_wait_cmdfifo_free();
 	NFC_WRITE_REG(NFC_REG_CNT, 1024);
@@ -1314,9 +1314,9 @@ __s32 _vender_get_param_otp_hynix(__u8 *para, __u8 *addr, __u32 count)
 			}
 		}
 
-		pr_info("RRT SET %d origin:",  j);
+		pr_info("RRT SET %d origin:\n",  j);
 		dump(para,         count, 4, 8);
-		pr_info("RRT SET %d inverse:", j);
+		pr_info("RRT SET %d inverse:\n", j);
 		dump(para_inverse, count, 4, 8);
 
 		if(!error_flag) {
@@ -1325,7 +1325,7 @@ __s32 _vender_get_param_otp_hynix(__u8 *para, __u8 *addr, __u32 count)
 		}
 		/*
 		else {
-			pr_info("DBG: OTP set %d MISMATCH at %d: origin %x, inverse %x", j, i,
+			pr_info("DBG: OTP set %d MISMATCH at %d: origin %x, inverse %x\n", j, i,
 				para[i], para_inverse[i]);
 		}
 		*/
@@ -1671,7 +1671,7 @@ __s32 NFC_ReadRetryInit(__u32 read_retry_type)
 	return 0;
 }
 
-__s32 NFC_GetDefaultParam(__u32 chip,__u8* default_value, __u32 read_retry_type)
+__s32 NFC_GetHynixOTPParam(__u32 chip,__u8* default_value, __u32 read_retry_type)
 {
 	__s32 ret;
 	__u32 i, j;
@@ -1690,11 +1690,11 @@ __s32 NFC_GetDefaultParam(__u32 chip,__u8* default_value, __u32 read_retry_type)
 			ret = _vender_get_param_otp_hynix(hynix_read_retry_otp_value[chip][0],
 							  read_retry_reg_adr, read_retry_reg_num * 8);
 			if(ret)
-				pr_info("DBG: read OTP attempt FAILED\n");
+				pr_info(__FUNCTION__ "Read OTP attempt FAILED\n");
 
 			//set read retry level
-			for(i=0;i<8;i++)
-				for(j=0; j<8;j++)
+			for(i = 0; i < 8; i++)
+				for(j = 0; j < read_retry_reg_num; j++)
 					default_value[8*i+j] = hynix_read_retry_otp_value[chip][i][j];
 		}
 		return 0;

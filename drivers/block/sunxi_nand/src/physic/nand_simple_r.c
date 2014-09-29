@@ -28,6 +28,8 @@
 
 #include <linux/io.h>
 
+extern void dump(void *buf, __u32 len , __u8 nbyte,__u8 linelen);
+
 struct __NandStorageInfo_t  NandStorageInfo;
 struct __NandPageCachePool_t PageCachePool;
 __u32 RetryCount[8];
@@ -573,10 +575,13 @@ __s32 PHY_Init(void)
 	return ret;
 }
 
+/* Should be called after NFC_ReadRetryInit which loads the RR table from the
+ * OTP block. */
 __s32 PHY_GetDefaultParam(__u32 bank)
 {
 	__u32 i, j, chip = 0, rb = 0;
 	__u8 default_value[64];
+	__u8 hynix_RRT[READ_RETRY_REG_CNT * 8];
 	__u8 oob[64];
 	__u8 *pdata;
 	__s32 ret;
@@ -595,6 +600,9 @@ __s32 PHY_GetDefaultParam(__u32 bank)
 	}
 	pdata = (__u8 *)(PHY_TMP_PAGE_CACHE);
 
+	pr_info(__FUNCTION__ "Read Retry Table in the temporary cache:\n");
+	dump(PHY_TMP_PAGE_CACHE, READ_RETRY_REG_CNT * 8, 4, 8);
+
 	if((READ_RETRY_MODE >= 2) && (READ_RETRY_MODE < 0x10)) {
 		for (retry = 0, otp_ok_flag = 0; (!otp_ok_flag) && retry < 8; retry++) {
 			for(i = 8; i<12; i++) {
@@ -612,8 +620,8 @@ __s32 PHY_GetDefaultParam(__u32 bank)
 				   (oob[2] == 0x4F) &&
 				   (oob[3] == 0x42)) {
 					otp_ok_flag = 1;
-					for(j=0;j<64;j++) {
-						if((pdata[j] + pdata[64+j])!= 0xff) {
+					for(j = 0; j < READ_RETRY_REG_CNT * 8; j++) {
+						if((pdata[j] + pdata[READ_RETRY_REG_CNT * 8 + j])!= 0xff) {
 							PHY_DBG("otp data check error!\n");
 							otp_ok_flag = 0;
 							break;
@@ -628,39 +636,18 @@ __s32 PHY_GetDefaultParam(__u32 bank)
 			}
 
 			if(otp_ok_flag) {
-				for(j = 0; j < READ_RETRY_REG_CNT * 8; j++)
-					default_value[j] = pdata[j];
-				PHY_DBG("Read Retry value Table from nand otp block:\n");
-				dump(default_value, READ_RETRY_REG_CNT * 8, 4, 8);
-					for(j = 0;j<64; j++) {
-						PHY_DBG("0x%x ", pdata[j]);
-						if(j%8 == 7)
-							PHY_DBG("\n");
-					}
-				}
 				NFC_SetDefaultParam(chip, default_value, READ_RETRY_TYPE);
 				// break;   ...function returns the call
 			}
 			else {
 				PHY_DBG("[PHY_DBG] can't get right otp value from nand otp blocks,"
 					" then use otp command\n");
-				NFC_GetDefaultParam(chip, default_value, READ_RETRY_TYPE);
+				NFC_GetDefaultParam(chip, hynix_RRT, READ_RETRY_TYPE);
 				NFC_SetDefaultParam(chip, default_value, READ_RETRY_TYPE);
-#if 0
-				if((READ_RETRY_MODE >= 2) && (READ_RETRY_MODE < 0x10)) {
-					PHY_DBG("Read Retry value Table from otp area:\n");
-					for(i = 0;i<8; i++) {
-						PHY_DBG("retry cycle %d: ", i);
-						for(j=0; j<8;j++)
-							PHY_DBG("0x%x ", default_value[8*i+j]);
-						PHY_DBG("\n");
-					}
-				}
-#endif
 
-				for(j=0;j<64;j++) {
-					pdata[j] = default_value[j];
-					pdata[64 + j] = 0xff - default_value[j];
+				for(j = 0; j < READ_RETRY_REG_CNT * 8; j++) {
+					pdata[j] = hynix_RRT[j];
+					pdata[READ_RETRY_REG_CNT * 8 + j] = 0xFF - pdata[j];
 				}
 
 				oob[0] = 0x00;
@@ -717,7 +704,7 @@ __s32 PHY_SetDefaultParam(__u32 bank)
 	__u8 temp_value[16];
 
 	if(SUPPORT_READ_RETRY) {
-		if(READ_RETRY_MODE<0x10) { //hynix mode
+		if(READ_RETRY_REG_CNT != 0 && READ_RETRY_COUNT != 0 && READ_RETRY_MODE<0x10) { //hynix mode
 			chip = _cal_real_chip(bank);
 			NFC_SelectChip(chip);
 			NFC_SetDefaultParam(chip, default_value, READ_RETRY_TYPE);
@@ -791,6 +778,8 @@ __s32 PHY_Exit(void)
 {
 	__u32 i = 0;
 
+	pr_info(__FUNCTION__ ": start\n");
+
 	if (PageCachePool.PageCache0) {
 		FREE(PageCachePool.PageCache0,SECTOR_CNT_OF_SUPER_PAGE * 512);
 		PageCachePool.PageCache0 = NULL;
@@ -813,6 +802,8 @@ __s32 PHY_Exit(void)
 
 	NFC_RandomDisable();
 	NFC_Exit();
+
+	pr_info(__FUNCTION__ ": end\n");
 
 	return 0;
 }
