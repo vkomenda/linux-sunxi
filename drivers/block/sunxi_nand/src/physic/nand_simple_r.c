@@ -600,7 +600,7 @@ __s32 PHY_GetDefaultParam(__u32 bank)
 	}
 	pdata = (__u8 *)(PHY_TMP_PAGE_CACHE);
 
-	pr_info(__FUNCTION__ "Read Retry Table in the temporary cache:\n");
+	pr_info("%s: Read Retry Table in the temporary cache:\n", __FUNCTION__);
 	dump(PHY_TMP_PAGE_CACHE, READ_RETRY_REG_CNT * 8, 4, 8);
 
 	if((READ_RETRY_MODE >= 2) && (READ_RETRY_MODE < 0x10)) {
@@ -642,7 +642,7 @@ __s32 PHY_GetDefaultParam(__u32 bank)
 			else {
 				PHY_DBG("[PHY_DBG] can't get right otp value from nand otp blocks,"
 					" then use otp command\n");
-				NFC_GetDefaultParam(chip, hynix_RRT, READ_RETRY_TYPE);
+				NFC_GetHynixOTPParam(chip, hynix_RRT, READ_RETRY_TYPE);
 				NFC_SetDefaultParam(chip, default_value, READ_RETRY_TYPE);
 
 				for(j = 0; j < READ_RETRY_REG_CNT * 8; j++) {
@@ -684,8 +684,8 @@ __s32 PHY_GetDefaultParam(__u32 bank)
 			}
 		}
 	}
-	else {
-		NFC_GetDefaultParam(chip, default_value, READ_RETRY_TYPE);
+	else {  // FIXME
+		NFC_GetHynixOTPParam(chip, default_value, READ_RETRY_TYPE);
 		NFC_SetDefaultParam(chip, default_value, READ_RETRY_TYPE);
 		if((READ_RETRY_MODE==0)||(READ_RETRY_MODE==1)) { //hynix mode
 			PHY_DBG("PHY_SetDefaultParam: chip 0x%x, Read Retry Default Value"
@@ -704,7 +704,7 @@ __s32 PHY_SetDefaultParam(__u32 bank)
 	__u8 temp_value[16];
 
 	if(SUPPORT_READ_RETRY) {
-		if(READ_RETRY_REG_CNT != 0 && READ_RETRY_COUNT != 0 && READ_RETRY_MODE<0x10) { //hynix mode
+		if(READ_RETRY_REG_CNT != 0 && READ_RETRY_CYCLE != 0 && READ_RETRY_MODE<0x10) { //hynix mode
 			chip = _cal_real_chip(bank);
 			NFC_SelectChip(chip);
 			NFC_SetDefaultParam(chip, default_value, READ_RETRY_TYPE);
@@ -714,7 +714,7 @@ __s32 PHY_SetDefaultParam(__u32 bank)
 				" is 0x%x, 0x%x, 0x%x, 0x%x \n", chip,
 				default_value[0], default_value[1],
 				default_value[2], default_value[3]);
-			NFC_GetDefaultParam(chip, temp_value, READ_RETRY_TYPE);
+			NFC_GetHynixOTPParam(chip, temp_value, READ_RETRY_TYPE);
 			PHY_DBG("PHY_SetDefaultParam: chip 0x%x, Read Default Value"
 				" After Set value is 0x%x, 0x%x, 0x%x, 0x%x \n", chip,
 				temp_value[0], temp_value[1],
@@ -778,7 +778,7 @@ __s32 PHY_Exit(void)
 {
 	__u32 i = 0;
 
-	pr_info(__FUNCTION__ ": start\n");
+	pr_info("%s: start\n", __FUNCTION__);
 
 	if (PageCachePool.PageCache0) {
 		FREE(PageCachePool.PageCache0,SECTOR_CNT_OF_SUPER_PAGE * 512);
@@ -803,7 +803,7 @@ __s32 PHY_Exit(void)
 	NFC_RandomDisable();
 	NFC_Exit();
 
-	pr_info(__FUNCTION__ ": end\n");
+	pr_info("%s: end\n", __FUNCTION__);
 
 	return 0;
 }

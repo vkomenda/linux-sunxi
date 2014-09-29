@@ -195,8 +195,8 @@ typedef struct NFC_init_info{
 __s32 NFC_ReadRetryInit(__u32 read_retry_type);
 __s32 NFC_ReadRetryExit(__u32 read_retry_type);
 __s32 NFC_ReadRetry_off(__u32 chip); //sandisk readretry exit
-__s32 NFC_GetDefaultParam(__u32 chip, __u8 *defautl_value, __u32 read_retry_type);
-__s32 NFC_SetDefaultParam(__u32 chip, __u8 *defautl_value, __u32 read_retry_type);
+__s32 NFC_GetHynixOTPParam(__u32 chip, __u8 *default_value, __u32 read_retry_type);
+__s32 NFC_SetDefaultParam(__u32 chip, __u8 *default_value, __u32 read_retry_type);
 __s32 NFC_ReadRetry(__u32 chip, __u32 retry_count, __u32 read_retry_type);
 __s32 NFC_LSBEnable(__u32 chip, __u32 read_retry_type);
 __s32 NFC_LSBDisable(__u32 chip, __u32 read_retry_type);

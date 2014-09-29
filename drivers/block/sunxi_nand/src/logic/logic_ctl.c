@@ -1416,7 +1416,7 @@ __s32 LML_Init(void)
 */
 __s32 LML_Exit(void)
 {
-	pr_info(__FUNCTION__ ": start\n");
+	pr_info("%s: start\n", __FUNCTION__);
 
 	//flush page cache to nand flash
 	LML_FlushPageCache();
@@ -1431,7 +1431,7 @@ __s32 LML_Exit(void)
 	FREE(NandDriverInfo.PageCachePool->PageCache1,SECTOR_CNT_OF_LOGIC_PAGE * SECTOR_SIZE);
 	FREE(NandDriverInfo.PageCachePool->PageCache2,SECTOR_CNT_OF_LOGIC_PAGE * SECTOR_SIZE);
 
-	pr_info(__FUNCTION__ ": end\n");
+	pr_info("%s: end\n", __FUNCTION__);
 
 	return 0;
 }
