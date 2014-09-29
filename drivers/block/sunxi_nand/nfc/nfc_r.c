@@ -1695,7 +1695,8 @@ __s32 NFC_GetHynixOTPParam(__u32 chip,__u8* default_value, __u32 read_retry_type
 			//set read retry level
 			for(i = 0; i < 8; i++)
 				for(j = 0; j < read_retry_reg_num; j++)
-					default_value[8*i+j] = hynix_read_retry_otp_value[chip][i][j];
+					default_value[read_retry_reg_num*i+j] =
+						hynix_read_retry_otp_value[chip][i][j];
 		}
 		return 0;
 	}
