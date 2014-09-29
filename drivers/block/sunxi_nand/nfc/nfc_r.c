@@ -1690,7 +1690,7 @@ __s32 NFC_GetHynixOTPParam(__u32 chip,__u8* default_value, __u32 read_retry_type
 			ret = _vender_get_param_otp_hynix(hynix_read_retry_otp_value[chip][0],
 							  read_retry_reg_adr, read_retry_reg_num * 8);
 			if(ret)
-				pr_info(__FUNCTION__ "Read OTP attempt FAILED\n");
+				pr_info("%s: Read OTP attempt FAILED\n", __FUNCTION__);
 
 			//set read retry level
 			for(i = 0; i < 8; i++)
