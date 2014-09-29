@@ -871,7 +871,7 @@ __s32 NFC_LSBInit(__u32 read_retry_type)
 	read_retry_cycle   = (read_retry_type>>8)  & 0xff;
 	read_retry_reg_num =  read_retry_type      & 0xff;
 
-	if(read_retry_mode == 1) //mode1
+	if(read_retry_cycle != 0 && read_retry_reg_num != 0 && read_retry_mode == 1) // Hynix mode 1
 	{
 		//set lsb mode
 		lsb_mode_reg_num = 5;

@@ -577,8 +577,8 @@ __s32 PHY_GetDefaultParam(__u32 bank)
 {
 	__u32 i, j, chip = 0, rb = 0;
 	__u8 default_value[64];
-	__u8 oob_buf[64];
-	__u8 *oob, *pdata;
+	__u8 oob[64];
+	__u8 *pdata;
 	__s32 ret;
 	struct boot_physical_param nand_op;
 	__u8 retry, otp_ok_flag;
@@ -587,7 +587,6 @@ __s32 PHY_GetDefaultParam(__u32 bank)
 	NFC_SelectChip(chip);
 	rb = _cal_real_rb(chip);
 	NFC_SelectRb(rb);
-	oob = (__u8 *)(oob_buf);
 
 	if (!PageCachePool.PageCache0){
 		PageCachePool.PageCache0 = (__u8 *)MALLOC(SECTOR_CNT_OF_SUPER_PAGE * 512);
@@ -603,7 +602,7 @@ __s32 PHY_GetDefaultParam(__u32 bank)
 				nand_op.block = i;
 				nand_op.page = 0;
 				nand_op.mainbuf = PHY_TMP_PAGE_CACHE;
-				nand_op.oobbuf = oob_buf;
+				nand_op.oobbuf = oob;
 
 				ret = PHY_SimpleRead_1K(&nand_op);
 				PHY_DBG("chip %d, block %d, page 0, oob: 0x%x, 0x%x, 0x%x, 0x%x\n",
@@ -629,16 +628,16 @@ __s32 PHY_GetDefaultParam(__u32 bank)
 			}
 
 			if(otp_ok_flag) {
-				for(j=0;j<64;j++) default_value[j] = pdata[j];
-				if((READ_RETRY_MODE >= 2) && (READ_RETRY_MODE < 0x10)) {
-					PHY_DBG("Read Retry value Table from nand otp block:\n");
+				for(j = 0; j < READ_RETRY_REG_CNT * 8; j++)
+					default_value[j] = pdata[j];
+				PHY_DBG("Read Retry value Table from nand otp block:\n");
+				dump(default_value, READ_RETRY_REG_CNT * 8, 4, 8);
 					for(j = 0;j<64; j++) {
 						PHY_DBG("0x%x ", pdata[j]);
 						if(j%8 == 7)
 							PHY_DBG("\n");
 					}
 				}
-				NFC_GetOTPValue(chip, default_value, READ_RETRY_TYPE);
 				NFC_SetDefaultParam(chip, default_value, READ_RETRY_TYPE);
 				// break;   ...function returns the call
 			}
@@ -676,7 +675,7 @@ __s32 PHY_GetDefaultParam(__u32 bank)
 					nand_op.block = i;
 					nand_op.page = 0;
 					nand_op.mainbuf = PHY_TMP_PAGE_CACHE;
-					nand_op.oobbuf = oob_buf;
+					nand_op.oobbuf = oob;
 
 					ret = PHY_SimpleErase(&nand_op);
 					if(ret<0) {
@@ -790,34 +789,31 @@ __s32 PHY_ChangeMode(__u8 serial_mode)
 */
 __s32 PHY_Exit(void)
 {
-    __u32 i = 0;
+	__u32 i = 0;
 
-	if (PageCachePool.PageCache0){
+	if (PageCachePool.PageCache0) {
 		FREE(PageCachePool.PageCache0,SECTOR_CNT_OF_SUPER_PAGE * 512);
 		PageCachePool.PageCache0 = NULL;
 	}
-	if (PageCachePool.SpareCache){
+	if (PageCachePool.SpareCache) {
 		FREE(PageCachePool.SpareCache,SECTOR_CNT_OF_SUPER_PAGE * 4);
 		PageCachePool.SpareCache = NULL;
 	}
-	if (PageCachePool.TmpPageCache){
+	if (PageCachePool.TmpPageCache) {
 		FREE(PageCachePool.TmpPageCache,SECTOR_CNT_OF_SUPER_PAGE * 512);
 		PageCachePool.TmpPageCache = NULL;
 	}
 
-	if(SUPPORT_READ_RETRY)
-	{
-	    for(i=0; i<NandStorageInfo.ChipCnt;i++)
-        {
-            PHY_SetDefaultParam(i);
-        }
-        NFC_ReadRetryExit(READ_RETRY_TYPE);
+	if(SUPPORT_READ_RETRY) {
+		for(i=0; i<NandStorageInfo.ChipCnt;i++) {
+			PHY_SetDefaultParam(i);
+		}
+		NFC_ReadRetryExit(READ_RETRY_TYPE);
 	}
 
-
 	NFC_RandomDisable();
-
 	NFC_Exit();
+
 	return 0;
 }
 
