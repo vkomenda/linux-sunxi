@@ -115,47 +115,47 @@
 
 
 /*define bit use in NFC_CMD*/
-#define NFC_CMD_LOW_BYTE		(0xff << 0)
-#define NFC_CMD_HIGH_BYTE		(0xff << 8)
-#define NFC_ADR_NUM				(0x7 << 16)
-#define NFC_SEND_ADR			(1 << 19)
-#define NFC_ACCESS_DIR			(1 << 20)
-#define NFC_DATA_TRANS			(1 << 21)
-#define NFC_SEND_CMD1			(1 << 22)
-#define NFC_WAIT_FLAG			(1 << 23)
-#define NFC_SEND_CMD2			(1 << 24)
-#define NFC_SEQ					(1 << 25)
-#define NFC_DATA_SWAP_METHOD	(1 << 26)
-#define NFC_ROW_AUTO_INC		(1 << 27)
+#define NFC_CMD_LOW_BYTE        (0xff << 0)
+#define NFC_CMD_HIGH_BYTE       (0xff << 8)
+#define NFC_ADR_NUM             (0x7 << 16)
+#define NFC_SEND_ADR            (1 << 19)
+#define NFC_ACCESS_DIR          (1 << 20)
+#define NFC_DATA_TRANS          (1 << 21)
+#define NFC_SEND_CMD1           (1 << 22)
+#define NFC_WAIT_FLAG           (1 << 23)
+#define NFC_SEND_CMD2           (1 << 24)
+#define NFC_SEQ                 (1 << 25)
+#define NFC_DATA_SWAP_METHOD    (1 << 26)
+#define NFC_ROW_AUTO_INC        (1 << 27)
 #define NFC_SEND_CMD3           (1 << 28)
 #define NFC_SEND_CMD4           (1 << 29)
-#define NFC_CMD_TYPE			(3 << 30)
+#define NFC_CMD_TYPE            (3 << 30)
 
 /* define bit use in NFC_RCMD_SET*/
-#define NFC_READ_CMD			(0xff<< 0)
-#define NFC_RANDOM_READ_CMD0 	(0xff << 8)
-#define NFC_RANDOM_READ_CMD1 	(0xff << 16)
+#define NFC_READ_CMD            (0xff<< 0)
+#define NFC_RANDOM_READ_CMD0    (0xff << 8)
+#define NFC_RANDOM_READ_CMD1    (0xff << 16)
 
 /*define bit use in NFC_WCMD_SET*/
-#define NFC_PROGRAM_CMD			(0xff << 0)
+#define NFC_PROGRAM_CMD		(0xff << 0)
 #define NFC_RANDOM_WRITE_CMD	(0xff << 8)
-#define NFC_READ_CMD0			(0xff << 16)
+#define NFC_READ_CMD0		(0xff << 16)
 #define NFC_READ_CMD1	        (0xff << 24)
 
 /*define bit use in NFC_ECC_CTL*/
-#define NFC_ECC_EN				(1 << 0)
-#define NFC_ECC_PIPELINE		(1 << 3)
+#define NFC_ECC_EN              (1 << 0)
+#define NFC_ECC_PIPELINE        (1 << 3)
 #define NFC_ECC_EXCEPTION       (1 << 4)
-#define NFC_ECC_BLOCK_SIZE		(1 << 5)
+#define NFC_ECC_BLOCK_SIZE      (1 << 5)
 #define NFC_RANDOM_EN           (1 << 9 )
 #define NFC_RANDOM_DIRECTION    (1 << 10 )
-#define NFC_ECC_MODE			(0xf << 12)
+#define NFC_ECC_MODE            (0xf << 12)
 #define NFC_RANDOM_SEED         (0x7fff << 16))
 
-#define NFC_IRQ_MAJOR		    13
+#define NFC_IRQ_MAJOR           13
 /*cmd flag bit*/
-#define NFC_PAGE_MODE  			0x1
-#define NFC_NORMAL_MODE  		0x0
+#define NFC_PAGE_MODE           0x1
+#define NFC_NORMAL_MODE         0x0
 
 #define NFC_DATA_FETCH 		0x1
 #define NFC_NO_DATA_FETCH 	0x0
@@ -195,7 +195,6 @@ typedef struct NFC_init_info{
 __s32 NFC_ReadRetryInit(__u32 read_retry_type);
 __s32 NFC_ReadRetryExit(__u32 read_retry_type);
 __s32 NFC_ReadRetry_off(__u32 chip); //sandisk readretry exit
-void NFC_GetOTPValue(__u32 chip, __u8* otp_value, __u32 read_retry_type);
 __s32 NFC_GetDefaultParam(__u32 chip, __u8 *defautl_value, __u32 read_retry_type);
 __s32 NFC_SetDefaultParam(__u32 chip, __u8 *defautl_value, __u32 read_retry_type);
 __s32 NFC_ReadRetry(__u32 chip, __u32 retry_count, __u32 read_retry_type);
