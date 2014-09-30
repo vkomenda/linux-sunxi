@@ -32,16 +32,16 @@ void dump(void *buf, __u32 len , __u8 nbyte,__u8 linelen)
 	__u32 i;
 	__u32 tmplen = len/nbyte;
 
-	PRINT("/********************************************/\n");
+//	PRINT("/********************************************/\n");
 
 	for (i = 0; i < tmplen; i++)
 	{
 		if (nbyte == 1)
-			PRINT("%x  ",((__u8 *)buf)[i]);
+			PRINT("%.2x ",((__u8 *)buf)[i]);
 		else if (nbyte == 2)
-			PRINT("%x  ",((__u16 *)buf)[i]);
+			PRINT("%.4x ",((__u16 *)buf)[i]);
 		else if (nbyte == 4)
-			PRINT("%x  ",((__u32 *)buf)[i]);
+			PRINT("%.8x ",((__u32 *)buf)[i]);
 		else
 			break;
 
@@ -833,8 +833,8 @@ static __s32 _read_block_map_tbl(__u8 nZone)
         _GetTblCheckSum((__u32 *)DATA_BLK_TBL,(DATA_BLK_CNT_OF_ZONE+FREE_BLK_CNT_OF_ZONE)))
     {
     	MAPPING_ERR("_read_block_map_tbl : read data block map table checksum err\n");
-		dump((void*)DATA_BLK_TBL,1024*4,4,8);
-		return NAND_OP_FALSE;
+	dump((void*)DATA_BLK_TBL,1024*4,4,8);
+	return NAND_OP_FALSE;
     }
 
     /*read log block table*/

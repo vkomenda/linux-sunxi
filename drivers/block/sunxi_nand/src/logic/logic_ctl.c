@@ -1346,58 +1346,55 @@ EXPORT_SYMBOL(LML_Write);
 */
 __s32 LML_Init(void)
 {
-    __s32   result;
+	__s32   result;
 
-    CachePage.LogicPageNum = 0xffffffff;
-    CachePage.SectorBitmap = 0x00000000;
+	CachePage.LogicPageNum = 0xffffffff;
+	CachePage.SectorBitmap = 0x00000000;
 
-    LogicalCtl.OpMode = 'n';
-    LogicalCtl.ZoneNum = 0xff;
-    LogicalCtl.LogicBlkNum = 0xffff;
-    LogicalCtl.LogicPageNum = 0xffff;
-    LogicalCtl.LogPageNum = 0xffff;
-    LogicalCtl.DataBlkNum.BlkEraseCnt = 0xffff;
-    LogicalCtl.DataBlkNum.PhyBlkNum = 0xffff;
-    LogicalCtl.LogBlkNum.BlkEraseCnt = 0xffff;
-    LogicalCtl.LogBlkNum.PhyBlkNum = 0xffff;
-    LogicalCtl.DiskCap = SECTOR_CNT_OF_SINGLE_PAGE * PAGE_CNT_OF_PHY_BLK * BLOCK_CNT_OF_DIE * \
-            DIE_CNT_OF_CHIP * NandDriverInfo.NandStorageInfo->ChipCnt  / BLOCK_CNT_OF_ZONE * DATA_BLK_CNT_OF_ZONE;
+	LogicalCtl.OpMode = 'n';
+	LogicalCtl.ZoneNum = 0xff;
+	LogicalCtl.LogicBlkNum = 0xffff;
+	LogicalCtl.LogicPageNum = 0xffff;
+	LogicalCtl.LogPageNum = 0xffff;
+	LogicalCtl.DataBlkNum.BlkEraseCnt = 0xffff;
+	LogicalCtl.DataBlkNum.PhyBlkNum = 0xffff;
+	LogicalCtl.LogBlkNum.BlkEraseCnt = 0xffff;
+	LogicalCtl.LogBlkNum.PhyBlkNum = 0xffff;
+	LogicalCtl.DiskCap = SECTOR_CNT_OF_SINGLE_PAGE * PAGE_CNT_OF_PHY_BLK * BLOCK_CNT_OF_DIE * \
+		DIE_CNT_OF_CHIP * NandDriverInfo.NandStorageInfo->ChipCnt  / BLOCK_CNT_OF_ZONE * DATA_BLK_CNT_OF_ZONE;
 
+	//request page buffer for process data
+	if (!NandDriverInfo.PageCachePool->PageCache1)
+		NandDriverInfo.PageCachePool->PageCache1 = MALLOC(SECTOR_CNT_OF_LOGIC_PAGE * SECTOR_SIZE);
+	if (!NandDriverInfo.PageCachePool->PageCache1) {
+		LOGICCTL_ERR("[LOGICCTL_ERR] Request memory for nand flash page cache failed!!");
+		return -ERR_MALLOC;
+	}
 
-    //request page buffer for process data
-    NandDriverInfo.PageCachePool->PageCache1 = (__u8 *)MALLOC(SECTOR_CNT_OF_LOGIC_PAGE * SECTOR_SIZE);
-    if(!NandDriverInfo.PageCachePool->PageCache1)
-    {
-        LOGICCTL_ERR("[LOGICCTL_ERR] Request memory for nand flash page cache failed!!");
-        return -ERR_MALLOC;
-    }
-    //NandDriverInfo.PageCachePool->PageCache2 = NULL;
-     NandDriverInfo.PageCachePool->PageCache2 = (__u8 *)MALLOC(SECTOR_CNT_OF_LOGIC_PAGE * SECTOR_SIZE);
-    if(!NandDriverInfo.PageCachePool->PageCache2)
-    {
-        LOGICCTL_ERR("[LOGICCTL_ERR] Request memory for nand flash page cache failed!!");
-        return -ERR_MALLOC;
-    }
+	if (!NandDriverInfo.PageCachePool->PageCache2)
+		NandDriverInfo.PageCachePool->PageCache2 = MALLOC(SECTOR_CNT_OF_LOGIC_PAGE * SECTOR_SIZE);
+	if (!NandDriverInfo.PageCachePool->PageCache2) {
+		LOGICCTL_ERR("[LOGICCTL_ERR] Request memory for nand flash page cache failed!!");
+		return -ERR_MALLOC;
+	}
 
-    //request buffer for process spare area data
-    MEMSET(LML_SPARE_BUF, 0xff, SECTOR_CNT_OF_SUPER_PAGE * 4);
+	//request buffer for process spare area data
+	MEMSET(LML_SPARE_BUF, 0xff, SECTOR_CNT_OF_SUPER_PAGE * 4);
 
-    //init the mapping tabel manage module
-    result = BMM_InitMapTblCache();
-    if(result < 0)
-    {
-        LOGICCTL_ERR("[LOGICCTL_ERR] Init the mapping table manage module failed! Err:0x%x\n", result);
-        return -ERR_MAPPING;
-    }
+	//init the mapping tabel manage module
+	result = BMM_InitMapTblCache();
+	if(result < 0) {
+		LOGICCTL_ERR("[LOGICCTL_ERR] Init the mapping table manage module failed! Err:0x%x\n", result);
+		return -ERR_MAPPING;
+	}
 
-    result = PMM_InitMapTblCache();
-    if(result < 0)
-    {
-        LOGICCTL_ERR("[LOGICCTL_ERR] Init the mapping table manage module failed! Err:0x%x\n", result);
-        return -ERR_MAPPING;
-    }
+	result = PMM_InitMapTblCache();
+	if(result < 0) {
+		LOGICCTL_ERR("[LOGICCTL_ERR] Init the mapping table manage module failed! Err:0x%x\n", result);
+		return -ERR_MAPPING;
+	}
 
-    return 0;
+	return 0;
 }
 
 

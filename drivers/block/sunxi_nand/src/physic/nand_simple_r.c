@@ -600,11 +600,8 @@ __s32 PHY_GetDefaultParam(__u32 bank)
 	}
 	pdata = (__u8 *)(PHY_TMP_PAGE_CACHE);
 
-	pr_info("%s: Read Retry Table in the temporary cache:\n", __FUNCTION__);
-	dump(PHY_TMP_PAGE_CACHE, READ_RETRY_REG_CNT * 8, 4, 8);
-
 	if((READ_RETRY_MODE >= 2) && (READ_RETRY_MODE < 0x10)) {
-		for (retry = 0, otp_ok_flag = 0; (!otp_ok_flag) && retry < 8; retry++) {
+		for (retry = 0, otp_ok_flag = 0; (!otp_ok_flag) && retry < 3; retry++) {
 			for(i = 8; i<12; i++) {
 				nand_op.chip = chip;
 				nand_op.block = i;
@@ -613,26 +610,31 @@ __s32 PHY_GetDefaultParam(__u32 bank)
 				nand_op.oobbuf = oob;
 
 				ret = PHY_SimpleRead_1K(&nand_op);
-				PHY_DBG("chip %d, block %d, page 0, oob: 0x%x, 0x%x, 0x%x, 0x%x\n",
-					nand_op.chip, nand_op.block, oob[0], oob[1], oob[2], oob[3]);
-				if((ret>=0)&&(oob[0] == 0x00) &&
-				   (oob[1] == 0x4F) &&
-				   (oob[2] == 0x4F) &&
-				   (oob[3] == 0x42)) {
+				if (ret < 0)
+					pr_warn("%s: OOB read error %d", __FUNCTION__, ret);
+				else if (oob[0] == 0    &&
+					 oob[1] == 0x4F &&
+					 oob[2] == 0x4F &&
+					 oob[3] == 0x42) {
+
 					otp_ok_flag = 1;
-					for(j = 0; j < READ_RETRY_REG_CNT * 8; j++) {
-						if((pdata[j] + pdata[READ_RETRY_REG_CNT * 8 + j])!= 0xff) {
-							PHY_DBG("otp data check error!\n");
+					for(j = 0; otp_ok_flag && j < READ_RETRY_REG_CNT * 8; j++) {
+						if((pdata[j] + pdata[READ_RETRY_REG_CNT * 8 + j]) != 0xff) {
 							otp_ok_flag = 0;
-							break;
+							PHY_DBG("otp data check error!\n");
 						}
 					}
 					if(otp_ok_flag) {
-						PHY_DBG("find good otp value in chip %d, block %d \n",
-							nand_op.chip, nand_op.block);
+						PHY_DBG("find good otp value in chip %d, block %d \n", chip, i);
 						break;
 					}
 				}
+				else {
+					otp_ok_flag = 0;
+					PHY_DBG("BAD MAGIC %x %x %x %x found on chip %d, block %d, page 0\n",
+						chip, i, oob[0], oob[1], oob[2], oob[3]);
+				}
+
 			}
 
 			if(otp_ok_flag) {
