@@ -598,7 +598,7 @@ __s32 PHY_GetDefaultParam(__u32 bank)
 		if (!PageCachePool.PageCache0)
 			return -1;
 	}
-	pdata = (__u8 *)(PHY_TMP_PAGE_CACHE);
+	pdata = (__u8*) PageCachePool.PageCache0;
 
 	if((READ_RETRY_MODE >= 2) && (READ_RETRY_MODE < 0x10)) {
 		for (retry = 0, otp_ok_flag = 0; (!otp_ok_flag) && retry < 3; retry++) {
