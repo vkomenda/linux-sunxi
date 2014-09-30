@@ -754,18 +754,23 @@ __s32 NFC_ChangMode(NFC_INIT_INFO *nand_info )
 	cfg |= ( (nand_info->bus_width & 0x1) << 2);
 	cfg |= ( (nand_info->ce_ctl & 0x1) << 6);
 	cfg |= ( (nand_info->ce_ctl1 & 0x1) << 7);
-	if(nand_info->pagesize == 2 )            /*  1K  */
-	   cfg |= ( 0x0 << 8 );
-	else if(nand_info->pagesize == 4 )       /*  2K  */
-	   cfg |= ( 0x1 << 8 );
-	else if(nand_info->pagesize == 8 )       /*  4K  */
-	   cfg |= ( 0x2 << 8 );
-	else if(nand_info->pagesize == 16 )       /*  8K  */
-	   cfg |= ( 0x3 << 8 );
-	else if(nand_info->pagesize == 32 )       /*  16K  */
-	   cfg |= ( 0x4 << 8 );
-	else                                      /* default 4K */
-	   cfg |= ( 0x2 << 8 );
+	switch (nand_info->pagesize) {
+	2:  /*  1K  */
+		break;
+	4:  /*  2K  */
+		cfg |= 1 << 8;
+		break;
+	16: /*  8K  */
+		cfg |= 3 << 8;
+		break;
+	32: /*  16K  */
+		cfg |= 4 << 8;
+		break;
+	8:  /*  4K  */
+	default:
+		cfg |= 2 << 8;
+		break;
+	}
 	cfg |= ((nand_info->ddr_type & 0x3) << 18);   //set ddr type
 	cfg |= ((nand_info->debug & 0x1) << 31);
 	NFC_WRITE_REG(NFC_REG_CTL,cfg);
@@ -1206,7 +1211,7 @@ inline void hynix_send_otp_rrt_prefix(__u8 addr, __u8 data)
  * count == 64 for Hynix types 2 and 3.
  * count == 32 for Hynix type 4.
  */
-__s32 _vender_get_param_otp_hynix(__u8 *para, __u8 *addr, __u32 count)
+__s32 _vender_get_param_otp_hynix(__u8 *para, __u32 count)
 {
 	__u32 i, j, cfg;
 	__s32 error_flag,ret = 0;
@@ -1214,6 +1219,7 @@ __s32 _vender_get_param_otp_hynix(__u8 *para, __u8 *addr, __u32 count)
 	__u8 para_inverse[64];
 	__u8 reg_addr[2] = {0, 0};
 	__u8 w_data[2]   = {0, 0};
+	__u32 rrt_set;
 
 	_enter_nand_critical();
 
@@ -1304,10 +1310,11 @@ __s32 _vender_get_param_otp_hynix(__u8 *para, __u8 *addr, __u32 count)
 	_wait_cmd_finish();
 
 	for(j=0;j<8;j++) {
+		rrt_set = NFC_RAM0_BASE + 16 + count*2*j;
 		error_flag = 0;
 		for(i=0;i<count;i++) {
-			para[i]         = NFC_READ_RAM_B(NFC_RAM0_BASE + count*2 *  j    + i);
-			para_inverse[i] = NFC_READ_RAM_B(NFC_RAM0_BASE + count*2 * (j+1) + i);
+			para[i]         = NFC_READ_RAM_B(rrt_set + i);
+			para_inverse[i] = NFC_READ_RAM_B(rrt_set + count + i);
 			if((para[i]+para_inverse[i]) != 0xff) {
 				error_flag = 1;
 //				break;
@@ -1315,9 +1322,9 @@ __s32 _vender_get_param_otp_hynix(__u8 *para, __u8 *addr, __u32 count)
 		}
 
 		pr_info("RRT SET %d origin:\n",  j);
-		dump(para,         count, 4, 8);
+		dump(para,         count, 1, 32);
 		pr_info("RRT SET %d inverse:\n", j);
-		dump(para_inverse, count, 4, 8);
+		dump(para_inverse, count, 1, 32);
 
 		if(!error_flag) {
 			pr_info("DBG: OTP set %d OK\n", j);
@@ -1688,7 +1695,7 @@ __s32 NFC_GetHynixOTPParam(__u32 chip,__u8* default_value, __u32 read_retry_type
 		}
 		else {
 			ret = _vender_get_param_otp_hynix(hynix_read_retry_otp_value[chip][0],
-							  read_retry_reg_adr, read_retry_reg_num * 8);
+							  read_retry_reg_num * (1 + read_retry_cycle));
 			if(ret)
 				pr_info("%s: Read OTP attempt FAILED\n", __FUNCTION__);
 
