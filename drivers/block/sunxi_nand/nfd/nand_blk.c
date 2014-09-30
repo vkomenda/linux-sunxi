@@ -1239,54 +1239,46 @@ static int __init init_blklayer(void)
 	int ret;
 	unsigned long irqflags;
 
-	#ifndef USE_SYS_CLK
-		__u32 nand_clk;
-		set_nand_clock(20);
-	#else
-		ret = nand_request_clk();
-		if(ret)
-		{
-			printk("[NAND] nand_request_clk fail \n");
-			return -1;
-		}
+#ifndef USE_SYS_CLK
+	__u32 nand_clk;
+	set_nand_clock(20);
+#else
+	ret = nand_request_clk();
+	if(ret) {
+		printk("[NAND] nand_request_clk fail \n");
+		return -1;
+	}
 
-		ret = nand_ahb_clk_enable();
-		if(ret)
-		{
-			printk("[NAND] nand_ahb_clk_enable fail \n");
-			return -1;
-		}
+	ret = nand_ahb_clk_enable();
+	if(ret) {
+		printk("[NAND] nand_ahb_clk_enable fail \n");
+		return -1;
+	}
 
-		ret = nand_module_clk_enable();
-		if(ret)
-		{
-			printk("[NAND] nand_module_clk_enable fail \n");
-			return -1;
-		}
+	ret = nand_module_clk_enable();
+	if(ret) {
+		printk("[NAND] nand_module_clk_enable fail \n");
+		return -1;
+	}
 
-		ret = nand_set_module_clk(20000000);
-		if(ret)
-		{
-			printk("[NAND] nand_set_module_clk fail \n");
-			return -1;
-		}
+	ret = nand_set_module_clk(20000000);
+	if(ret) {
+		printk("[NAND] nand_set_module_clk fail \n");
+		return -1;
+	}
 
-	#endif
-	//set nand pio
+#endif
 	set_nand_pio();
-
-
 	clear_NAND_ZI();
 
 	printk("[NAND] nand driver version: 0x%x 0x%x \n", NAND_VERSION_0,NAND_VERSION_1);
-    NAND_ClearRbInt();
-    spin_lock_init(&nand_rb_lock);
+	NAND_ClearRbInt();
+	spin_lock_init(&nand_rb_lock);
 	irqflags = IRQF_DISABLED;
 
-	if (request_irq(SW_INT_IRQNO_NAND, nand_rb_interrupt, irqflags, mytr.name, &mytr))
-	{
-	    printk("nand interrupte register error\n");
-	    return -EAGAIN;
+	if (request_irq(SW_INT_IRQNO_NAND, nand_rb_interrupt, irqflags, mytr.name, &mytr)) {
+		printk("nand interrupte register error\n");
+		return -EAGAIN;
 	}
 
 	ret = PHY_Init();
@@ -1300,29 +1292,27 @@ static int __init init_blklayer(void)
 		return ret;
 
 	//set nand clk
-	#ifndef USE_SYS_CLK
-		nand_clk =NandStorageInfo.FrequencePar;
-		if(nand_clk>30)
-			nand_clk = 30;
-		set_nand_clock(nand_clk);
-		dbg_inf("set nand clk to %x \n", nand_clk);
-	#else
-		ret = nand_set_module_clk((NandStorageInfo.FrequencePar)*1000000);
-		if(ret)
-		{
-			printk("[NAND] nand_set_module_clk fail \n");
-			return -1;
-		}
-	#endif
-
+#ifndef USE_SYS_CLK
+	nand_clk =NandStorageInfo.FrequencePar;
+	if(nand_clk>30)
+		nand_clk = 30;
+	set_nand_clock(nand_clk);
+	dbg_inf("set nand clk to %x \n", nand_clk);
+#else
+	ret = nand_set_module_clk((NandStorageInfo.FrequencePar)*1000000);
+	if(ret) {
+		printk("[NAND] nand_set_module_clk fail \n");
+		return -1;
+	}
+#endif
 
 	ret = PHY_ChangeMode(1);
 	if (ret < 0)
 		return ret;
 
-    ret = PHY_ScanDDRParam();
-    if (ret < 0)
-        return ret;
+	ret = PHY_ScanDDRParam();
+	if (ret < 0)
+		return ret;
 
 	ret = FMT_Init();
 	if (ret < 0)
@@ -1338,9 +1328,9 @@ static int __init init_blklayer(void)
 	if (ret < 0)
 		return ret;
 
-	#ifdef NAND_CACHE_RW
-		NAND_CacheOpen();
-	#endif
+#ifdef NAND_CACHE_RW
+	NAND_CacheOpen();
+#endif
 
 	return nand_blk_register(&mytr);
 }
@@ -1526,4 +1516,3 @@ module_exit(nand_exit);
 MODULE_LICENSE ("GPL");
 MODULE_AUTHOR ("nand flash groups");
 MODULE_DESCRIPTION ("Generic NAND flash driver code");
-
