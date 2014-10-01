@@ -606,7 +606,7 @@ __s32 PHY_GetDefaultParam(__u32 bank)
 				nand_op.chip = chip;
 				nand_op.block = i;
 				nand_op.page = 0;
-				nand_op.mainbuf = PHY_TMP_PAGE_CACHE;
+				nand_op.mainbuf = PageCachePool.PageCache0;
 				nand_op.oobbuf = oob;
 
 				ret = PHY_SimpleRead_1K(&nand_op);
