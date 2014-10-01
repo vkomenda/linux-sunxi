@@ -755,18 +755,18 @@ __s32 NFC_ChangMode(NFC_INIT_INFO *nand_info )
 	cfg |= ( (nand_info->ce_ctl & 0x1) << 6);
 	cfg |= ( (nand_info->ce_ctl1 & 0x1) << 7);
 	switch (nand_info->pagesize) {
-	2:  /*  1K  */
+	case 2:  /*  1K  */
 		break;
-	4:  /*  2K  */
+	case 4:  /*  2K  */
 		cfg |= 1 << 8;
 		break;
-	16: /*  8K  */
+	case 16: /*  8K  */
 		cfg |= 3 << 8;
 		break;
-	32: /*  16K  */
+	case 32: /*  16K  */
 		cfg |= 4 << 8;
 		break;
-	8:  /*  4K  */
+	case 8:  /*  4K  */
 	default:
 		cfg |= 2 << 8;
 		break;
