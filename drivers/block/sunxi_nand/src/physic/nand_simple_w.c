@@ -183,20 +183,11 @@ __s32 _write_signle_page_1K (struct boot_physical_param *writeop,__u32 program1,
 	NFC_SelectChip(writeop->chip);
 	NFC_SelectRb(rb);
 
-
-	if(1)
-	{
-	    random_seed = 0x4a80;
-		NFC_SetRandomSeed(random_seed);
-		NFC_RandomEnable();
-		ret = NFC_Write_1K(cmd_list, writeop->mainbuf, sparebuf, dma_wait_mode, rb_wait_mode, NFC_PAGE_MODE);
-		NFC_RandomDisable();
-	}
-	else
-	{
-	    ret = NFC_Write_1K(cmd_list, writeop->mainbuf, sparebuf, dma_wait_mode, rb_wait_mode, NFC_PAGE_MODE);
-	}
-
+	random_seed = 0x4a80;
+	NFC_SetRandomSeed(random_seed);
+	NFC_RandomEnable();
+	ret = NFC_Write_1K(cmd_list, writeop->mainbuf, sparebuf, dma_wait_mode, rb_wait_mode, NFC_PAGE_MODE);
+	NFC_RandomDisable();
 
 	NFC_DeSelectChip(writeop->chip);
 	NFC_DeSelectRb(rb);
@@ -204,7 +195,6 @@ __s32 _write_signle_page_1K (struct boot_physical_param *writeop,__u32 program1,
 		_pending_dma_irq_sem();
 
 	return ret;
-
 }
 
 __s32 _erase_single_block(struct boot_physical_param *eraseop)
@@ -222,9 +212,8 @@ __s32 _erase_single_block(struct boot_physical_param *eraseop)
 	_add_cmd_list(cmd_list,0x60,3,addr,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE);
 	_add_cmd_list(cmd_list + 1,0xd0,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE);
 
-	for(i = 0; i < list_len - 1; i++){
+	for(i = 0; i < list_len - 1; i++)
 		cmd_list[i].next = &(cmd_list[i+1]);
-	}
 
 	rb = _cal_real_rb(eraseop->chip);
 	NFC_SelectChip(eraseop->chip);
@@ -351,4 +340,3 @@ __s32 PHY_SimpleErase (struct boot_physical_param *eraseop )
 	return ret;
 
 }
-

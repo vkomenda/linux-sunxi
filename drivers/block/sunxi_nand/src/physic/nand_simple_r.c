@@ -461,7 +461,7 @@ __s32 _read_single_page(struct boot_physical_param *readop, __u8 dma_wait_mode)
 				}
 			}
 			else
-				ret = NFC_Read(cmd_list, readop->mainbuf, sparebuf, dma_wait_mode , NFC_PAGE_MODE);
+				ret = NFC_Read(cmd_list, readop->mainbuf, sparebuf, dma_wait_mode, NFC_PAGE_MODE);
 
 			if((ret != -ERR_ECC)||(k==READ_RETRY_CYCLE)) {
 				if(k==0)
@@ -611,30 +611,37 @@ __s32 PHY_GetDefaultParam(__u32 bank)
 
 				ret = PHY_SimpleRead_1K(&nand_op);
 				if (ret < 0)
-					pr_warn("%s: OOB read error %d", __FUNCTION__, ret);
+					pr_warn("%s: OOB MAGIC read error %d\n", __FUNCTION__, ret);
 				else if (oob[0] == 0    &&
 					 oob[1] == 0x4F &&
 					 oob[2] == 0x4F &&
 					 oob[3] == 0x42) {
 
 					otp_ok_flag = 1;
-					for(j = 0; otp_ok_flag && j < READ_RETRY_REG_CNT * 8; j++) {
-						if((pdata[j] + pdata[READ_RETRY_REG_CNT * 8 + j]) != 0xff) {
+					// FIXME: ditch this for-loop
+					for (j = 0;
+					     otp_ok_flag && j < READ_RETRY_REG_CNT * (1 + READ_RETRY_CYCLE);
+					     j++) {
+						if ((pdata[j] +
+						     pdata[READ_RETRY_REG_CNT * (1 + READ_RETRY_CYCLE) + j])
+						    != 0xff) {
 							otp_ok_flag = 0;
-							PHY_DBG("otp data check error!\n");
+							pr_warn("%s: RRT check FAILED\n", __FUNCTION__);
 						}
+//						else
+//							pr_info("%s: RRT check PASSED\n", __FUNCTION__);
 					}
-					if(otp_ok_flag) {
-						PHY_DBG("find good otp value in chip %d, block %d \n", chip, i);
+					if (otp_ok_flag) {
+						pr_info("%s: GOOD MAGIC found on chip %d block %d\n",
+							__FUNCTION__, chip, i);
 						break;
 					}
 				}
 				else {
 					otp_ok_flag = 0;
-					PHY_DBG("BAD MAGIC %x %x %x %x found on chip %d, block %d, page 0\n",
-						chip, i, oob[0], oob[1], oob[2], oob[3]);
+					pr_warn("%s: BAD MAGIC %x %x %x %x found on chip %d, block %d, page 0\n",
+						__FUNCTION__, oob[0], oob[1], oob[2], oob[3], chip, i);
 				}
-
 			}
 
 			if(otp_ok_flag) {
@@ -642,14 +649,15 @@ __s32 PHY_GetDefaultParam(__u32 bank)
 				// break;   ...function returns the call
 			}
 			else {
-				PHY_DBG("[PHY_DBG] can't get right otp value from nand otp blocks,"
-					" then use otp command\n");
+				pr_info("%s: magic write begin\n", __FUNCTION__);
+
 				NFC_GetHynixOTPParam(chip, hynix_RRT, READ_RETRY_TYPE);
 				NFC_SetDefaultParam(chip, default_value, READ_RETRY_TYPE);
 
-				for(j = 0; j < READ_RETRY_REG_CNT * 8; j++) {
+				for(j = 0; j < READ_RETRY_REG_CNT * (1 + READ_RETRY_CYCLE); j++) {
 					pdata[j] = hynix_RRT[j];
-					pdata[READ_RETRY_REG_CNT * 8 + j] = 0xFF - pdata[j];
+					pdata[READ_RETRY_REG_CNT * (1 + READ_RETRY_CYCLE) + j] =
+						0xFF - pdata[j];
 				}
 
 				oob[0] = 0x00;
@@ -657,32 +665,38 @@ __s32 PHY_GetDefaultParam(__u32 bank)
 				oob[2] = 0x4F;
 				oob[3] = 0x42;
 
-				NFC_LSBInit(READ_RETRY_TYPE);
-				NFC_LSBEnable(chip, READ_RETRY_TYPE);
-				for(i = 8; i<12; i++) {
+//				NFC_LSBInit(READ_RETRY_TYPE);
+//				NFC_LSBEnable(chip, READ_RETRY_TYPE);
+				for (i = 8; i<12; i++) {
 					nand_op.chip = chip;
 					nand_op.block = i;
 					nand_op.page = 0;
-					nand_op.mainbuf = PHY_TMP_PAGE_CACHE;
+					nand_op.mainbuf = PageCachePool.PageCache0;
 					nand_op.oobbuf = oob;
 
 					ret = PHY_SimpleErase(&nand_op);
 					if(ret<0) {
-						PHY_ERR("erase chip %d, block %d error\n",
-							nand_op.chip, nand_op.block);
+						pr_err("%s: chip %d block %d erase ERROR\n",
+						       __FUNCTION__, chip, i);
 						continue;
 					}
+					else
+						pr_info("%s: chip %d block %d erase SUCCESS\n",
+							__FUNCTION__, chip, i);
 					ret = PHY_SimpleWrite_1K(&nand_op);
 					if(ret<0) {
-						PHY_ERR("write chip %d, block %d, page 0 error\n",
-							nand_op.chip, nand_op.block);
+						pr_err("%s: chip %d block %d page 0 write ERROR\n",
+						       __FUNCTION__, chip, i);
 						continue;
 					}
+					else
+						pr_info("%s: chip %d block %d page 0 write SUCCESS\n",
+							__FUNCTION__, chip, i);
 				}
-				NFC_LSBDisable(chip, READ_RETRY_TYPE);
-				NFC_LSBExit(READ_RETRY_TYPE);
+//				NFC_LSBDisable(chip, READ_RETRY_TYPE);
+//				NFC_LSBExit(READ_RETRY_TYPE);
 
-				PHY_DBG("[PHY_DBG] repair otp value end\n");
+				pr_info("%s: magic write end\n", __FUNCTION__);
 			}
 		}
 	}

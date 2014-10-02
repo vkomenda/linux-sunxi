@@ -86,7 +86,7 @@
 /*define bit use in NFC_CTL*/
 #define NFC_EN					(1 << 0)
 #define NFC_RESET				(1 << 1)
-#define NFC_BUS_WIDYH			(1 << 2)
+#define NFC_BUS_WIDTH			(1 << 2)
 #define NFC_RB_SEL				(1 << 3)
 #define NFC_CE_SEL				(7 << 24)
 #define NFC_CE_CTL				(1 << 6)
@@ -150,25 +150,25 @@
 #define NFC_RANDOM_EN           (1 << 9 )
 #define NFC_RANDOM_DIRECTION    (1 << 10 )
 #define NFC_ECC_MODE            (0xf << 12)
-#define NFC_RANDOM_SEED         (0x7fff << 16))
+//#define NFC_RANDOM_SEED         (0x7fff << 16)
 
 #define NFC_IRQ_MAJOR           13
 /*cmd flag bit*/
-#define NFC_PAGE_MODE           0x1
-#define NFC_NORMAL_MODE         0x0
+#define NFC_PAGE_MODE           1
+#define NFC_NORMAL_MODE         0
 
-#define NFC_DATA_FETCH 		0x1
-#define NFC_NO_DATA_FETCH 	0x0
-#define NFC_MAIN_DATA_FETCH 	0x1
-#define NFC_SPARE_DATA_FETCH	0X0
-#define NFC_WAIT_RB		0x1
-#define NFC_NO_WAIT_RB		0x0
-#define NFC_IGNORE		0x0
+#define NFC_DATA_FETCH 		1
+#define NFC_NO_DATA_FETCH 	0
+#define NFC_MAIN_DATA_FETCH 	1
+#define NFC_SPARE_DATA_FETCH	0
+#define NFC_WAIT_RB		1
+#define NFC_NO_WAIT_RB		0
+#define NFC_IGNORE		0
 
-#define NFC_INT_RB				0
-#define NFC_INT_CMD				1
-#define NFC_INT_DMA				2
-#define NFC_INT_BATCh			5
+#define NFC_INT_RB		0
+#define NFC_INT_CMD		1
+#define NFC_INT_DMA		2
+#define NFC_INT_BATCh		5
 
 typedef struct cmd_list{
 	struct	cmd_list *next;
