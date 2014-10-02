@@ -198,13 +198,17 @@ __s32 _read_single_page_1K(struct boot_physical_param *readop,__u8 dma_wait_mode
 	NFC_SelectRb(rb);
 
 	//random_seed = _cal_random_seed(readop->page);
-	random_seed = 0x4a80;
+	random_seed = 0xb1ad; //0x4a80;
 	NFC_SetRandomSeed(random_seed);
 	NFC_RandomEnable();
 	ret = NFC_Read_1K(cmd_list, readop->mainbuf, sparebuf, dma_wait_mode, NFC_PAGE_MODE);
 	NFC_RandomDisable();
-	if (ret)
+	if (ret) {
+		pr_warn("%s: NFC_Read_1K (randomised) error %d", __FUNCTION__, ret);
 		ret = NFC_Read_1K(cmd_list, readop->mainbuf, sparebuf, dma_wait_mode, NFC_PAGE_MODE);
+		if (ret)
+			pr_warn("%s: NFC_Read_1K (not randomised) error %d", __FUNCTION__, ret);
+	}
 
 	if (dma_wait_mode)
 		_pending_dma_irq_sem();
