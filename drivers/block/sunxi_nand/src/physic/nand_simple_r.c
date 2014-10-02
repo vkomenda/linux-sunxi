@@ -612,10 +612,11 @@ __s32 PHY_GetDefaultParam(__u32 bank)
 				ret = PHY_SimpleRead_1K(&nand_op);
 				if (ret < 0)
 					pr_warn("%s: OOB MAGIC read error %d\n", __FUNCTION__, ret);
-				else if (oob[0] == 0    &&
-					 oob[1] == 0x4F &&
-					 oob[2] == 0x4F &&
-					 oob[3] == 0x42) {
+				else if (/*oob[0] == oob[1] == oob[2] == oob[3] == */
+					 oob[4] == 0    &&
+					 oob[5] == 0x4F &&
+					 oob[6] == 0x4F &&
+					 oob[7] == 0x42) {
 
 					otp_ok_flag = 1;
 					// FIXME: ditch this for-loop
@@ -639,8 +640,9 @@ __s32 PHY_GetDefaultParam(__u32 bank)
 				}
 				else {
 					otp_ok_flag = 0;
-					pr_warn("%s: BAD MAGIC %x %x %x %x found on chip %d, block %d, page 0\n",
-						__FUNCTION__, oob[0], oob[1], oob[2], oob[3], chip, i);
+					pr_warn("%s: BAD MAGIC found on chip %d, block %d, page 0:\n",
+						__FUNCTION__, chip, i);
+					dump(oob, 8, 1, 8);
 				}
 			}
 
@@ -660,10 +662,14 @@ __s32 PHY_GetDefaultParam(__u32 bank)
 						0xFF - pdata[j];
 				}
 
-				oob[0] = 0x00;
-				oob[1] = 0x4F;
-				oob[2] = 0x4F;
-				oob[3] = 0x42;
+				oob[0] = 0;
+				oob[1] = 1;
+				oob[2] = 2;
+				oob[3] = 3;
+				oob[4] = 0;
+				oob[5] = 0x4F;
+				oob[6] = 0x4F;
+				oob[7] = 0x42;
 
 //				NFC_LSBInit(READ_RETRY_TYPE);
 //				NFC_LSBEnable(chip, READ_RETRY_TYPE);

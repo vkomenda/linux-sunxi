@@ -128,7 +128,7 @@ __s32 NFC_Write( NFC_CMD_LIST  *wcmd, void *mainbuf, void *sparebuf,  __u8 dma_w
 		return ret;
 	}
 	/*set NFC_REG_CNT*/
-  NFC_WRITE_REG(NFC_REG_CNT,1024);
+	NFC_WRITE_REG(NFC_REG_CNT,1024);
 
 	/*set NFC_REG_RCMD_SET*/
 	cfg = 0;
@@ -139,11 +139,10 @@ __s32 NFC_Write( NFC_CMD_LIST  *wcmd, void *mainbuf, void *sparebuf,  __u8 dma_w
 	/*set NFC_REG_SECTOR_NUM*/
 	NFC_WRITE_REG(NFC_REG_SECTOR_NUM, pagesize/1024);
 
-
 	/*set user data*/
 	for (i = 0; i < pagesize/1024;  i++){
 		pr_info("%s: out-of-band input %.8x", __FUNCTION__, *((__u32*) sparebuf + i));
-		NFC_WRITE_REG(NFC_REG_USER_DATA(i), *((__u32*) sparebuf + i) );
+		NFC_WRITE_REG(NFC_REG_USER_DATA(i), *((__u32*) sparebuf + i));
 	}
 
 	/*set addr*/
@@ -241,7 +240,7 @@ __s32 NFC_Write_Seq( NFC_CMD_LIST  *wcmd, void *mainbuf, void *sparebuf,  __u8 d
 	NFC_WRITE_REG(NFC_REG_SECTOR_NUM, pagesize/1024);
 
 	/*set user data*/
-	for (i = 0; i < pagesize/1024;  i++){
+	for (i = 0; i < pagesize/1024;  i++) {
 		pr_info("%s: out-of-band input %.8x", __FUNCTION__, *((__u32*) sparebuf + i));
 		NFC_WRITE_REG(NFC_REG_USER_DATA(i), *((__u32*) sparebuf + i));
 	}
@@ -295,7 +294,7 @@ __s32 NFC_Write_1K(NFC_CMD_LIST *wcmd, void *mainbuf, void *sparebuf,
 		   __u8 dma_wait_mode, __u8 rb_wait_mode, __u8 page_mode)
 {
 	__s32 ret = 0;
-//	__s32 i;
+	__s32 i;
 	__u32 cfg;
 	__u32 page_size_temp, ecc_mode_temp;
 	__u32 program_cmd,random_program_cmd;
@@ -351,13 +350,17 @@ __s32 NFC_Write_1K(NFC_CMD_LIST *wcmd, void *mainbuf, void *sparebuf,
 	/*set NFC_REG_SECTOR_NUM*/
 	NFC_WRITE_REG(NFC_REG_SECTOR_NUM, 1024/1024);
 
-	pr_info("%s: out-of-band input %.8x", __FUNCTION__, *((__u32 *)sparebuf));
+	pr_info("%s: out-of-band input %.8x %.8x", __FUNCTION__,
+		*((__u32*) sparebuf), *((__u32*) sparebuf + 1));
 
 	/*set user data*/
-//	for (i = 0; i < 1024/1024;  i++)
+	for (i = 0; i < 2;  i++)
+		NFC_WRITE_REG(__NFC_REG(NFC_REG_o_SPARE_AREA + (4 * i)),
+			      *((__u32*) sparebuf + i));
 //		NFC_WRITE_REG(NFC_REG_USER_DATA(i), *((__u32 *)sparebuf + i));
 
-	NFC_WRITE_REG(NFC_REG_USER_DATA(0), *((__u32*) sparebuf));
+//	NFC_WRITE_REG(NFC_REG_USER_DATA(0), *((__u32*) sparebuf));
+//	NFC_WRITE_REG(__NFC_REG(NFC_REG_o_SPARE_AREA + 4), *((__u32*) sparebuf + 1));
 
 	/*set addr*/
 	_set_addr(program_addr_cmd->addr,program_addr_cmd->addr_cycle);
@@ -607,7 +610,7 @@ __s32 _read_in_page_mode_seq(NFC_CMD_LIST  *rcmd,void *mainbuf,void *sparebuf,__
 __s32 _read_in_page_mode_1K(NFC_CMD_LIST  *rcmd,void *mainbuf,void *sparebuf,__u8 dma_wait_mode)
 {
 	__s32 ret;
-//	__s32 i;
+	__s32 i;
 	__u32 cfg;
 	NFC_CMD_LIST *cur_cmd,*read_addr_cmd;
 	__u32 read_data_cmd,random_read_cmd0,random_read_cmd1;
@@ -673,16 +676,16 @@ __s32 _read_in_page_mode_1K(NFC_CMD_LIST  *rcmd,void *mainbuf,void *sparebuf,__u
 	cfg |= 1 << 25;
 	cfg |= (read_addr_cmd->addr_cycle - 1) << 16;
 	cfg |= NFC_SEND_ADR | NFC_DATA_TRANS | NFC_SEND_CMD1 | NFC_SEND_CMD2 | NFC_WAIT_FLAG | NFC_DATA_SWAP_METHOD;
-	cfg |= ((__u32)1 << 31);//page command
+	cfg |= (__u32)1 << 31;//page command
 
-	if (1024/1024 == 1)
-		cfg |= NFC_SEQ;
+//	if (1024/1024 == 1)
+	cfg |= NFC_SEQ;
 
 	/*enable ecc*/
 	_enable_ecc(1);
 
 	/*set ecc to 64-bit ecc*/
-	ecc_mode_temp = NFC_READ_REG(NFC_REG_ECC_CTL) & 0xf000;
+	ecc_mode_temp = NFC_READ_REG(NFC_REG_ECC_CTL) & NFC_ECC_MODE;
 	NFC_WRITE_REG(NFC_REG_ECC_CTL, ((NFC_READ_REG(NFC_REG_ECC_CTL) & (~NFC_ECC_MODE))|(0x8<<12) ));
 
 	NFC_WRITE_REG(NFC_REG_CMD,cfg);
@@ -700,11 +703,16 @@ __s32 _read_in_page_mode_1K(NFC_CMD_LIST  *rcmd,void *mainbuf,void *sparebuf,__u
 		return ret;
 	}
 	/*get user data*/
-//	for (i = 0; i < 1024/1024;  i++)
+	for (i = 0; i < 2;  i++)
+		*((__u32*) sparebuf + i) =
+			NFC_READ_REG(__NFC_REG(NFC_REG_o_SPARE_AREA + (4 * i)));
 //		*(((__u32*) sparebuf)+i) = NFC_READ_REG(NFC_REG_USER_DATA(i));
-	*((__u32*) sparebuf) = NFC_READ_REG(NFC_REG_USER_DATA(0));
 
-	pr_info("%s: out-of-band output %.8x", __FUNCTION__, *((__u32*) sparebuf));
+//	*((__u32*) sparebuf) = NFC_READ_REG(NFC_REG_USER_DATA(0));
+//	*((__u32*) sparebuf) = NFC_READ_REG(NFC_REG_SPARE_AREA);
+
+	pr_info("%s: out-of-band output %.8x %.8x", __FUNCTION__,
+		*((__u32*) sparebuf), *((__u32*) sparebuf + 1));
 
 	/*ecc check and disable ecc*/
 	ret = _check_ecc(1); // was in AW version: (pagesize/1024);

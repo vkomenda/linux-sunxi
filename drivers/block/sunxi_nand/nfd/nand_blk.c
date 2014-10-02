@@ -919,6 +919,7 @@ int nand_blk_register(struct nand_blk_ops *nandr)
 
 void nand_blk_unregister(struct nand_blk_ops *nandr)
 {
+	pr_info("%s BEGIN", __FUNCTION__);
 	down(&nand_mutex);
 	/* Clean up the kernel thread */
 	nandr->quit = 1;
@@ -939,6 +940,7 @@ void nand_blk_unregister(struct nand_blk_ops *nandr)
 	unregister_blkdev(nandr->major, nandr->name);
 
 	up(&nand_mutex);
+	pr_info("%s END", __FUNCTION__);
 }
 
 static int nand_getgeo(struct nand_blk_dev *dev,  struct hd_geometry *geo)
@@ -1360,11 +1362,11 @@ static void  __exit exit_blklayer(void)
 }
 #endif
 
-#ifdef CONFIG_SUNXI_NAND_TEST
+//#ifdef CONFIG_SUNXI_NAND_TEST
 int nand_suspend(struct platform_device *plat_dev, pm_message_t state)
-#else
-static int nand_suspend(struct platform_device *plat_dev, pm_message_t state)
-#endif
+//#else
+//static int nand_suspend(struct platform_device *plat_dev, pm_message_t state)
+//#endif
 {
 	int i=0;
 
@@ -1393,11 +1395,11 @@ static int nand_suspend(struct platform_device *plat_dev, pm_message_t state)
 	}
 }
 
-#ifdef CONFIG_SUNXI_NAND_TEST
+//#ifdef CONFIG_SUNXI_NAND_TEST
 int nand_resume(struct platform_device *plat_dev)
-#else
-static int nand_resume(struct platform_device *plat_dev)
-#endif
+//#else
+//static int nand_resume(struct platform_device *plat_dev)
+//#endif
 {
 
 	printk("[NAND] nand_resume \n");
@@ -1416,12 +1418,12 @@ static int nand_resume(struct platform_device *plat_dev)
 }
 
 
-static int nand_probe(struct platform_device *plat_dev)
+int nand_probe(struct platform_device *plat_dev)
 {
 	return 0;
 }
 
-static int nand_remove(struct platform_device *plat_dev)
+int nand_remove(struct platform_device *plat_dev)
 {
 	return 0;
 }
@@ -1432,7 +1434,7 @@ void nand_shutdown(struct platform_device *plat_dev)
 	nand_flush_all();
 }
 
-static struct platform_driver nand_driver = {
+struct platform_driver nand_driver = {
 	.probe = nand_probe,
 	.remove = nand_remove,
 	.shutdown =  nand_shutdown,
