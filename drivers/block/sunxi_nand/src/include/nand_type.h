@@ -292,7 +292,7 @@ struct __NandDriverGlobal_t
 //==============================================================================
 
 //define the mask for the nand flash optional operation
-#define NAND_CACHE_READ         (1<<0)      // support cache read operation
+#define NAND_CACHE_READ          1          // support cache read operation
 #define NAND_CACHE_PROGRAM      (1<<1)      // support page cache program operation
 #define NAND_MULTI_READ         (1<<2)      // support multi-plane page read operation
 #define NAND_MULTI_PROGRAM      (1<<3)      // support multi-plane page program operation
@@ -306,7 +306,7 @@ struct __NandDriverGlobal_t
 
 
 //define the mask for the nand flash operation status
-#define NAND_OPERATE_FAIL       (1<<0)              //nand flash program/erase failed mask
+#define NAND_OPERATE_FAIL        1                  //nand flash program/erase failed mask
 #define NAND_CACHE_READY        (1<<5)              //nand flash cache program true ready mask
 #define NAND_STATUS_READY       (1<<6)              //nand flash ready/busy status mask
 #define NAND_WRITE_PROTECT      (1<<7)              //nand flash write protected mask
