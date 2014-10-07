@@ -1287,4 +1287,5 @@ module_exit(nand_test_exit);
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Nand test driver");
 MODULE_AUTHOR("Grace Miao");
-#endif
+
+#endif // CONFIG_SUNXI_NAND_TEST

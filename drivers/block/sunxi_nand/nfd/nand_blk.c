@@ -452,7 +452,7 @@ static int nand_xfer_request(struct request_queue* rq, struct request* req)
 	int rw_flag = 0;
 #endif
 
-	pr_info("%s START request in direction %d", __FUNCTION__, rq_data_dir(req));
+	pr_info("%s START request in direction %d\n", __FUNCTION__, rq_data_dir(req));
 
 #if USE_BIO_MERGE==1
 	//spin_unlock_irq(rq->queue_lock);
@@ -556,7 +556,8 @@ static int nand_xfer_request(struct request_queue* rq, struct request* req)
 
 #ifdef NAND_BIO_ALIGN
 	reset(req);
-#endif
+#endif // NAND_BIO_ALIGN
+
 #if NAND_TEST_TICK
 	tick = jiffies;
 	res = cache_align_page_request(nandr, dev, req);
@@ -564,17 +565,20 @@ static int nand_xfer_request(struct request_queue* rq, struct request* req)
 #else
 	res = cache_align_page_request(nandr, dev, req);
 #endif // NAND_TEST_TICK
+
 	up(&nandr->nand_ops_mutex);
 	IS_IDLE = 1;
 	spin_lock_irq(rq->queue_lock);
 
 	if(!__blk_end_request_cur(req, res)) {
 		req = NULL;
+
 #if NAND_TEST_TICK
 		printk("[N]ticks=%ld\n",nand_rw_time);
-#endif
-	}
 #endif // NAND_TEST_TICK
+
+	}
+#endif // USE_BIO_MERGE
 
 	pr_info("%s END", __FUNCTION__);
 
@@ -615,6 +619,10 @@ static int nand_blktrans_thread(void *arg)
 	struct request *req = NULL;
 	sigset_t saved_signals;
 
+#ifdef THREAD_CAPTURES_SIGNALS
+	int ret = 0;
+#endif // THREAD_CAPTURES_SIGNALS
+
 	/* we might get involved when memory gets low, so use PF_MEMALLOC */
 	current->flags |= PF_MEMALLOC | PF_NOFREEZE;
 	daemonize("%sd", nandr->name);
@@ -641,7 +649,7 @@ static int nand_blktrans_thread(void *arg)
 			set_current_state(TASK_INTERRUPTIBLE);
 #ifdef THREAD_CAPTURES_SIGNALS
 			if (signal_pending(current)) {
-				nandr->quit = 1;
+				ret = -ERESTARTSYS;
 				break;
 			}
 #endif // THREAD_CAPTURES_SIGNALS
@@ -653,7 +661,13 @@ static int nand_blktrans_thread(void *arg)
 		__set_current_state(TASK_RUNNING);
 		// End of the modified wait_event_interruptible_locked_irq().
 
-		nand_xfer_request(rq, req);
+		if (likely(req))
+			nand_xfer_request(rq, req);
+
+#ifdef THREAD_CAPTURES_SIGNALS
+		if (unlikely(ret))
+			break;
+#endif // THREAD_CAPTURES_SIGNALS
 	}
 	if (req)
 		__blk_end_request_all(req, -EIO);
@@ -663,8 +677,6 @@ static int nand_blktrans_thread(void *arg)
 
 //	unblock_thread_signals(&saved_signals);    // May be unnecessary.
 	complete_and_exit(&nandr->thread_exit, 0);
-
-	return 0;
 }
 
 
