@@ -93,13 +93,10 @@ __s32 _flush_w_cache(void)
 					nand_r_cache.hit_page = 0xffffffff;
 					nand_r_cache.secbitmap = 0;
 			}
-
 		}
 	}
 
-
 	return 0;
-
 }
 
 __s32 _flush_w_cache_simple(__u32 i)

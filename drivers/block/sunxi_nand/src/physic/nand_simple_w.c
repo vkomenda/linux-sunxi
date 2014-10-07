@@ -46,7 +46,7 @@ __s32 _write_signle_page (struct boot_physical_param *writeop,__u32 program1,__u
 	__u32 rb;
 	__u32 random_seed;
 	//__u8 *sparebuf;
-	__u8 sparebuf[4*16];
+	__u8 sparebuf[SECTOR_CNT_OF_SINGLE_PAGE * 4];
 	__u8 addr[5];
 	NFC_CMD_LIST cmd_list[4];
 	__u32 list_len,i,addr_cycle;
@@ -56,7 +56,7 @@ __s32 _write_signle_page (struct boot_physical_param *writeop,__u32 program1,__u
 		MEMCPY(sparebuf,writeop->oobbuf,SECTOR_CNT_OF_SINGLE_PAGE * 4);
 	}
 	/*create cmd list*/
-	addr_cycle = (SECTOR_CNT_OF_SINGLE_PAGE == 1)?4:5;
+	addr_cycle = (SECTOR_CNT_OF_SINGLE_PAGE == 1) ? 4 : 5;
 
 	/*the cammand have no corresponding feature if IGNORE was set, */
 	_cal_addr_in_chip(writeop->block,writeop->page,0,addr,addr_cycle);
@@ -72,19 +72,15 @@ __s32 _write_signle_page (struct boot_physical_param *writeop,__u32 program1,__u
 	NFC_SelectChip(writeop->chip);
 	NFC_SelectRb(rb);
 
-	if(SUPPORT_RANDOM)
-    {
-        random_seed = _cal_random_seed(writeop->page);
+	if(SUPPORT_RANDOM) {
+		random_seed = _cal_random_seed(writeop->page);
 		NFC_SetRandomSeed(random_seed);
 		NFC_RandomEnable();
 		ret = NFC_Write(cmd_list, writeop->mainbuf, sparebuf, dma_wait_mode, rb_wait_mode, NFC_PAGE_MODE);
 		NFC_RandomDisable();
-    }
-    else
-    {
-        ret = NFC_Write(cmd_list, writeop->mainbuf, sparebuf, dma_wait_mode, rb_wait_mode, NFC_PAGE_MODE);
-    }
-
+	}
+	else
+		ret = NFC_Write(cmd_list, writeop->mainbuf, sparebuf, dma_wait_mode, rb_wait_mode, NFC_PAGE_MODE);
 
 	NFC_DeSelectChip(writeop->chip);
 	NFC_DeSelectRb(rb);
@@ -92,7 +88,6 @@ __s32 _write_signle_page (struct boot_physical_param *writeop,__u32 program1,__u
 		_pending_dma_irq_sem();
 
 	return ret;
-
 }
 
 __s32 _write_signle_page_seq (struct boot_physical_param *writeop,__u32 program1,__u32 program2,__u8 dma_wait_mode, __u8 rb_wait_mode )
@@ -101,7 +96,7 @@ __s32 _write_signle_page_seq (struct boot_physical_param *writeop,__u32 program1
 	__u32 rb;
 	__u32 random_seed;
 	//__u8 *sparebuf;
-	__u8 sparebuf[4*16];
+	__u8 sparebuf[SECTOR_CNT_OF_SINGLE_PAGE * 4];
 	__u8 addr[5];
 	NFC_CMD_LIST cmd_list[4];
 	__u32 list_len,i,addr_cycle;
@@ -157,12 +152,12 @@ __s32 _write_signle_page_1K (struct boot_physical_param *writeop,__u32 program1,
 	__u32 rb;
 	__u32 random_seed;
 	//__u8 *sparebuf;
-	__u8 sparebuf[4*16];
+	__u8 sparebuf[16 * 4];
 	__u8 addr[5];
 	NFC_CMD_LIST cmd_list[4];
 	__u32 list_len,i,addr_cycle;
 
-	MEMSET(sparebuf, 0xff, SECTOR_CNT_OF_SINGLE_PAGE * 4);
+	MEMSET(sparebuf, 0xff, 16 * 4);
 	if (writeop->oobbuf){
 		MEMCPY(sparebuf,writeop->oobbuf,SECTOR_CNT_OF_SINGLE_PAGE * 4);
 	}
