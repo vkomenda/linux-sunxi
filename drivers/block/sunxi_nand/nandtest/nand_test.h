@@ -25,7 +25,7 @@
 
 
 
-#define  INIT_NAND_IN_TESTDRIVER
+#define INIT_NAND_IN_TESTDRIVER
 //#define   NAND_CACHE_RW
 
 #define REPEAT_TIMES    500000
