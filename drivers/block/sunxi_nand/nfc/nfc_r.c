@@ -1726,7 +1726,7 @@ __s32 NFC_SetDefaultParam(__u32 chip, __u8* default_value, __u32 read_retry_type
 		for(i=0; i<read_retry_reg_num; i++) {
 			if(read_retry_mode <= 1)
 				default_value[i] = read_retry_default_val[chip][i];
-			else // FIXME
+			else // FIXME: test for inverse halves of the table copy
 				default_value[i] = hynix_read_retry_otp_value[chip][0][i];
 		}
 		ret =_vender_set_param(default_value, read_retry_reg_adr, read_retry_reg_num);

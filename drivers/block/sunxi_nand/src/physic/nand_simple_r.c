@@ -552,12 +552,13 @@ __s32 _read_single_page(struct boot_physical_param *readop, __u8 dma_wait_mode)
 */
 __s32 PHY_Init(void)
 {
-    __s32 ret;
-    __u32 i;
+	__s32 ret;
+	__u32 i;
 	NFC_INIT_INFO nand_info;
-    //init RetryCount
-    for(i=0; i<8; i++)
-        RetryCount[i] = 0;
+	//init RetryCount
+	for(i=0; i<8; i++)
+		RetryCount[i] = 0;
+
 	nand_info.bus_width = 0x0;
 	nand_info.ce_ctl = 0x0;
 	nand_info.ce_ctl1 = 0x0;
@@ -568,7 +569,7 @@ __s32 PHY_Init(void)
 	nand_info.ddr_type = 0;
 	ret = NFC_Init(&nand_info);
 
-    PHY_DBG("NFC Randomizer start. \n");
+	PHY_DBG("NFC Randomizer start. \n");
 	_random_seed_init();
 	NFC_RandomDisable();
 
@@ -579,20 +580,27 @@ __s32 PHY_Init(void)
  * OTP block. */
 __s32 PHY_GetDefaultParam(__u32 bank)
 {
-	__u32 i, j, chip = 0, rb = 0;
+	__u32 chip = 0, rb = 0;
 	__u8 default_value[64];
 	__u8 hynix_RRT[READ_RETRY_REG_CNT * 8];
+
+#ifdef OOB_MAGIC_TEST
+	__u32 i, j;
 	__u8 oob[64];
 	__u8 *pdata;
-	__s32 ret;
 	struct boot_physical_param nand_op;
 	__u8 retry, otp_ok_flag;
+#endif // OOB_MAGIC_TEST;
 
 	chip = _cal_real_chip(bank);
 	NFC_SelectChip(chip);
 	rb = _cal_real_rb(chip);
 	NFC_SelectRb(rb);
 
+#ifndef OOB_MAGIC_TEST
+	NFC_GetHynixOTPParam(chip, hynix_RRT, READ_RETRY_TYPE);
+	NFC_SetDefaultParam(chip, default_value, READ_RETRY_TYPE);
+#else
 	if (!PageCachePool.PageCache0){
 		PageCachePool.PageCache0 = (__u8 *)MALLOC(SECTOR_CNT_OF_SUPER_PAGE * 512);
 		if (!PageCachePool.PageCache0)
@@ -612,11 +620,10 @@ __s32 PHY_GetDefaultParam(__u32 bank)
 				ret = PHY_SimpleRead_1K(&nand_op);
 				if (ret < 0)
 					pr_warn("%s: OOB MAGIC read error %d\n", __FUNCTION__, ret);
-				else if (/*oob[0] == oob[1] == oob[2] == oob[3] == */
-					 oob[4] == 0    &&
-					 oob[5] == 0x4F &&
-					 oob[6] == 0x4F &&
-					 oob[7] == 0x42) {
+				else if (oob[0] == 0    &&
+					 oob[1] == 0x4F &&
+					 oob[2] == 0x4F &&
+					 oob[3] == 0x42) {
 
 					otp_ok_flag = 1;
 					// FIXME: ditch this for-loop
@@ -663,13 +670,15 @@ __s32 PHY_GetDefaultParam(__u32 bank)
 				}
 
 				oob[0] = 0;
-				oob[1] = 1;
-				oob[2] = 2;
-				oob[3] = 3;
-				oob[4] = 0;
-				oob[5] = 0x4F;
-				oob[6] = 0x4F;
-				oob[7] = 0x42;
+				oob[1] = 0x4F;
+				oob[2] = 0x4F;
+				oob[3] = 0x42;
+				/* The following word is needed for testing word
+				 * alignment during a spare area write. */
+				oob[4] = 0x24;
+				oob[5] = 0x35;
+				oob[6] = 0x46;
+				oob[7] = 0x57;
 
 //				NFC_LSBInit(READ_RETRY_TYPE);
 //				NFC_LSBEnable(chip, READ_RETRY_TYPE);
@@ -716,6 +725,8 @@ __s32 PHY_GetDefaultParam(__u32 bank)
 				default_value[2], default_value[3]);
 		}
 	}
+#endif // OOB_MAGIC_TEST
+
 	return 0;
 }
 
