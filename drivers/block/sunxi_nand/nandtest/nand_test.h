@@ -23,14 +23,18 @@
 #ifndef  __NAND_TEST_H__
 #define  __NAND_TEST_H__
 
-
 #define CONFIG_SUNXI_NAND_TEST  // FIXME: make a proper Kconfig file
+
+#ifdef CONFIG_SUNXI_NAND_TEST
 
 #define INIT_NAND_IN_TESTDRIVER
 //#define   NAND_CACHE_RW
 
 #define REPEAT_TIMES    500000
 
+int  __init nand_test_init(void);
+void __exit nand_test_exit(void);
 
+#endif // CONFIG_SUNXI_NAND_TEST
 
-#endif
+#endif // __NAND_TEST_H__
