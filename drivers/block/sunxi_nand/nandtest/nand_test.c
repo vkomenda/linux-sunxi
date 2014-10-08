@@ -50,6 +50,8 @@
 #include "../src/include/nand_simple.h"
 
 #include "../nfd/nand_blk.h"
+#include "../nfd/nand_private.h"
+
 #include <plat/mbr411.h>
 
 #include "nand_test.h"
@@ -1187,13 +1189,10 @@ static void set_nand_clock(__u32 nand_max_clock)
 
 #endif // INIT_NAND_IN_TESTDRIVER
 
-static int __init nand_test_init(void)
+int __init nand_test_init(void)
 {
 
-   int ret;
-#ifdef INIT_NAND_IN_TESTDRIVER
-    __u32 cmu_clk;
-#endif // INIT_NAND_IN_TESTDRIVER
+    int ret;
 
     printk("[nand_test]:nand_test_init test init.\n");
     if((ret = kobject_init_and_add(&kobj,&ktype,NULL,"nand")) != 0 ) {
@@ -1257,9 +1256,7 @@ static int __init nand_test_init(void)
 
 }
 
-
-
-static void __exit nand_test_exit(void)
+void __exit nand_test_exit(void)
 {
     printk("[nand_test]:nand test exit.\n");
     kobject_del(&kobj);
@@ -1279,12 +1276,12 @@ static void __exit nand_test_exit(void)
 }
 
 
-module_init(nand_test_init);
-module_exit(nand_test_exit);
+//module_init(nand_test_init);
+//module_exit(nand_test_exit);
 
 
-MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("Nand test driver");
-MODULE_AUTHOR("Grace Miao");
+//MODULE_LICENSE("GPL");
+//MODULE_DESCRIPTION("Nand test driver");
+//MODULE_AUTHOR("Grace Miao");
 
 #endif // CONFIG_SUNXI_NAND_TEST
