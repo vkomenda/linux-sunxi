@@ -24,6 +24,7 @@
 #define  __NAND_TEST_H__
 
 
+#define CONFIG_SUNXI_NAND_TEST  // FIXME: make a proper Kconfig file
 
 #define INIT_NAND_IN_TESTDRIVER
 //#define   NAND_CACHE_RW
