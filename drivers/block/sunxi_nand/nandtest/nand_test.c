@@ -169,7 +169,7 @@ static int nand_test_simple_transfer(struct nand_test_card *test,
 #else
         //printk("Ws %lu %lu \n",start, nsector);
         ret = NAND_CacheWrite(start, nsector, test->buffer + dev_addr);
-#endif
+#endif // NAND_CACHE_RW
         if(ret){
             return -EIO;
         }
@@ -1201,7 +1201,6 @@ int __init nand_test_init(void)
 
 
 #ifdef INIT_NAND_IN_TESTDRIVER
-
     /* init nand resource */
     printk("[nand_test]:init nand resource \n");
     //set nand clk
@@ -1249,7 +1248,6 @@ int __init nand_test_init(void)
 #ifdef NAND_CACHE_RW
     NAND_CacheOpen();
 #endif // NAND_CACHE_RW
-
 #endif // INIT_NAND_IN_TESTDRIVER
 
    return 0;  // init success
@@ -1268,7 +1266,7 @@ void __exit nand_test_exit(void)
     FMT_Exit();
     PHY_Exit();
 #ifdef NAND_CACHE_RW
-    NAND_CacheOpen();
+    NAND_CacheClose();
 #endif // NAND_CACHE_RW
 #endif // INIT_NAND_IN_TESTDRIVER
 
