@@ -182,7 +182,7 @@ static int nand_test_simple_transfer(struct nand_test_card *test,
         //printk("Rs %lu %lu \n",start, nsector);
         LML_FlushPageCache();
         ret = NAND_CacheRead(start, nsector, test->buffer + dev_addr);
-#endif                                                  // read
+#endif // NAND_CACHE_RW
 
         if (ret){
             return -EIO;
@@ -1153,7 +1153,7 @@ static void set_nand_clock(__u32 nand_max_clock)
 	//edo_clk = (nand_max_clock > 20)?(nand_max_clock-10):nand_max_clock;
 	edo_clk = nand_max_clock * 2;
 
-    cmu_clk = get_cmu_clk( );
+	cmu_clk = get_cmu_clk( );
 	nand_clk_divid_ratio = cmu_clk / edo_clk;
 	if (cmu_clk % edo_clk)
 			nand_clk_divid_ratio++;
@@ -1185,7 +1185,7 @@ static void set_nand_clock(__u32 nand_max_clock)
 	printk("offset 0x14:  0x%x \n", *(volatile __u32 *)(0xf1c20000 + 0x80));
 }
 
-#endif
+#endif // INIT_NAND_IN_TESTDRIVER
 
 static int __init nand_test_init(void)
 {
@@ -1193,7 +1193,7 @@ static int __init nand_test_init(void)
    int ret;
 #ifdef INIT_NAND_IN_TESTDRIVER
     __u32 cmu_clk;
-#endif
+#endif // INIT_NAND_IN_TESTDRIVER
 
     printk("[nand_test]:nand_test_init test init.\n");
     if((ret = kobject_init_and_add(&kobj,&ktype,NULL,"nand")) != 0 ) {
@@ -1249,9 +1249,9 @@ static int __init nand_test_init(void)
     }
 #ifdef NAND_CACHE_RW
     NAND_CacheOpen();
-#endif
+#endif // NAND_CACHE_RW
 
-#endif
+#endif // INIT_NAND_IN_TESTDRIVER
 
    return 0;  // init success
 
@@ -1272,9 +1272,8 @@ static void __exit nand_test_exit(void)
     PHY_Exit();
 #ifdef NAND_CACHE_RW
     NAND_CacheOpen();
-#endif
-
-#endif
+#endif // NAND_CACHE_RW
+#endif // INIT_NAND_IN_TESTDRIVER
 
     return;
 }
