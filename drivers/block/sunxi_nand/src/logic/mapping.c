@@ -807,7 +807,7 @@ static __s32 _read_block_map_tbl(__u8 nZone)
 
     /*read data block and free block map tbl*/
 
-	param.MDataPtr = LML_PROCESS_TBL_BUF;
+    param.MDataPtr = LML_PROCESS_TBL_BUF;
     param.SDataPtr = NULL;
     param.SectBitmap = 0xf;
     LML_CalculatePhyOpPar(&param, nZone, TableBlk, TablePage);
