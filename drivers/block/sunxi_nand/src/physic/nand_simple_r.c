@@ -715,15 +715,9 @@ __s32 PHY_GetDefaultParam(__u32 bank)
 			}
 		}
 	}
-	else {  // FIXME
-		NFC_GetHynixOTPParam(chip, default_value, READ_RETRY_TYPE);
-		NFC_SetDefaultParam(chip, default_value, READ_RETRY_TYPE);
-		if((READ_RETRY_MODE==0)||(READ_RETRY_MODE==1)) { //hynix mode
-			PHY_DBG("PHY_SetDefaultParam: chip 0x%x, Read Retry Default Value"
-				" is 0x%x, 0x%x, 0x%x, 0x%x\n", chip,
-				default_value[0], default_value[1],
-				default_value[2], default_value[3]);
-		}
+	else {  // FIXME: get non-Hynix OTP parameters
+//		NFC_GetHynixOTPParam(chip, default_value, READ_RETRY_TYPE);
+//		NFC_SetDefaultParam(chip, default_value, READ_RETRY_TYPE);
 	}
 #endif // OOB_MAGIC_TEST
 
@@ -747,11 +741,6 @@ __s32 PHY_SetDefaultParam(__u32 bank)
 				" is 0x%x, 0x%x, 0x%x, 0x%x \n", chip,
 				default_value[0], default_value[1],
 				default_value[2], default_value[3]);
-			NFC_GetHynixOTPParam(chip, temp_value, READ_RETRY_TYPE);
-			PHY_DBG("PHY_SetDefaultParam: chip 0x%x, Read Default Value"
-				" After Set value is 0x%x, 0x%x, 0x%x, 0x%x \n", chip,
-				temp_value[0], temp_value[1],
-				temp_value[2], temp_value[3]);
 		}
 	}
 	return 0;
@@ -830,7 +819,7 @@ __s32 PHY_Exit(void)
 		for(i=0; i<NandStorageInfo.ChipCnt;i++) {
 			PHY_SetDefaultParam(i);
 		}
-		NFC_ReadRetryExit(READ_RETRY_TYPE);
+		NFC_ReadRetryExit(READ_RETRY_TYPE);  // FIXME: Isn't RR set by PHY_SetDef.?
 	}
 
 	NFC_RandomDisable();
