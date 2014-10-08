@@ -486,6 +486,7 @@ __s32 NFC_RandomEnable(void)
 	cfg = NFC_READ_REG(NFC_REG_ECC_CTL);
 	cfg |= (0x1<<9);
 	NFC_WRITE_REG(NFC_REG_ECC_CTL,cfg);
+	pr_info("NAND randomiser enabled\n");
 
 	return 0;
 }
@@ -497,6 +498,7 @@ __s32 NFC_RandomDisable(void)
 	cfg = NFC_READ_REG(NFC_REG_ECC_CTL);
 	cfg &= (~(0x1<<9));
 	NFC_WRITE_REG(NFC_REG_ECC_CTL,cfg);
+	pr_info("NAND randomiser disabled\n");
 
 	return 0;
 }
@@ -856,6 +858,8 @@ void NFC_Exit( void )
 	cfg = NFC_READ_REG(NFC_REG_CTL);
 	cfg &= ( (~NFC_EN) & 0xffffffff);
 	NFC_WRITE_REG(NFC_REG_CTL,cfg);
+
+	pr_info("NAND flash controller disabled\n");
 
 	/*free dma*/
 	NAND_ReleaseDMA(dma_hdle);
@@ -1814,8 +1818,8 @@ __s32 NFC_ReadRetry_off(__u32 chip) //sandisk readretry exit
 	return 0;
 }
 
+// FIXME: Merge with PHY_SetDefaultParam
 __s32 NFC_ReadRetryExit(__u32 read_retry_type)
 {
-
 	return 0;
 }

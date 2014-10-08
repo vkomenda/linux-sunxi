@@ -1439,12 +1439,12 @@ static void  __exit exit_blklayer(void)
 {
 	nand_flush(NULL);
 	nand_blk_unregister(&mytr);
-#ifdef NAND_CACHE_RW
-	NAND_CacheClose();
-#endif
 	LML_Exit();
 	FMT_Exit();
 	PHY_Exit();
+#ifdef NAND_CACHE_RW
+	NAND_CacheClose();
+#endif
 }
 
 #else

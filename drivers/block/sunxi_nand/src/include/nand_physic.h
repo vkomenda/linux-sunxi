@@ -325,7 +325,7 @@ __s32 PHY_SynchBank(__u32 nBank, __u32 bMode);
 
 
 __s32 PHY_GetDefaultParam(__u32 bank);
-__s32 PHY_SetDefaultParam(__u32 bank);
+__s32 PHY_SetHynixDefaultParam(__u32 bank);
 
 __s32 PHY_ScanDDRParam(void);
 
