@@ -152,6 +152,7 @@ static int nand_test_prepare_read(struct nand_test_card *test)
  */
 static int create_BMT_prepare(struct nand_test_card* test)
 {
+	// TODO: pointer correction assertions... cache initialisation?
 	return 0;
 }
 
@@ -162,7 +163,7 @@ static int create_BMT_cleanup(struct nand_test_card* test)
 
 static int create_BMT_run(struct nand_test_card *test)
 {
-	return 0;
+	return BMM_WriteBackAllMapTbl();
 }
 
 

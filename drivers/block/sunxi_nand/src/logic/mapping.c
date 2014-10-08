@@ -20,6 +20,8 @@
  * MA 02111-1307 USA
  */
 
+#include "linux/errno.h"
+
 #include "../include/nand_logic.h"
 
 extern struct __NandDriverGlobal_t     NandDriverInfo;
@@ -684,6 +686,8 @@ static __s32 _write_back_block_map_tbl(__u8 nZone)
     struct  __PhysicOpPara_t  param;
     struct __SuperPhyBlkType_t BadBlk,NewBlk;
 
+    pr_info("%s in zone %d\n", __FUNCTION__, nZone);
+
     /*write back all page map table within this zone*/
     if (NAND_OP_TRUE != _write_back_all_page_map_tbl(nZone)){
         MAPPING_ERR("write back all page map tbl err\n");
@@ -790,6 +794,8 @@ rewrite:
     /*reset zone info*/
     NandDriverInfo.ZoneTblPstInfo[nZone].PhyBlkNum = TableBlk;
     NandDriverInfo.ZoneTblPstInfo[nZone].TablePst = TablePage - 2;
+
+    pr_info("%s in zone %d SUCCESS\n", __FUNCTION__, nZone);
 
     return NAND_OP_TRUE;
 }
@@ -927,25 +933,35 @@ __s32 BMM_SwitchMapTbl(__u32 nZone)
 */
 __s32 BMM_WriteBackAllMapTbl(void)
 {
-     __u8 i;
+	__u8 i;
 
         /*save current scene*/
         struct __BlkMapTblCache_t *TmpBmt = BLK_MAP_CACHE;
         struct __PageMapTblCache_t *TmpPmt = PAGE_MAP_CACHE;
 
-        for (i = 0; i < BLOCK_MAP_TBL_CACHE_CNT; i++)
-        {
-            if (BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i].DirtyFlag){
-                   BLK_MAP_CACHE = &(BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i]);
-                   if (NAND_OP_TRUE != _write_back_block_map_tbl(CUR_MAP_ZONE))
-                        return NAND_OP_FALSE;
-                    BLK_MAP_CACHE->DirtyFlag = 0;
-            }
-       }
+	pr_info("%s started\n", __FUNCTION__);
+
+	if (!BLK_MAP_CACHE_POOL ||
+	    !BLK_MAP_CACHE ||
+	    !BLK_MAP_CACHE_POOL->BlkMapTblCachePool ||
+	    !PAGE_MAP_CACHE) {
+		pr_err("%s: NULL pointer ERROR\n", __FUNCTION__);
+		return -EFAULT;
+	}
+        for (i = 0; i < BLOCK_MAP_TBL_CACHE_CNT; i++) {
+		if (BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i].DirtyFlag) {
+			BLK_MAP_CACHE = &(BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i]);
+			if (NAND_OP_TRUE != _write_back_block_map_tbl(CUR_MAP_ZONE))
+				return NAND_OP_FALSE;
+			BLK_MAP_CACHE->DirtyFlag = 0;
+		}
+	}
 
         /*resore current scene*/
         BLK_MAP_CACHE  = TmpBmt;
         PAGE_MAP_CACHE = TmpPmt;
+
+	pr_info("%s: map table written OK\n", __FUNCTION__);
 
         return NAND_OP_TRUE;
 }
