@@ -147,10 +147,24 @@ static int nand_test_prepare_read(struct nand_test_card *test)
 }
 
 
-static int nand_test_prepare_pwm(struct nand_test_card *test)
+/*
+ *  Create and write the block mapping table onto the flash.
+ */
+static int create_BMT_prepare(struct nand_test_card* test)
 {
-    return 0;
+	return 0;
 }
+
+static int create_BMT_cleanup(struct nand_test_card* test)
+{
+	return 0;
+}
+
+static int create_BMT_run(struct nand_test_card *test)
+{
+	return 0;
+}
+
 
 
 /* read /write one sector with out verification*/
@@ -972,14 +986,13 @@ static const struct nand_test_case nand_test_cases[] = {
 	    .run = nand_test_random_read,
 	    .cleanup = nand_test_cleanup,
     },
-
-    {                                                    // 32
-	    .name = " pwm  test (no data verification)",
+    {       // 32
+	    .name = " create block map table",
 	    .sector_cnt = 1,
-	    .prepare = nand_test_prepare_pwm,
-	    //.run = nand_test_pwm,
-	    .cleanup = nand_test_cleanup,
-    },
+	    .prepare = create_BMT_prepare,
+	    .run     = create_BMT_run,
+	    .cleanup = create_BMT_cleanup,
+    }
 };
 
 static DEFINE_MUTEX(nand_test_lock);
