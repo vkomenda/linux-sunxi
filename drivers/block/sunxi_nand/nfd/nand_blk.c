@@ -1549,6 +1549,8 @@ static struct platform_driver nand_driver = {
  *
  ****************************************************************************/
 
+#ifndef CONFIG_SUNXI_NAND_TEST
+
 static int __init nand_init(void)
 {
 	s32 ret;
@@ -1599,6 +1601,21 @@ static void __exit nand_exit(void)
 	//platform_device_unregister(&nand_device);
 	exit_blklayer();
 }
+
+#else // CONFIG_SUNXI_NAND_TEST
+
+static int __init nand_init(void)
+{
+	return nand_test_init();
+}
+
+static void __exit nand_exit(void)
+{
+	nand_test_exit();
+}
+
+#endif // CONFIG_SUNXI_NAND_TEST
+
 
 module_init(nand_init);
 module_exit(nand_exit);
