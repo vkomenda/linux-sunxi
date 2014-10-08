@@ -75,14 +75,14 @@ void obj_test_release(struct kobject *kobject);
 
 struct nand_test_card {
     u8    *buffer;
-    u8    *scratch;
+//    u8    *scratch;
     unsigned int sector_cnt;
 };
 
 struct nand_test_case {
     const char *name;
-    int  sectors_cnt;
-    int (*prepare)(struct nand_test_card *, int sectors_cnt);
+    int  sector_cnt;
+    int (*prepare)(struct nand_test_card *);
     int (*run)(struct nand_test_card * );
     int (*cleanup)(struct nand_test_card *);
 };
@@ -119,17 +119,15 @@ void obj_test_release(struct kobject *kobject)
 
 
 /* prepare buffer data for read and write*/
-static int __nand_test_prepare(struct nand_test_card *test, int sector_cnt,int write)
+static int __nand_test_prepare(struct nand_test_card *test, int write)
 {
     int i;
 
-    test->sector_cnt = sector_cnt;
-
-    if (write){
-        memset(test->buffer, 0xDF, 512 * (sector_cnt) +4);
+    if (write) {
+        memset(test->buffer, 0xDF, 512 * test->sector_cnt + 4);
     }
     else {
-        for (i = 0; i < 512 * (sector_cnt) + 4; i++){
+        for (i = 0; i < 512 * test->sector_cnt + 4; i++){
             test->buffer[i] = i%256;
          }
     }
@@ -138,20 +136,19 @@ static int __nand_test_prepare(struct nand_test_card *test, int sector_cnt,int w
 }
 
 
-static int nand_test_prepare_write(struct nand_test_card *test, int sector_cnt)
+static int nand_test_prepare_write(struct nand_test_card *test)
 {
-    return __nand_test_prepare(test, sector_cnt, 1);
+    return __nand_test_prepare(test, 1);
 }
 
-static int nand_test_prepare_read(struct nand_test_card *test, int sector_cnt)
+static int nand_test_prepare_read(struct nand_test_card *test)
 {
-    return __nand_test_prepare(test, sector_cnt, 0);
+    return __nand_test_prepare(test, 0);
 }
 
 
-static int nand_test_prepare_pwm(struct nand_test_card *test, int sector_cnt)
+static int nand_test_prepare_pwm(struct nand_test_card *test)
 {
-    test->sector_cnt = sector_cnt;
     return 0;
 }
 
@@ -726,7 +723,7 @@ static int nand_test_cleanup(struct nand_test_card *test)
 static const struct nand_test_case nand_test_cases[] = {
     {
 	    .name = "single sector write (no data verification)",
-	    .sectors_cnt = 1,
+	    .sector_cnt = 1,
 	    .prepare = nand_test_prepare_write,
 	    .run = nand_test_single_write,
 	    .cleanup = nand_test_cleanup
@@ -734,7 +731,7 @@ static const struct nand_test_case nand_test_cases[] = {
 
     {
 	    .name = "single sector read (no data verification)",
-	    .sectors_cnt = 1,
+	    .sector_cnt = 1,
 	    .prepare = nand_test_prepare_read,
 	    .run = nand_test_single_read,
 	    .cleanup = nand_test_cleanup
@@ -742,7 +739,7 @@ static const struct nand_test_case nand_test_cases[] = {
 
     {
 	    .name = "single sector write(verify data)",
-	    .sectors_cnt = 1,
+	    .sector_cnt = 1,
 	    .prepare = nand_test_prepare_write,
 	    .run = nand_test_verify_write,
 	    .cleanup = nand_test_cleanup
@@ -750,7 +747,7 @@ static const struct nand_test_case nand_test_cases[] = {
 
     {
 	    .name = "single sector read(verify data)",
-	    .sectors_cnt = 1,
+	    .sector_cnt = 1,
 	    .prepare = nand_test_prepare_read,
 	    .run = nand_test_verify_read,
 	    .cleanup = nand_test_cleanup
@@ -759,7 +756,7 @@ static const struct nand_test_case nand_test_cases[] = {
     /* multi read/write*/
     {
 	    .name = "multi sector read(2 sectors, verify)",
-	    .sectors_cnt = 2,
+	    .sector_cnt = 2,
 	    .prepare = nand_test_prepare_read,
 	    .run = nand_test_multi_read,
 	    .cleanup = nand_test_cleanup
@@ -767,7 +764,7 @@ static const struct nand_test_case nand_test_cases[] = {
 
     {
 	    .name = "multi sector read(3 sectors, verify)",
-	    .sectors_cnt = 3,
+	    .sector_cnt = 3,
 	    .prepare = nand_test_prepare_read,
 	    .run = nand_test_multi_read,
 	    .cleanup = nand_test_cleanup
@@ -775,7 +772,7 @@ static const struct nand_test_case nand_test_cases[] = {
 
     {
 	    .name = "multi sector read(8 sectors, verify)",
-	    .sectors_cnt = 8,
+	    .sector_cnt = 8,
 	    .prepare = nand_test_prepare_read,
 	    .run = nand_test_multi_read,
 	    .cleanup = nand_test_cleanup
@@ -783,7 +780,7 @@ static const struct nand_test_case nand_test_cases[] = {
 
     {
 	    .name = "multi sector read(18 sectors, verify)",
-	    .sectors_cnt = 18,
+	    .sector_cnt = 18,
 	    .prepare = nand_test_prepare_read,
 	    .run = nand_test_multi_read,
 	    .cleanup = nand_test_cleanup
@@ -791,7 +788,7 @@ static const struct nand_test_case nand_test_cases[] = {
 
     {
 	    .name = "multi sector read(53 sectors, verify)",
-	    .sectors_cnt = 53,
+	    .sector_cnt = 53,
 	    .prepare = nand_test_prepare_read,
 	    .run = nand_test_multi_read,
 	    .cleanup = nand_test_cleanup
@@ -799,7 +796,7 @@ static const struct nand_test_case nand_test_cases[] = {
 
     {
 	    .name = "multi sector write(2 sectors ,verify)",
-	    .sectors_cnt = 2,
+	    .sector_cnt = 2,
 	    .prepare = nand_test_prepare_write,
 	    .run = nand_test_multi_write,
 	    .cleanup = nand_test_cleanup
@@ -807,7 +804,7 @@ static const struct nand_test_case nand_test_cases[] = {
 
     {
 	    .name = "multi sector write(5 sectors ,verify)",
-	    .sectors_cnt = 5,
+	    .sector_cnt = 5,
 	    .prepare = nand_test_prepare_write,
 	    .run = nand_test_multi_write,
 	    .cleanup = nand_test_cleanup,
@@ -815,7 +812,7 @@ static const struct nand_test_case nand_test_cases[] = {
 
     {
 	    .name = "multi sector write(12 sectors ,verify)",
-	    .sectors_cnt = 12,
+	    .sector_cnt = 12,
 	    .prepare = nand_test_prepare_write,
 	    .run = nand_test_multi_write,
 	    .cleanup = nand_test_cleanup,
@@ -823,7 +820,7 @@ static const struct nand_test_case nand_test_cases[] = {
 
     {
 	    .name = "multi sector write(15 sectors ,verify)",
-	    .sectors_cnt = 15,
+	    .sector_cnt = 15,
 	    .prepare = nand_test_prepare_write,
 	    .run = nand_test_multi_write,
 	    .cleanup = nand_test_cleanup,
@@ -831,7 +828,7 @@ static const struct nand_test_case nand_test_cases[] = {
 
     {
 	    .name = "multi sector write(26 sectors ,verify)",
-	    .sectors_cnt = 26,
+	    .sector_cnt = 26,
 	    .prepare = nand_test_prepare_write,
 	    .run = nand_test_multi_write,
 	    .cleanup = nand_test_cleanup,
@@ -839,7 +836,7 @@ static const struct nand_test_case nand_test_cases[] = {
 
     {
 	    .name = "multi sector write(93 sectors ,verify)",
-	    .sectors_cnt = 93,
+	    .sector_cnt = 93,
 	    .prepare = nand_test_prepare_write,
 	    .run = nand_test_multi_write,
 	    .cleanup = nand_test_cleanup,
@@ -848,7 +845,7 @@ static const struct nand_test_case nand_test_cases[] = {
     /*align test*/
     {
 	    .name = "align write(1 sector ,verify)",
-	    .sectors_cnt = 1,
+	    .sector_cnt = 1,
 	    .prepare = nand_test_prepare_write,
 	    .run = nand_test_align_write,
 	    .cleanup = nand_test_cleanup,
@@ -856,7 +853,7 @@ static const struct nand_test_case nand_test_cases[] = {
 
     {
 	    .name = "align read(1 sector ,verify)",
-	    .sectors_cnt = 1,
+	    .sector_cnt = 1,
 	    .prepare = nand_test_prepare_read,
 	    .run = nand_test_align_read,
 	    .cleanup = nand_test_cleanup,
@@ -865,7 +862,7 @@ static const struct nand_test_case nand_test_cases[] = {
     /* stability test */
     {
 	    .name = "weird write(negative start)",   // 18
-	    .sectors_cnt = 10,
+	    .sector_cnt = 10,
 	    .prepare = nand_test_prepare_write,
 	    .run = nand_test_negstart_write,
 	    .cleanup = nand_test_cleanup,
@@ -873,7 +870,7 @@ static const struct nand_test_case nand_test_cases[] = {
 
     {
 	    .name = "weid read(nagative satrt)",
-	    .sectors_cnt = 10,
+	    .sector_cnt = 10,
 	    .prepare = nand_test_prepare_read,
 	    .run = nand_test_negstart_read,
 	    .cleanup = nand_test_cleanup,
@@ -881,7 +878,7 @@ static const struct nand_test_case nand_test_cases[] = {
 
     {
 	    .name = "weird write(beyond start)",   // 20
-	    .sectors_cnt = 10,
+	    .sector_cnt = 10,
 	    .prepare = nand_test_prepare_write,
 	    .run = nand_test_beyond_write,
 	    .cleanup = nand_test_cleanup,
@@ -889,7 +886,7 @@ static const struct nand_test_case nand_test_cases[] = {
 
     {
 	    .name = "weid read(bayond start)",
-	    .sectors_cnt = 10,
+	    .sector_cnt = 10,
 	    .prepare = nand_test_prepare_read,
 	    .run = nand_test_beyond_read,
 	    .cleanup = nand_test_cleanup,
@@ -897,7 +894,7 @@ static const struct nand_test_case nand_test_cases[] = {
 
     {                                            // 22
 	    .name = "write all ascending",
-	    .sectors_cnt = 1,
+	    .sector_cnt = 1,
 	    .prepare = nand_test_prepare_write,
 	    .run = nand_test_write_all_ascending,
 	    .cleanup = nand_test_cleanup,
@@ -905,7 +902,7 @@ static const struct nand_test_case nand_test_cases[] = {
 
     {
 	    .name = "read all ascending",
-	    .sectors_cnt = 1,
+	    .sector_cnt = 1,
 	    .prepare = nand_test_prepare_read,
 	    .run = nand_test_read_all_ascending,
 	    .cleanup = nand_test_cleanup,
@@ -913,7 +910,7 @@ static const struct nand_test_case nand_test_cases[] = {
 
     {
 	    .name = "write all descending",
-	    .sectors_cnt = 1,
+	    .sector_cnt = 1,
 	    .prepare = nand_test_prepare_write,
 	    .run = nand_test_write_all_descending,
 	     .cleanup = nand_test_cleanup,
@@ -922,7 +919,7 @@ static const struct nand_test_case nand_test_cases[] = {
 
     {
 	    .name = "read all descending",
-	    .sectors_cnt = 1,
+	    .sector_cnt = 1,
 	    .prepare = nand_test_prepare_read,
 	    .run = nand_test_read_all_descending,
 	    .cleanup = nand_test_cleanup,
@@ -930,7 +927,7 @@ static const struct nand_test_case nand_test_cases[] = {
 
     {                                                     // 26
 	    .name = " repeat  write (no data verification) ",
-	    .sectors_cnt = 1,
+	    .sector_cnt = 1,
 	    .prepare = nand_test_prepare_write,
 	    .run = nand_test_repeat_single_write,
 	    .cleanup = nand_test_cleanup,
@@ -938,7 +935,7 @@ static const struct nand_test_case nand_test_cases[] = {
 
     {                                                    // 27
 	    .name = " repeat  read (no data verification) ",
-	    .sectors_cnt = 1,
+	    .sector_cnt = 1,
 	    .prepare = nand_test_prepare_read,
 	    .run = nand_test_repeat_single_read,
 	    .cleanup = nand_test_cleanup,
@@ -946,7 +943,7 @@ static const struct nand_test_case nand_test_cases[] = {
 
    {                                                     // 28
 	    .name = " repeat multi write (no data verification)",
-	    .sectors_cnt = 43,
+	    .sector_cnt = 43,
 	    .prepare = nand_test_prepare_write,
 	    .run = nand_test_repeat_multi_write,
 	    .cleanup = nand_test_cleanup,
@@ -954,7 +951,7 @@ static const struct nand_test_case nand_test_cases[] = {
 
    {                                                    // 29
 	    .name = " repeat multi read (no data verification)",
-	    .sectors_cnt = 81,
+	    .sector_cnt = 81,
 	    .prepare = nand_test_prepare_read,
 	    .run = nand_test_repeat_multi_read,
 	    .cleanup = nand_test_cleanup,
@@ -962,7 +959,7 @@ static const struct nand_test_case nand_test_cases[] = {
 
     {                                                    // 30
 	    .name = " random  write (no data verification)",
-	    .sectors_cnt = 1,
+	    .sector_cnt = 1,
 	    .prepare = nand_test_prepare_write,
 	    .run = nand_test_random_write,
 	    .cleanup = nand_test_cleanup,
@@ -970,7 +967,7 @@ static const struct nand_test_case nand_test_cases[] = {
 
     {                                                    // 31
 	    .name = " random  read (no data verification)",
-	    .sectors_cnt = 1,
+	    .sector_cnt = 1,
 	    .prepare = nand_test_prepare_read,
 	    .run = nand_test_random_read,
 	    .cleanup = nand_test_cleanup,
@@ -978,7 +975,7 @@ static const struct nand_test_case nand_test_cases[] = {
 
     {                                                    // 32
 	    .name = " pwm  test (no data verification)",
-	    .sectors_cnt = 1,
+	    .sector_cnt = 1,
 	    .prepare = nand_test_prepare_pwm,
 	    //.run = nand_test_pwm,
 	    .cleanup = nand_test_cleanup,
@@ -1003,11 +1000,12 @@ static void nand_test_run(struct nand_test_card *test, int testcase)
         printk(KERN_INFO "[nand_test]: Test case %d. %s...\n", i + 1, nand_test_cases[i].name);
 
         if (nand_test_cases[i].prepare) {
-              ret = nand_test_cases[i].prepare(test, nand_test_cases[i].sectors_cnt);
-          if (ret) {
-              printk(KERN_INFO "[nand_test]: Result: Prepare stage failed! (%d)\n", ret);
-              continue;
-          }
+		test->sector_cnt = nand_test_cases[i].sector_cnt;
+		ret = nand_test_cases[i].prepare(test);
+		if (ret) {
+			printk(KERN_INFO "[nand_test]: Result: Prepare stage failed! (%d)\n", ret);
+			continue;
+		}
         }
 
         ret = nand_test_cases[i].run(test);
@@ -1070,17 +1068,17 @@ static ssize_t nand_test_store(struct kobject *kobject,struct attribute *attr, c
     }
 
     test->buffer = kzalloc(BUFFER_SIZE, GFP_KERNEL);  // alloc buffer for r/w
-    test->scratch = kzalloc(BUFFER_SIZE, GFP_KERNEL); // not used now
+//    test->scratch = kzalloc(BUFFER_SIZE, GFP_KERNEL); // not used now
 
-    if (test->buffer && test->scratch) {
+//    if (test->buffer && test->scratch) {
+    if (test->buffer) {
         mutex_lock(&nand_test_lock);
         nand_test_run(test, testcase);             // run test cases
         mutex_unlock(&nand_test_lock);
     }
 
-
     kfree(test->buffer);
-    kfree(test->scratch);
+//    kfree(test->scratch);
     kfree(test);
 
     return count;
