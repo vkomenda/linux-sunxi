@@ -417,13 +417,13 @@ __s32  SCN_AnalyzeNandSystem(void)
     SCAN_DBG("\n\n");
     SCAN_DBG("[SCAN_DBG] ==============Nand Architecture Parameter==============\n");
     SCAN_DBG("[SCAN_DBG]    Nand Chip ID:         0x%x 0x%x\n",
-        (NandStorageInfo.NandChipId[0] << 0) | (NandStorageInfo.NandChipId[1] << 8)
-        | (NandStorageInfo.NandChipId[2] << 16) | (NandStorageInfo.NandChipId[3] << 24),
-        (NandStorageInfo.NandChipId[4] << 0) | (NandStorageInfo.NandChipId[5] << 8)
-        | (NandStorageInfo.NandChipId[6] << 16) | (NandStorageInfo.NandChipId[7] << 24));
+	     (NandStorageInfo.NandChipId[0] << 0)  | (NandStorageInfo.NandChipId[1] << 8) |
+	     (NandStorageInfo.NandChipId[2] << 16) | (NandStorageInfo.NandChipId[3] << 24),
+	     (NandStorageInfo.NandChipId[4] << 0)  | (NandStorageInfo.NandChipId[5] << 8) |
+	     (NandStorageInfo.NandChipId[6] << 16) | (NandStorageInfo.NandChipId[7] << 24));
     SCAN_DBG("[SCAN_DBG]    Nand Chip Count:      0x%x\n", NandStorageInfo.ChipCnt);
     SCAN_DBG("[SCAN_DBG]    Nand Chip Connect:    0x%x\n", NandStorageInfo.ChipConnectInfo);
-	SCAN_DBG("[SCAN_DBG]    Nand Rb Connect Mode:      0x%x\n", NandStorageInfo.RbConnectMode);
+    SCAN_DBG("[SCAN_DBG]    Nand Rb Connect Mode: 0x%x\n", NandStorageInfo.RbConnectMode);
     SCAN_DBG("[SCAN_DBG]    Sector Count Of Page: 0x%x\n", NandStorageInfo.SectorCntPerPage);
     SCAN_DBG("[SCAN_DBG]    Page Count Of Block:  0x%x\n", NandStorageInfo.PageCntPerPhyBlk);
     SCAN_DBG("[SCAN_DBG]    Block Count Of Die:   0x%x\n", NandStorageInfo.BlkCntPerDie);
@@ -433,8 +433,8 @@ __s32  SCN_AnalyzeNandSystem(void)
     SCAN_DBG("[SCAN_DBG]    Optional Operation:   0x%x\n", NandStorageInfo.OperationOpt);
     SCAN_DBG("[SCAN_DBG]    Access Frequence:     0x%x\n", NandStorageInfo.FrequencePar);
     SCAN_DBG("[SCAN_DBG]    ECC Mode:             0x%x\n", NandStorageInfo.EccMode);
-	SCAN_DBG("[SCAN_DBG]    Read Retry Type:      0x%x\n", NandStorageInfo.ReadRetryType);
-	SCAN_DBG("[SCAN_DBG]    DDR Type:             0x%x\n", NandStorageInfo.DDRType);
+    SCAN_DBG("[SCAN_DBG]    Read Retry Type:      0x%x\n", NandStorageInfo.ReadRetryType);
+    SCAN_DBG("[SCAN_DBG]    DDR Type:             0x%x\n", NandStorageInfo.DDRType);
     SCAN_DBG("[SCAN_DBG] =======================================================\n\n");
 
     //print nand flash optional operation parameter
