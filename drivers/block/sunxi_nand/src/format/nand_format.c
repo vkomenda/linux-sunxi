@@ -570,7 +570,7 @@ static void _DumpDieInfo(struct __ScanDieInfo_t *pDieInfo)
     {
         tmpZoneInfo = &pDieInfo->ZoneInfo[tmpZone];
         FORMAT_DBG("[FORMAT_DBG] ---------------------------------------------------\n");
-        FORMAT_DBG("[FORMAT_DBG] ZoneNum:    0x%x\n", tmpZone);
+        FORMAT_DBG("[FORMAT_DBG]    ZoneNum:             0x%x\n", tmpZone);
         FORMAT_DBG("[FORMAT_DBG]    Data block Count:    0x%x\n", tmpZoneInfo->nDataBlkCnt);
         FORMAT_DBG("[FORMAT_DBG]    Free block Count:    0x%x\n", tmpZoneInfo->nFreeBlkCnt);
         FORMAT_DBG("[FORMAT_DBG]    Log block table: \n");
@@ -2618,6 +2618,3 @@ void clear_NAND_ZI( void )
 {
     MEMSET(&PageCachePool, 0x00, sizeof(struct __NandPageCachePool_t));
 }
-
-
-

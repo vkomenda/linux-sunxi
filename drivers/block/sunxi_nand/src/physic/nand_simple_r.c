@@ -122,17 +122,18 @@ __u8 _cal_real_chip(__u32 global_bank)
 	cnt = 0;
 	chip = global_bank / BNK_CNT_OF_CHIP;
 
-	for (i = 0; i <MAX_CHIP_SELECT_CNT; i++ ){
+	for (i = 0; i < MAX_CHIP_SELECT_CNT; i++ ) {
 		if (CHIP_CONNECT_INFO & (1 << i)) {
 			cnt++;
-			if (cnt == (chip+1)){
+			if (cnt == (chip+1)) {
 				chip = i;
 				return chip;
 			}
 		}
 	}
 
-	PHY_ERR("wrong chip number ,chip = %d, chip info = %x\n",chip,CHIP_CONNECT_INFO);
+	PHY_ERR("wrong chip number %d, chip info = %x\n",
+		chip, CHIP_CONNECT_INFO);
 
 	return 0xff;
 }
@@ -142,138 +143,108 @@ __u8 _cal_real_chip(__u32 global_bank)
 {
 	__u8 chip = 0;
 
-	if((RB_CONNECT_MODE == 0)&&(global_bank<=2))
-	{
-	    if(global_bank)
-		chip = 7;
-	    else
-		chip = 0;
-
-	    return chip;
+	if ((RB_CONNECT_MODE == 0)&&(global_bank<=2))
+		if (global_bank)
+			chip = 7;
+		else
+			chip = 0;
+	else if ((RB_CONNECT_MODE == 1)&&(global_bank<=1))
+		chip = global_bank;
+	else if ((RB_CONNECT_MODE == 2)&&(global_bank<=2))
+		chip = global_bank;
+	else if ((RB_CONNECT_MODE == 3)&&(global_bank<=2))
+		chip = global_bank*2;
+	else if ((RB_CONNECT_MODE == 4)&&(global_bank<=4))
+		switch(global_bank) {
+		case 0:
+			chip = 0;
+			break;
+		case 1:
+			chip = 2;
+			break;
+		case 2:
+			chip = 1;
+			break;
+		case 3:
+			chip = 3;
+			break;
+		default:
+			chip = 0;
+			break;
+		}
+	else if ((RB_CONNECT_MODE == 5)&&(global_bank<=4))
+		chip = global_bank*2;
+	else if (RB_CONNECT_MODE == 8 && global_bank <= 8)
+		switch (global_bank) {
+		case 0:
+			chip = 0;
+			break;
+		case 1:
+			chip = 2;
+			break;
+		case 2:
+			chip = 1;
+			break;
+		case 3:
+			chip = 3;
+			break;
+		case 4:
+			chip = 4;
+			break;
+		case 5:
+			chip = 6;
+			break;
+		case 6:
+			chip = 5;
+			break;
+		case 7:
+			chip = 7;
+			break;
+		default:
+			chip = 0;
+			break;
+		}
+	else {
+		PHY_ERR("wrong rb_mode %d or bank %d (chip WAS %d; info at %lx)\n",
+			RB_CONNECT_MODE, global_bank, chip, CHIP_CONNECT_INFO);
+		chip = 0xFF;
 	}
-	if((RB_CONNECT_MODE == 1)&&(global_bank<=1))
-      	{
-      	    chip = global_bank;
-	    return chip;
-      	}
-	if((RB_CONNECT_MODE == 2)&&(global_bank<=2))
-      	{
-      	    chip = global_bank;
-	    return chip;
-      	}
-	if((RB_CONNECT_MODE == 3)&&(global_bank<=2))
-      	{
-      	    chip = global_bank*2;
-	    return chip;
-      	}
-	if((RB_CONNECT_MODE == 4)&&(global_bank<=4))
-      	{
-      	    switch(global_bank){
-		  case 0:
-		  	chip = 0;
-			break;
-		  case 1:
-		  	chip = 2;
-			break;
-		  case 2:
-		  	chip = 1;
-			break;
-		  case 3:
-		  	chip = 3;
-			break;
-		  default :
-		  	chip =0;
-	    }
-
-	    return chip;
-      	}
-	if((RB_CONNECT_MODE == 5)&&(global_bank<=4))
-      	{
-      	    chip = global_bank*2;
-
-	    return chip;
-      	}
-	if((RB_CONNECT_MODE == 8)&&(global_bank<=8))
-      	{
-      	    switch(global_bank){
-		  case 0:
-		  	chip = 0;
-			break;
-		  case 1:
-		  	chip = 2;
-			break;
-		  case 2:
-		  	chip = 1;
-			break;
-		  case 3:
-		  	chip = 3;
-			break;
-		  case 4:
-		  	chip = 4;
-			break;
-		  case 5:
-		  	chip = 6;
-			break;
-		  case 6:
-		  	chip = 5;
-			break;
-		  case 7:
-		  	chip = 7;
-			break;
-		  default : chip =0;
-
-	    }
-
-	    return chip;
-      	}
-
-
-
-	PHY_ERR("wrong chip number ,rb_mode = %d, bank = %d, chip = %d, chip info = %x\n",RB_CONNECT_MODE, global_bank, chip, CHIP_CONNECT_INFO);
-
-	return 0xff;
+	return chip;
 }
 
 __u8 _cal_real_rb(__u32 chip)
 {
-	__u8 rb;
+	__u8 rb = 0xFF;
 
+	switch (RB_CONNECT_MODE) {
+	case 0:
+		rb = 0;
+		break;
+	case 1:
+		rb = chip;
+		break;
+	case 2:
+		rb = chip;
+		break;
+	case 3:
+		rb = chip/2;
+		break;
+	case 4:
+		rb = chip/2;
+		break;
+	case 5:
+		rb = (chip/2)%2;
+		break;
+	case 8:
+		rb = (chip/2)%2;
+		break;
+	default:
+		break;
+	}
 
-	rb = 0;
-
-	if(RB_CONNECT_MODE == 0)
-      	{
-      	    rb = 0;
-      	}
-      if(RB_CONNECT_MODE == 1)
-      	{
-      	    rb = chip;
-      	}
-	if(RB_CONNECT_MODE == 2)
-      	{
-      	    rb = chip;
-      	}
-	if(RB_CONNECT_MODE == 3)
-      	{
-      	    rb = chip/2;
-      	}
-	if(RB_CONNECT_MODE == 4)
-      	{
-      	    rb = chip/2;
-      	}
-	if(RB_CONNECT_MODE == 5)
-      	{
-      	    rb = (chip/2)%2;
-      	}
-	if(RB_CONNECT_MODE == 8)
-      	{
-      	    rb = (chip/2)%2;
-      	}
-
-	if((rb!=0)&&(rb!=1))
-	{
-	    PHY_ERR("wrong Rb connect Mode, chip = %d ,RbConnectMode = %d \n",chip,RB_CONNECT_MODE);
-	    return 0xff;
+	if (rb > 1) {
+		PHY_ERR("wrong RbConnectMode %d (chip %d)\n",
+			RB_CONNECT_MODE, chip);
 	}
 
 	return rb;
