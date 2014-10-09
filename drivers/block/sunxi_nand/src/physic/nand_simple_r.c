@@ -27,6 +27,7 @@
 #include "../../nfc/nfc_i.h"
 
 #include <linux/io.h>
+#include <linux/errno.h>
 
 extern void dump(void *buf, __u32 len , __u8 nbyte,__u8 linelen);
 
@@ -1119,12 +1120,11 @@ __s32 PHY_SynchBank(__u32 nBank, __u32 bMode)
 	if(status & NAND_OPERATE_FAIL)
 	{
 	    PHY_ERR("PHY_SynchBank : last W/E operation fail,chip = %x, bank = %x, cmd value = %x, status = %x\n",chip,nBank,cmd_value,status);
-	    ret = NAND_OP_FALSE;
+	    ret = -EIO;
 	}
 
 	NFC_DeSelectChip(chip);
 	NFC_DeSelectRb(rb);
-
 
 	return ret;
 }
