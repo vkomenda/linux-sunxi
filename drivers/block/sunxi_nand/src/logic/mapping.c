@@ -688,6 +688,17 @@ static __s32 _write_back_block_map_tbl(__u8 nZone)
 
     pr_info("%s in zone %d\n", __FUNCTION__, nZone);
 
+    if (!BLK_MAP_CACHE ||
+	!DATA_BLK_TBL ||
+	!LML_PROCESS_TBL_BUF ||
+	!LOG_BLK_TBL) {
+	    pr_err("%s ERROR: NULL pointer in %x %x %x %x", __FUNCTION__,
+		   BLK_MAP_CACHE, DATA_BLK_TBL, LML_PROCESS_TBL_BUF, LOG_BLK_TBL);
+	    return -EFAULT;
+    }
+    else
+	    pr_info("%s precondition OK", __FUNCTION__);
+
     /*write back all page map table within this zone*/
     if (0 != _write_back_all_page_map_tbl(nZone)){
         MAPPING_ERR("write back all page map tbl err\n");
@@ -933,41 +944,41 @@ __s32 BMM_SwitchMapTbl(__u32 nZone)
 */
 __s32 BMM_WriteBackAllMapTbl(void)
 {
-	__u8 i;
+	__u8 i, ret = 0;
 
-        /*save current scene*/
-        struct __BlkMapTblCache_t *TmpBmt = BLK_MAP_CACHE;
-        struct __PageMapTblCache_t *TmpPmt = PAGE_MAP_CACHE;
-
-	pr_info("%s started\n", __FUNCTION__);
+	/*save current scene*/
+	struct __BlkMapTblCache_t *TmpBmt = BLK_MAP_CACHE;
+	struct __PageMapTblCache_t *TmpPmt = PAGE_MAP_CACHE; // What is this for?
 
 	if (!BLK_MAP_CACHE_POOL ||
-	    !BLK_MAP_CACHE ||
-	    !BLK_MAP_CACHE_POOL->BlkMapTblCachePool ||
-	    !PAGE_MAP_CACHE) {
-		pr_err("%s: NULL pointer ERROR: %x %x %x %x\n", __FUNCTION__,
+	    !BLK_MAP_CACHE_POOL->BlkMapTblCachePool) {
+		pr_err("%s ERROR: NULL pointer in %x %x\n", __FUNCTION__,
 		       BLK_MAP_CACHE_POOL,
-		       BLK_MAP_CACHE,
-		       BLK_MAP_CACHE_POOL->BlkMapTblCachePool,
-		       PAGE_MAP_CACHE);
+		       BLK_MAP_CACHE_POOL->BlkMapTblCachePool);
 		return -EFAULT;
 	}
-        for (i = 0; i < BLOCK_MAP_TBL_CACHE_CNT; i++) {
+	else
+		pr_info("%s precondition OK", __FUNCTION__);
+
+	for (i = 0; i < BLOCK_MAP_TBL_CACHE_CNT; i++) {
 		if (BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i].DirtyFlag) {
 			BLK_MAP_CACHE = &(BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i]);
-			if (0 != _write_back_block_map_tbl(CUR_MAP_ZONE))
-				return -1;
+			if ((ret = _write_back_block_map_tbl(CUR_MAP_ZONE)) != 0)
+				break;
 			BLK_MAP_CACHE->DirtyFlag = 0;
 		}
 	}
 
-        /*resore current scene*/
-        BLK_MAP_CACHE  = TmpBmt;
-        PAGE_MAP_CACHE = TmpPmt;
+	/*resore current scene*/
+	BLK_MAP_CACHE  = TmpBmt;
+	PAGE_MAP_CACHE = TmpPmt;
 
-	pr_info("%s: map table written OK\n", __FUNCTION__);
+	if (!ret)
+		pr_info("%s: map table written OK\n", __FUNCTION__);
+	else
+		pr_err("%s: map table write ERROR %d\n", __FUNCTION__, ret);
 
-        return 0;
+	return ret;
 }
 
 static __s32 _write_dirty_flag(__u8 nZone)
@@ -1014,7 +1025,7 @@ __s32 BMM_SetDirtyFlag(void)
 {
 	if (BLK_MAP_CACHE_POOL &&
 	    BLK_MAP_CACHE &&
-	    !BLK_MAP_CACHE->DirtyFlag){
+	    !BLK_MAP_CACHE->DirtyFlag) {
 		_write_dirty_flag(CUR_MAP_ZONE);
 		BLK_MAP_CACHE->DirtyFlag = 1;
 	}
