@@ -331,9 +331,6 @@ struct __NandDriverGlobal_t
 //  define the function return value for different modules
 //==============================================================================
 
-#define NAND_OP_FALSE           (-1)                    //define the failed return value
-
-
 // FIXME: Remove these non-standard values and use the ones from the kernel.
 #define ECC_LIMIT               10                  //reach the limit of the ability of ECC
 #define ERR_MALLOC              11                  //request buffer failed
