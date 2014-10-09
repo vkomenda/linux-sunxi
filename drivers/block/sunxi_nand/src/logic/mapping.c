@@ -696,6 +696,10 @@ static __s32 _write_back_block_map_tbl(__u8 nZone)
 		   BLK_MAP_CACHE, DATA_BLK_TBL, LML_PROCESS_TBL_BUF, LOG_BLK_TBL);
 	    return -EFAULT;
     }
+    else if (nZone > MAX_ZONE_CNT - 1) {
+	    pr_err("%s ERROR: invalid zone %d\n", __FUNCTION__, nZone);
+	    return -EINVAL;
+    }
     else
 	    pr_info("%s precondition OK\n", __FUNCTION__);
 
