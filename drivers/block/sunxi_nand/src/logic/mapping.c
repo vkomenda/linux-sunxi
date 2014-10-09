@@ -883,6 +883,7 @@ static __s32 _blk_map_tbl_cache_post(__u32 nZone)
 {
     __u8 poisition;
 
+    pr_info("%s in zone %d", __FUNCTION__, nZone);
     /*find the cache to be post*/
     poisition = _find_blk_tbl_post_location();
     BLK_MAP_CACHE = &(BLK_MAP_CACHE_POOL->BlkMapTblCachePool[poisition]);
