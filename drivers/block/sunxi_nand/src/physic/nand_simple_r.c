@@ -440,8 +440,10 @@ __s32 _read_single_page(struct boot_physical_param *readop, __u8 dma_wait_mode)
 				NFC_RandomEnable();
 				ret = NFC_Read(cmd_list, readop->mainbuf, sparebuf, dma_wait_mode, NFC_PAGE_MODE);
 				NFC_RandomDisable();
-				if(ret == -ERR_ECC)
+				if(ret == -ERR_ECC) {
+					pr_err("%s random read ECC ERROR\n", __FUNCTION__);
 					ret = NFC_Read(cmd_list, readop->mainbuf, sparebuf, dma_wait_mode, NFC_PAGE_MODE);
+				}
 
 				/**************************************************************************************
 				* 1. add by Neil, from v2.09
@@ -515,8 +517,10 @@ __s32 _read_single_page(struct boot_physical_param *readop, __u8 dma_wait_mode)
 			NFC_RandomEnable();
 			ret = NFC_Read(cmd_list, readop->mainbuf, sparebuf, dma_wait_mode, NFC_PAGE_MODE);
 			NFC_RandomDisable();
-			if(ret == -ERR_ECC)
+			if(ret == -ERR_ECC) {
+				pr_err("%s non-RR randomiser ERROR\n", __FUNCTION__);
 				ret = NFC_Read(cmd_list, readop->mainbuf, sparebuf, dma_wait_mode, NFC_PAGE_MODE);
+			}
 		}
 		else {
 			ret = NFC_Read(cmd_list, readop->mainbuf, sparebuf, dma_wait_mode , NFC_PAGE_MODE);

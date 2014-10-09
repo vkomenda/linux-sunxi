@@ -692,12 +692,12 @@ static __s32 _write_back_block_map_tbl(__u8 nZone)
 	!DATA_BLK_TBL ||
 	!LML_PROCESS_TBL_BUF ||
 	!LOG_BLK_TBL) {
-	    pr_err("%s ERROR: NULL pointer in %x %x %x %x", __FUNCTION__,
+	    pr_err("%s ERROR: NULL pointer in %lx %lx %lx %lx\n", __FUNCTION__,
 		   BLK_MAP_CACHE, DATA_BLK_TBL, LML_PROCESS_TBL_BUF, LOG_BLK_TBL);
 	    return -EFAULT;
     }
     else
-	    pr_info("%s precondition OK", __FUNCTION__);
+	    pr_info("%s precondition OK\n", __FUNCTION__);
 
     /*write back all page map table within this zone*/
     if (0 != _write_back_all_page_map_tbl(nZone)){
@@ -952,13 +952,13 @@ __s32 BMM_WriteBackAllMapTbl(void)
 
 	if (!BLK_MAP_CACHE_POOL ||
 	    !BLK_MAP_CACHE_POOL->BlkMapTblCachePool) {
-		pr_err("%s ERROR: NULL pointer in %x %x\n", __FUNCTION__,
+		pr_err("%s ERROR: NULL pointer in %lx %lx\n", __FUNCTION__,
 		       BLK_MAP_CACHE_POOL,
 		       BLK_MAP_CACHE_POOL->BlkMapTblCachePool);
 		return -EFAULT;
 	}
 	else
-		pr_info("%s precondition OK", __FUNCTION__);
+		pr_info("%s precondition OK\n", __FUNCTION__);
 
 	for (i = 0; i < BLOCK_MAP_TBL_CACHE_CNT; i++) {
 		if (BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i].DirtyFlag) {
@@ -973,8 +973,12 @@ __s32 BMM_WriteBackAllMapTbl(void)
 	BLK_MAP_CACHE  = TmpBmt;
 	PAGE_MAP_CACHE = TmpPmt;
 
-	if (!ret)
-		pr_info("%s: map table written OK\n", __FUNCTION__);
+	if (!ret) {
+		if (i == 0)
+			pr_info("%s: map table write omitted\n", __FUNCTION__);
+		else
+			pr_info("%s: map table written OK\n", __FUNCTION__);
+	}
 	else
 		pr_err("%s: map table write ERROR %d\n", __FUNCTION__, ret);
 
