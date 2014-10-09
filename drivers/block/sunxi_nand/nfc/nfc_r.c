@@ -486,7 +486,7 @@ __s32 NFC_RandomEnable(void)
 	cfg = NFC_READ_REG(NFC_REG_ECC_CTL);
 	cfg |= (0x1<<9);
 	NFC_WRITE_REG(NFC_REG_ECC_CTL,cfg);
-	pr_info("NAND randomiser enabled\n");
+	pr_info("NAND +random\n");
 
 	return 0;
 }
@@ -498,7 +498,7 @@ __s32 NFC_RandomDisable(void)
 	cfg = NFC_READ_REG(NFC_REG_ECC_CTL);
 	cfg &= (~(0x1<<9));
 	NFC_WRITE_REG(NFC_REG_ECC_CTL,cfg);
-	pr_info("NAND randomiser disabled\n");
+	pr_info("NAND -random\n");
 
 	return 0;
 }

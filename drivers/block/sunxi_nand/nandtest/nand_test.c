@@ -152,11 +152,15 @@ static int nand_test_prepare_read(struct nand_test_card *test)
  */
 static int create_BMT_prepare(struct nand_test_card* test)
 {
+	int i;
+
 	// TODO: pointer correction assertions... cache initialisation?
 	if (!NandDriverInfo.BlkMapTblCachePool)
 		return -EFAULT;
 
-	NandDriverInfo.BlkMapTblCachePool->BlkMapTblCachePool[0].DirtyFlag = 1;
+	for (i = 0; i < BLOCK_MAP_TBL_CACHE_CNT; i++)
+		NandDriverInfo.BlkMapTblCachePool->BlkMapTblCachePool[i].DirtyFlag = 1;
+
 	return 0;
 }
 
