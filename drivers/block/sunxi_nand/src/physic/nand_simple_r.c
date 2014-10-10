@@ -205,7 +205,7 @@ __u8 _cal_real_chip(__u32 global_bank)
 			break;
 		}
 	else {
-		PHY_ERR("wrong rb_mode %d or bank %d (chip WAS %d; info at %lx)\n",
+		PHY_ERR("wrong rb_mode %d or bank %d (chip WAS %d; info at %x)\n",
 			RB_CONNECT_MODE, global_bank, chip, CHIP_CONNECT_INFO);
 		chip = 0xFF;
 	}

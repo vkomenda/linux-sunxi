@@ -215,5 +215,4 @@
 #define     LOGICCTL_ERR(...)
 #endif
 
-
 #endif //ifndef __NAND_DRV_CFG_H
