@@ -505,6 +505,7 @@ static __s32 _WriteBadBlkFlag(__u32 nDieNum, __u32 nBlock)
 {
     __s32   i;
     struct __NandUserData_t tmpSpare[2];
+    int result = 0;
 
     //set bad block flag to the spare data write to nand flash
     tmpSpare[0].BadBlkFlag = 0x00;
@@ -519,14 +520,24 @@ static __s32 _WriteBadBlkFlag(__u32 nDieNum, __u32 nBlock)
     for(i=0; i<INTERLEAVE_BANK_CNT; i++)
     {
         //write the bad block flag on the first page
-        _VirtualPageWrite(nDieNum, nBlock, i, FULL_BITMAP_OF_SUPER_PAGE, FORMAT_PAGE_BUF, (void *)&tmpSpare);
+        result = _VirtualPageWrite(nDieNum, nBlock, i, FULL_BITMAP_OF_SUPER_PAGE, FORMAT_PAGE_BUF, (void *)&tmpSpare);
+	if (result) {
+		DBG("First page bad block flag write ERROR");
+		break;
+	}
 
         //write the bad block flag on the last page
         _VirtualPageWrite(nDieNum, nBlock, PAGE_CNT_OF_SUPER_BLK - INTERLEAVE_BANK_CNT + i, \
                         FULL_BITMAP_OF_SUPER_PAGE, FORMAT_PAGE_BUF, (void *)&tmpSpare);
+	if (result) {
+		DBG("Last page bad block flag write ERROR");
+		break;
+	}
     }
+    if (!result)
+	    DBG("Die 0x%x block %0x%x marked bad OK", nDieNum, nBlock);
 
-    return 0;
+    return result;
 }
 
 
@@ -1552,6 +1563,8 @@ static __s32 _KickValidTblBlk(struct __ScanDieInfo_t *pDieInfo)
     __u32   tmpTblBlk, tmpTblPage;
     __u16   tmpPhyBlk;
 
+    CAPTION;
+
     for(i=0; i<ZONE_CNT_OF_DIE; i++)
     {
         //check if the block mapping table of the zone is valid
@@ -1767,6 +1780,8 @@ static __s32 _FillZoneTblInfo(struct __ScanDieInfo_t *pDieInfo)
     __u32   tmpPhyBlk, tmpBlkErase;
     __s32   result;
 
+    CAPTION;
+
     //calculte the first block is used in the die
     if(pDieInfo->nDie == 0)
     {
@@ -1791,7 +1806,6 @@ static __s32 _FillZoneTblInfo(struct __ScanDieInfo_t *pDieInfo)
                 FORMAT_DBG("[FORMAT_DBG] mark the last block as bad block \n");
                 pDieInfo->pPhyBlk[tmpPhyBlk] = BAD_BLOCK_INFO;
                 _WriteBadBlkFlag(pDieInfo->nDie, tmpPhyBlk);
-
             }
         }
 
@@ -2337,12 +2351,21 @@ static __s32 _RebuildZoneTbls(struct __ScanDieInfo_t *pDieInfo)
 
     //read the logical information of every physical block of the die
     result = _GetBlkLogicInfo(pDieInfo);
+    if (result) {
+	    DBG("_GetBlkLogicInfo ERROR %d", result);
+    }
 
     //fill the zone table information structure with the logical block information in the Die informaton buffer
     result = _FillZoneTblInfo(pDieInfo);
+    if (result) {
+	    DBG("_FillZoneTblInfo ERROR %d", result);
+    }
 
     //kick the free blocks that has been used by the valid zone table
     result = _KickValidTblBlk(pDieInfo);
+    if (result) {
+	    DBG("_KickValidTblBlk ERROR %d", result);
+    }
 
     //get a physical block in the table block area for every mapping table to save block mapping table
     result = _GetMapTblBlock(pDieInfo);

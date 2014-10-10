@@ -355,6 +355,9 @@ struct __NandDriverGlobal_t
 		return -EINVAL; \
 	}
 
-#define CAPTION pr_info("%s", __FUNCTION__)
+#define CAPTION pr_info(">>> %s\n", __FUNCTION__)
+
+#define DBG(fmt, arg...) pr_info("%s " fmt "\n", __FUNCTION__, ##arg)
+//#define DBG(...) {}
 
 #endif //ifndef __NAND_TYPE_H
