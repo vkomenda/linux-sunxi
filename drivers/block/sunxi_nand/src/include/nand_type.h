@@ -345,4 +345,16 @@ struct __NandDriverGlobal_t
 #define ERR_ADDRBEYOND          20                  //the logical sectors need be accessed is beyond the logical disk
 #define ERR_INVALIDPHYADDR		  21
 
+
+/* Verification macros */
+#define PRECONDITION(b) \
+	if (b) \
+		pr_info("%s precondition test PASS\n", __FUNCTION__); \
+	else { \
+		pr_err("%s precondition test FAIL:\n%s\n", __FUNCTION__, #b); \
+		return -EINVAL; \
+	}
+
+#define CAPTION pr_info("%s", __FUNCTION__)
+
 #endif //ifndef __NAND_TYPE_H
