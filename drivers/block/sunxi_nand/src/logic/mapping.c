@@ -949,7 +949,8 @@ __s32 BMM_SwitchMapTbl(__u32 nZone)
 */
 __s32 BMM_WriteBackAllMapTbl(void)
 {
-	__u8 i, ret = 0;
+	__u8 i;
+	int ret = 0;
 
 	/*save current scene*/
 	struct __BlkMapTblCache_t *TmpBmt = BLK_MAP_CACHE;
