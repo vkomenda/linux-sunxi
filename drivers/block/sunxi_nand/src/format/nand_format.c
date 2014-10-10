@@ -520,22 +520,26 @@ static __s32 _WriteBadBlkFlag(__u32 nDieNum, __u32 nBlock)
     for(i=0; i<INTERLEAVE_BANK_CNT; i++)
     {
         //write the bad block flag on the first page
-        result = _VirtualPageWrite(nDieNum, nBlock, i, FULL_BITMAP_OF_SUPER_PAGE, FORMAT_PAGE_BUF, (void *)&tmpSpare);
+        result = _VirtualPageWrite(nDieNum, nBlock, i,
+				   FULL_BITMAP_OF_SUPER_PAGE, FORMAT_PAGE_BUF,
+				   (void *)&tmpSpare);
 	if (result) {
 		DBG("First page bad block flag write ERROR");
 		break;
 	}
 
         //write the bad block flag on the last page
-        _VirtualPageWrite(nDieNum, nBlock, PAGE_CNT_OF_SUPER_BLK - INTERLEAVE_BANK_CNT + i, \
-                        FULL_BITMAP_OF_SUPER_PAGE, FORMAT_PAGE_BUF, (void *)&tmpSpare);
+        result = _VirtualPageWrite(nDieNum, nBlock,
+				   PAGE_CNT_OF_SUPER_BLK - INTERLEAVE_BANK_CNT + i,
+				   FULL_BITMAP_OF_SUPER_PAGE, FORMAT_PAGE_BUF,
+				   (void *)&tmpSpare);
 	if (result) {
 		DBG("Last page bad block flag write ERROR");
 		break;
 	}
     }
     if (!result)
-	    DBG("Die 0x%x block %0x%x marked bad OK", nDieNum, nBlock);
+	    DBG("Die 0x%x block 0x%x marked bad OK", nDieNum, nBlock);
 
     return result;
 }
@@ -1557,7 +1561,7 @@ static __s32 _GetMapTblBlock(struct __ScanDieInfo_t *pDieInfo)
 *               < 0     kick free block failed.
 ************************************************************************************************************************
 */
-static __s32 _KickValidTblBlk(struct __ScanDieInfo_t *pDieInfo)
+static void _KickValidTblBlk(struct __ScanDieInfo_t *pDieInfo)
 {
     __s32   i, j;
     __u32   tmpTblBlk, tmpTblPage;
@@ -1570,8 +1574,9 @@ static __s32 _KickValidTblBlk(struct __ScanDieInfo_t *pDieInfo)
         //check if the block mapping table of the zone is valid
         if(!(pDieInfo->TblBitmap & (1 << i)))
         {
-            //block mapping table is invalid, ignore the zone table
-            continue;
+		//block mapping table is invalid, ignore the zone table
+		DBG("Valid block map skipped");
+		continue;
         }
 
         tmpTblBlk = ZoneTblPstInfo[i + pDieInfo->nDie * ZONE_CNT_OF_DIE].PhyBlkNum;
@@ -1592,7 +1597,8 @@ static __s32 _KickValidTblBlk(struct __ScanDieInfo_t *pDieInfo)
             if(tmpPhyBlk == 0xffff)
             {
                 //the table item is empty
-                continue;
+		    DBG("Zone 0x%x block 0x%x mapping is empty", i, j);
+		    continue;
             }
 
             if(pDieInfo->pPhyBlk[tmpPhyBlk] == FREE_BLOCK_INFO)
@@ -1603,8 +1609,6 @@ static __s32 _KickValidTblBlk(struct __ScanDieInfo_t *pDieInfo)
             }
         }
     }
-
-    return 0;
 }
 
 
@@ -1621,18 +1625,21 @@ static __s32 _KickValidTblBlk(struct __ScanDieInfo_t *pDieInfo)
 *               < 0     repair log block table failed.
 ************************************************************************************************************************
 */
-static __s32 _RepairLogBlkTbl(struct __ScanDieInfo_t *pDieInfo)
+static void _RepairLogBlkTbl(struct __ScanDieInfo_t *pDieInfo)
 {
 
-    __s32 i, tmpZone, tmpLastUsedPage;
+    __s32 i, tmpZone;
     struct __LogBlkType_t *tmpLogTbl;
+
+    CAPTION;
 
     for(tmpZone=0; tmpZone<ZONE_CNT_OF_DIE; tmpZone++)
     {
         //skip the valid block mapping table
         if(pDieInfo->TblBitmap & (1 << tmpZone))
         {
-            continue;
+		DBG("Valid block map skipped");
+		continue;
         }
 
         tmpLogTbl = pDieInfo->ZoneInfo[tmpZone].LogBlkTbl;
@@ -1641,16 +1648,14 @@ static __s32 _RepairLogBlkTbl(struct __ScanDieInfo_t *pDieInfo)
         {
             if(tmpLogTbl->LogicBlkNum != 0xffff)
             {
-                tmpLastUsedPage = _GetLastUsedPage(pDieInfo->nDie, tmpLogTbl->PhyBlk.PhyBlkNum);
-
-                tmpLogTbl->LastUsedPage = tmpLastUsedPage;
+                tmpLogTbl->LastUsedPage = _GetLastUsedPage(pDieInfo->nDie,
+							   tmpLogTbl->PhyBlk.PhyBlkNum);
+		DBG("logic block 0x%x last used page 0x%x",
+		    tmpLogTbl->LogicBlkNum, tmpLogTbl->LastUsedPage);
             }
-
             tmpLogTbl++;
         }
     }
-
-    return 0;
 }
 
 
@@ -2362,10 +2367,7 @@ static __s32 _RebuildZoneTbls(struct __ScanDieInfo_t *pDieInfo)
     }
 
     //kick the free blocks that has been used by the valid zone table
-    result = _KickValidTblBlk(pDieInfo);
-    if (result) {
-	    DBG("_KickValidTblBlk ERROR %d", result);
-    }
+    _KickValidTblBlk(pDieInfo);     // Always 0.
 
     //get a physical block in the table block area for every mapping table to save block mapping table
     result = _GetMapTblBlock(pDieInfo);
@@ -2379,7 +2381,7 @@ static __s32 _RebuildZoneTbls(struct __ScanDieInfo_t *pDieInfo)
     }
 
     //repair the log block table
-    result = _RepairLogBlkTbl(pDieInfo);
+    _RepairLogBlkTbl(pDieInfo);      // Always returns 0.
 
     //allocate the free block to every block mapping table
     result = _DistributeFreeBlk(pDieInfo);
