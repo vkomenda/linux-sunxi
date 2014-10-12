@@ -1257,7 +1257,7 @@ __s32  PHY_PageReadSpare(struct __PhysicOpPara_t *pPageAdr)
 	struct __NandUserData_t oob_buf;
 	struct boot_physical_param readop;
 
-	PRECONDITION(pPageAdr);
+//	PRECONDITION(pPageAdr);
 
 	ret = 0;
 	plane_cnt = SUPPORT_MULTI_PROGRAM ? PLANE_CNT_OF_DIE : 1;

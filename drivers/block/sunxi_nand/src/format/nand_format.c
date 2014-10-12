@@ -226,7 +226,7 @@ static __s32 _VirtualPageRead(__u32 nDieNum, __u32 nBlkNum, __u32 nPage, __u32 S
     __u8  *tmpSrcData, *tmpDstData, *tmpSrcPtr[4], *tmpDstPtr[4];
     struct __PhysicOpPara_t tmpPhyPage;
 
-    pr_info("%s in die 0x%x block 0x%x page 0x%x bitmap 0x%x buffer 0x%x",
+    pr_info("%s in die 0x%x block 0x%x page 0x%x bitmap 0x%x buffer 0x%x\n",
 	    __FUNCTION__, nDieNum, nBlkNum, nPage, SectBitmap, (u32)pBuf);
 
     //calculate the physical operation parameter by te die number, block number and page number
@@ -2182,7 +2182,10 @@ static __s32 _SearchZoneTbls(struct __ScanDieInfo_t *pDieInfo)
 	   GET_LOGIC_INFO_BLK(tmpSpareData[0].LogicInfo) != 0xaa)
         {
             //the block is not a valid block-mapping-table block, ignore it
-		pr_warn("%s block 0x%x is invalid\n", __FUNCTION__, tmpSuperBlk);
+		pr_warn("%s block 0x%x is invalid: badness bytes %.2x %.2x, info %.4x\n",
+			__FUNCTION__, tmpSuperBlk,
+			tmpSpareData[0].BadBlkFlag, tmpSpareData[1].BadBlkFlag,
+			tmpSpareData[0].LogicInfo);
 		continue;
         }
 
@@ -2623,6 +2626,27 @@ __s32 FMT_FormatNand(void)
 		//result = -1;
 		if (result < 0) {
 			for (rebuild = 0; rebuild < 2; rebuild++) {
+				pr_info("%s will attempt (#%d) to build logical tables on die 0x%x\n",
+					__FUNCTION__, rebuild + 1, tmpDie);
+				pr_info("  die number         0x%x\n", tmpDieInfo.nDie);
+				pr_info("  table bitmap       0x%x\n", tmpDieInfo.TblBitmap);
+				pr_info("  bad blocks         0x%x\n", tmpDieInfo.nBadCnt);
+				pr_info("  free blocks        0x%x\n", tmpDieInfo.nFreeCnt);
+				pr_info("  free block index   0x%x\n", tmpDieInfo.nFreeIndex);
+/*
+				pr_info("Data block count   0x%x\n", tmpDieInfo.nDataBlkCnt);
+				pr_info("Free block count   0x%x\n", tmpDieInfo.nFreeBlkCnt);
+				pr_info("Free blocks index  0x%x\n", tmpDieInfo.nFreeBlkIndex);
+				pr_info("First block info:\n"
+					"  physical block   0x%x\n"
+					"  erase count      0x%x\n"
+					"  logic block      0x%x\n"
+					"  last used page   0x%x\n",
+					tmpDieInfo.ZoneTbl[0].PhyBlkNum,
+					tmpDieInfo.ZoneTbl[0].BlkEraseCnt,
+					tmpDieInfo.LogBlkTbl[0].LogicBlkNum,
+					tmpDieInfo.LogBlkTbl[0].LastUsedPage);
+*/
 				//search zone tables from the nand flash failed, need repair or build it
 				result = _RebuildZoneTbls(&tmpDieInfo);
 				if (result != RET_FORMAT_TRY_AGAIN)
