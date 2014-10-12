@@ -579,14 +579,18 @@ static void _DumpDieInfo(struct __ScanDieInfo_t *pDieInfo)
         FORMAT_DBG("[FORMAT_DBG]    Data block Count:    0x%x\n", tmpZoneInfo->nDataBlkCnt);
         FORMAT_DBG("[FORMAT_DBG]    Free block Count:    0x%x\n", tmpZoneInfo->nFreeBlkCnt);
         FORMAT_DBG("[FORMAT_DBG]    Log block table: \n");
-		FORMAT_DBG("       [Index]             [LogicalBlk]         [LogBlk]        [DataBlk]\n");
+	FORMAT_DBG("[Index]  [LogBlk]  [PhyBlk]  [DataBlk]\n");
         for(tmpLog=0; tmpLog<MAX_LOG_BLK_CNT; tmpLog++)
         {
             tmpLogBlk = tmpLogBlk;
             tmpLogBlk = &tmpZoneInfo->LogBlkTbl[tmpLog];
-            FORMAT_DBG("      %x           %x          %x        %x\n", tmpLog, tmpLogBlk->LogicBlkNum,
-    		    tmpLogBlk->PhyBlk.PhyBlkNum,
-    		    (tmpLogBlk->LogicBlkNum == 0xffff)? 0xffff : tmpZoneInfo->ZoneTbl[tmpLogBlk->LogicBlkNum].PhyBlkNum);
+            FORMAT_DBG(" %x       %x        %x        %x\n",
+		       tmpLog,
+		       tmpLogBlk->LogicBlkNum,
+		       tmpLogBlk->PhyBlk.PhyBlkNum,
+		       (tmpLogBlk->LogicBlkNum == 0xffff) ?
+		       0xffff :
+		       tmpZoneInfo->ZoneTbl[tmpLogBlk->LogicBlkNum].PhyBlkNum);
         }
     }
 
@@ -989,9 +993,9 @@ static __s32 _GetBlkLogicInfo(struct __ScanDieInfo_t *pDieInfo)
 
                 //calculate the number of the page in the super block to get spare data
                 tmpPage = tmpPageNum[i] * INTERLEAVE_BANK_CNT + tmpBnkNum;
-                //_VirtualPageRead(pDieInfo->nDie, tmpBlkNum, tmpPage, LOGIC_INFO_BITMAP, FORMAT_PAGE_BUF, (void *)&tmpSpare);
+                //_VirtualPageRead(pDieInfo->nDie, tmpBlkNum, tmpPage, LOGIC_INFO_BITMAP, FORMAT_PAGE_BUF, (void *)&tmpSpare[0]);
                 spare_bitmap = (SUPPORT_MULTI_PROGRAM ? (0x3 | (0x3 << SECTOR_CNT_OF_SINGLE_PAGE)) : 0x3);
-                _VirtualPageRead(pDieInfo->nDie, tmpBlkNum, tmpPage, spare_bitmap, FORMAT_PAGE_BUF, (void *)&tmpSpare);
+                _VirtualPageRead(pDieInfo->nDie, tmpBlkNum, tmpPage, spare_bitmap, FORMAT_PAGE_BUF, (void *)&tmpSpare[0]);
 
 				//check if the block is a bad block
                 if((tmpSpare[0].BadBlkFlag != 0xff) || (SUPPORT_MULTI_PROGRAM && (tmpSpare[1].BadBlkFlag != 0xff)))
@@ -2171,7 +2175,7 @@ static __s32 _SearchZoneTbls(struct __ScanDieInfo_t *pDieInfo)
         tmpSpareData[0].BadBlkFlag = tmpSpareData[1].BadBlkFlag = 0xff;
 
         //read page0 to get the block logical information
-        result = _VirtualPageRead(pDieInfo->nDie, tmpSuperBlk, 0, SPARE_DATA_BITMAP, FORMAT_PAGE_BUF, (void *)&tmpSpareData);
+        result = _VirtualPageRead(pDieInfo->nDie, tmpSuperBlk, 0, SPARE_DATA_BITMAP, FORMAT_PAGE_BUF, (void *)&tmpSpareData[0]);
 	if (result)
 		pr_warn("%s virtual page read ERROR %d\n", __FUNCTION__, result);
 
