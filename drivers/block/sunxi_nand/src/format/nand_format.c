@@ -1701,6 +1701,8 @@ static __s32 _DistributeFreeBlk(struct __ScanDieInfo_t *pDieInfo)
 
     struct __SuperPhyBlkType_t *tmpZoneTbl;
 
+    CAPTION;
+
     //initiate the first super block of the die
     if(pDieInfo->nDie == 0)
     {
@@ -2023,6 +2025,8 @@ static __s32 _WriteBlkMapTbl(struct __ScanDieInfo_t *pDieInfo)
     struct __NandUserData_t tmpSpare[2];
     struct __SuperPhyBlkType_t *tmpDataBlk;
     struct __LogBlkType_t *tmpLogBlk;
+
+    CAPTION;
 
     for(tmpZone=0; tmpZone<ZONE_CNT_OF_DIE; tmpZone++)
     {
