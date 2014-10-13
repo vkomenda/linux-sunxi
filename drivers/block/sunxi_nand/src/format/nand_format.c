@@ -226,11 +226,16 @@ static __s32 _VirtualPageRead(__u32 nDieNum, __u32 nBlkNum, __u32 nPage, __u32 S
     __u8  *tmpSrcData, *tmpDstData, *tmpSrcPtr[4], *tmpDstPtr[4];
     struct __PhysicOpPara_t tmpPhyPage;
 
-    pr_info("%s in die 0x%x block 0x%x page 0x%x bitmap 0x%x buffer 0x%x\n",
-	    __FUNCTION__, nDieNum, nBlkNum, nPage, SectBitmap, (u32)pBuf);
+    CAPTION;
+
+    DBG("[LOGIC] die %.2x block %.4x page %.2x sector bitmap %.8x",
+	nDieNum, nBlkNum, nPage, SectBitmap);
 
     //calculate the physical operation parameter by te die number, block number and page number
     _CalculatePhyOpPar(&tmpPhyPage, nDieNum * ZONE_CNT_OF_DIE, nBlkNum, nPage);
+
+    DBG("[PHY] bank %.2x block %.4x page %.2x sector bitmap %.8x",
+	tmpPhyPage.BankNum, tmpPhyPage.PageNum, tmpPhyPage.BlkNum, tmpPhyPage.SectBitmap);
 
     //set the sector bitmap in the page, the main data buffer and the spare data buffer
     tmpPhyPage.SectBitmap = SectBitmap;
@@ -329,6 +334,9 @@ static __s32 _VirtualPageWrite(__u32 nDieNum, __u32 nBlkNum, __u32 nPage, __u32 
     //calculate the physical operation parameter by te die number, block number and page number
     _CalculatePhyOpPar(&tmpPhyPage, nDieNum * ZONE_CNT_OF_DIE, nBlkNum, nPage);
 
+    DBG("bank %.2x page %.2x block %.4x sector bitmap %.8x",
+	tmpPhyPage.BankNum, tmpPhyPage.PageNum, tmpPhyPage.BlkNum, tmpPhyPage.SectBitmap);
+
     //set the sector bitmap in the page, the main data buffer and the spare data buffer
     tmpPhyPage.SectBitmap = SectBitmap;
     tmpPhyPage.MDataPtr = pBuf;
@@ -377,6 +385,9 @@ static __s32 _VirtualPageWrite(__u32 nDieNum, __u32 nBlkNum, __u32 nPage, __u32 
                 *tmpDstData++ = *tmpSrcData++;
                 *tmpDstData++ = *tmpSrcData++;
                 *tmpDstData++ = *tmpSrcData++;
+		DBG("[#%d] spare data to be written %.2x %.2x %.2x %.2x", i,
+		    *tmpDstPtr[i],   *tmpDstPtr[i+1],
+		    *tmpDstPtr[i+2], *tmpDstPtr[i+3]);
             }
         }
     }
@@ -508,21 +519,19 @@ static __s32 _WriteBadBlkFlag(__u32 nDieNum, __u32 nBlock)
     int result = 0;
 
     //set bad block flag to the spare data write to nand flash
-    tmpSpare[0].BadBlkFlag = 0x00;
-    tmpSpare[1].BadBlkFlag = 0x00;
-    tmpSpare[0].LogicInfo = 0x00;
-    tmpSpare[1].LogicInfo = 0x00;
-    tmpSpare[0].LogicPageNum = 0x00;
-    tmpSpare[1].LogicPageNum = 0x00;
-    tmpSpare[0].PageStatus = 0x00;
-    tmpSpare[1].PageStatus = 0x00;
+    for (i = 0; i < 2; i++)
+	    memset(&tmpSpare[i], 0, sizeof(struct __NandUserData_t));
 
+    /*
+     * FIXME: bad block marker location types are not taken into account, only
+     * type 2 is supported (first & last pages).
+     */
     for(i=0; i<INTERLEAVE_BANK_CNT; i++)
     {
         //write the bad block flag on the first page
         result = _VirtualPageWrite(nDieNum, nBlock, i,
 				   FULL_BITMAP_OF_SUPER_PAGE, FORMAT_PAGE_BUF,
-				   (void *)&tmpSpare);
+				   (void *)&tmpSpare[0]);
 	if (result) {
 		DBG("First page bad block flag write ERROR");
 		break;
@@ -532,7 +541,7 @@ static __s32 _WriteBadBlkFlag(__u32 nDieNum, __u32 nBlock)
         result = _VirtualPageWrite(nDieNum, nBlock,
 				   PAGE_CNT_OF_SUPER_BLK - INTERLEAVE_BANK_CNT + i,
 				   FULL_BITMAP_OF_SUPER_PAGE, FORMAT_PAGE_BUF,
-				   (void *)&tmpSpare);
+				   (void *)&tmpSpare[0]);
 	if (result) {
 		DBG("Last page bad block flag write ERROR");
 		break;
@@ -579,12 +588,12 @@ static void _DumpDieInfo(struct __ScanDieInfo_t *pDieInfo)
         FORMAT_DBG("[FORMAT_DBG]    Data block Count:    0x%x\n", tmpZoneInfo->nDataBlkCnt);
         FORMAT_DBG("[FORMAT_DBG]    Free block Count:    0x%x\n", tmpZoneInfo->nFreeBlkCnt);
         FORMAT_DBG("[FORMAT_DBG]    Log block table: \n");
-	FORMAT_DBG("[Index]  [LogBlk]  [PhyBlk]  [DataBlk]\n");
+	FORMAT_DBG("[Index]\t[LogicBlk]\t[PhyBlk]\t[DataBlk]\n");
         for(tmpLog=0; tmpLog<MAX_LOG_BLK_CNT; tmpLog++)
         {
             tmpLogBlk = tmpLogBlk;
             tmpLogBlk = &tmpZoneInfo->LogBlkTbl[tmpLog];
-            FORMAT_DBG(" %x       %x        %x        %x\n",
+            FORMAT_DBG("%x\t%.4x\t\t%.4x\t\t%.4x\n",
 		       tmpLog,
 		       tmpLogBlk->LogicBlkNum,
 		       tmpLogBlk->PhyBlk.PhyBlkNum,
@@ -934,21 +943,23 @@ static __s32 _GetBlkLogicInfo(struct __ScanDieInfo_t *pDieInfo)
 {
     __u32   tmpBlkNum, tmpBnkNum, tmpPage, tmpBadFlag;
     __s32   i;
-    __s16   tmpPageNum[4];
+    __s16   tmpPageNum[3];
     __u16   tmpLogicInfo;
     __u32   spare_bitmap;
     struct  __NandUserData_t tmpSpare[2];
 
     CAPTION;
 
+//    for (i = 0; i < 2; i++)
+//	    memset(&tmpSpare[i], 0, sizeof(struct __NandUserData_t));
+
     //initiate the number of the pages which need be read, the first page is read always, because the
     //the logical information is stored in the first page, other pages is read for check bad block flag
     tmpPageNum[0] = 0;
     tmpPageNum[1] = -1;
     tmpPageNum[2] = -1;
-    tmpPageNum[3] = -1;
 
-	tmpLogicInfo = 0xffff;
+    tmpLogicInfo = 0xffff;
 
     //analyze the number of pages which need be read
     switch(BAD_BLK_FLAG_PST & 0x03)
@@ -983,7 +994,7 @@ static __s32 _GetBlkLogicInfo(struct __ScanDieInfo_t *pDieInfo)
         //the super block is composed of several physical blocks in several banks
         for(tmpBnkNum=0; tmpBnkNum<INTERLEAVE_BANK_CNT; tmpBnkNum++)
         {
-            for(i=3; i>=0; i--)
+            for (i = 2; i >= 0; i--)
             {
                 if(tmpPageNum[i] == -1)
                 {
@@ -997,11 +1008,14 @@ static __s32 _GetBlkLogicInfo(struct __ScanDieInfo_t *pDieInfo)
                 spare_bitmap = (SUPPORT_MULTI_PROGRAM ? (0x3 | (0x3 << SECTOR_CNT_OF_SINGLE_PAGE)) : 0x3);
                 _VirtualPageRead(pDieInfo->nDie, tmpBlkNum, tmpPage, spare_bitmap, FORMAT_PAGE_BUF, (void *)&tmpSpare[0]);
 
-				//check if the block is a bad block
+		//check if the block is a bad block
                 if((tmpSpare[0].BadBlkFlag != 0xff) || (SUPPORT_MULTI_PROGRAM && (tmpSpare[1].BadBlkFlag != 0xff)))
                 {
                     //set the bad flag of the physical block
-                    tmpBadFlag = 1;
+			DBG("die 0x%x block 0x%x page 0x%x badness bytes: 0x%.2x + multiprogram 0x%.2x",
+			    pDieInfo->nDie, tmpBlkNum, tmpPage,
+			    tmpSpare[0].BadBlkFlag, tmpSpare[1].BadBlkFlag);
+			tmpBadFlag = 1;
                 }
 
                 if(tmpPage == 0)
@@ -1015,7 +1029,9 @@ static __s32 _GetBlkLogicInfo(struct __ScanDieInfo_t *pDieInfo)
         if(tmpBadFlag == 1)
         {
             //the physical block is a bad block, set bad block flag in the logical information buffer
-            FORMAT_DBG("[FORMAT_DBG] Find a bad block (NO. 0x%x) in the Die 0x%x\n", tmpBlkNum, pDieInfo->nDie);
+            DBG("BAD BLOCK 0x%x in die 0x%x with badness bytes 0x%x 0x%x\n",
+		tmpBlkNum, pDieInfo->nDie,
+		tmpSpare[0].BadBlkFlag, tmpSpare[1].BadBlkFlag);
             pDieInfo->pPhyBlk[tmpBlkNum] = BAD_BLOCK_INFO;
 
             continue;
@@ -1571,7 +1587,8 @@ static void _KickValidTblBlk(struct __ScanDieInfo_t *pDieInfo)
     __u32   tmpTblBlk, tmpTblPage;
     __u16   tmpPhyBlk;
 
-    CAPTION;
+//    CAPTION;
+    DBG("table bitmap %.2x", pDieInfo->TblBitmap);
 
     for(i=0; i<ZONE_CNT_OF_DIE; i++)
     {
@@ -1808,6 +1825,7 @@ static __s32 _FillZoneTblInfo(struct __ScanDieInfo_t *pDieInfo)
 
         //added by penggang 20101206
         //the last block is degenrous, if it is free block, kick it as a bad block
+/* EXPERIMENT: Is the last block already marked bad and can be detected so?
         if(tmpPhyBlk == SuperBlkCntOfDie-1)
         {
             if(tmpLogicInfo == FREE_BLOCK_INFO)
@@ -1817,7 +1835,7 @@ static __s32 _FillZoneTblInfo(struct __ScanDieInfo_t *pDieInfo)
                 _WriteBadBlkFlag(pDieInfo->nDie, tmpPhyBlk);
             }
         }
-
+*/
         tmpLogicInfo = pDieInfo->pPhyBlk[tmpPhyBlk];
 
 
@@ -2084,7 +2102,7 @@ static __s32 _WriteBlkMapTbl(struct __ScanDieInfo_t *pDieInfo)
 
 
         result = _VirtualPageWrite(pDieInfo->nDie, tmpTblBlk, tmpTblPage + DATA_TBL_OFFSET, \
-                            FULL_BITMAP_OF_SUPER_PAGE, FORMAT_PAGE_BUF, (void *)tmpSpare);
+				   FULL_BITMAP_OF_SUPER_PAGE, FORMAT_PAGE_BUF, (void *)&tmpSpare[0]);
         if(result < 0)
         {
             FORMAT_DBG("[FORMAT_DBG] Write page failed when write block mapping table!\n");
@@ -2097,7 +2115,7 @@ static __s32 _WriteBlkMapTbl(struct __ScanDieInfo_t *pDieInfo)
 
         MEMCPY(FORMAT_PAGE_BUF, (__u32 *)&tmpDataBlk[BLOCK_CNT_OF_ZONE / 2], SECTOR_SIZE * 4);
         result = _VirtualPageWrite(pDieInfo->nDie, tmpTblBlk, tmpTblPage + DATA_TBL_OFFSET + 1, \
-                            FULL_BITMAP_OF_SUPER_PAGE, FORMAT_PAGE_BUF, (void *)tmpSpare);
+				   FULL_BITMAP_OF_SUPER_PAGE, FORMAT_PAGE_BUF, (void *)&tmpSpare[0]);
         if(result < 0)
         {
             FORMAT_DBG("[FORMAT_DBG] Write page failed when write block mapping table!\n");
@@ -2114,7 +2132,7 @@ static __s32 _WriteBlkMapTbl(struct __ScanDieInfo_t *pDieInfo)
         result = _CalCheckSum((__u32 *)FORMAT_PAGE_BUF, LOG_BLK_CNT_OF_ZONE*sizeof(struct __LogBlkType_t)/sizeof(__u32));
         ((__u32*)FORMAT_PAGE_BUF)[511] = (__u32)result;
         result = _VirtualPageWrite(pDieInfo->nDie, tmpTblBlk, tmpTblPage + LOG_TBL_OFFSET, \
-                            FULL_BITMAP_OF_SUPER_PAGE, FORMAT_PAGE_BUF, (void *)tmpSpare);
+				   FULL_BITMAP_OF_SUPER_PAGE, FORMAT_PAGE_BUF, (void *)&tmpSpare[0]);
         if(result < 0)
         {
             FORMAT_DBG("[FORMAT_DBG] Write page failed when write block mapping table!\n");
@@ -2562,11 +2580,12 @@ __s32 FMT_Init(void)
     MEMSET(FORMAT_SPARE_BUF, 0xff, SECTOR_CNT_OF_SUPER_PAGE * 4);
 
     FORMAT_DBG("\n");
-    FORMAT_DBG("[FORMAT_DBG] ===========Logical Architecture Paramter===========\n");
-    FORMAT_DBG("[FORMAT_DBG]    Logic Block Count of Zone:  0x%x\n", LogicArchiPar.LogicBlkCntPerZone);
-    FORMAT_DBG("[FORMAT_DBG]    Page Count of Logic Block:  0x%x\n", LogicArchiPar.PageCntPerLogicBlk);
-    FORMAT_DBG("[FORMAT_DBG]    Sector Count of Logic Page: 0x%x\n", LogicArchiPar.SectCntPerLogicPage);
-    FORMAT_DBG("[FORMAT_DBG]    Zone Count of Die:          0x%x\n", LogicArchiPar.ZoneCntPerDie);
+    FORMAT_DBG("[FORMAT_DBG] ===========Logical Architecture Parameters=========\n");
+    FORMAT_DBG("[FORMAT_DBG]    logical blocks in a zone   0x%x\n", LogicArchiPar.LogicBlkCntPerZone);
+    FORMAT_DBG("[FORMAT_DBG]    pages in a logical block   0x%x\n", LogicArchiPar.PageCntPerLogicBlk);
+    FORMAT_DBG("[FORMAT_DBG]    sectors in a page          0x%x\n", LogicArchiPar.SectCntPerLogicPage);
+    FORMAT_DBG("[FORMAT_DBG]    zones in a die             0x%x\n", LogicArchiPar.ZoneCntPerDie);
+    FORMAT_DBG("[FORMAT_DBG]    superblocks in a die       0x%x\n", SuperBlkCntOfDie);
     FORMAT_DBG("[FORMAT_DBG] ===================================================\n");
 
     return 0;
