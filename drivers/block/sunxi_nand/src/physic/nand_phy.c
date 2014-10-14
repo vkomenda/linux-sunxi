@@ -487,6 +487,8 @@ __s32  PHY_BlockErase(struct __PhysicOpPara_t *pBlkAdr)
 		return -ERR_INVALIDPHYADDR;
 	}
 
+	DBG("chip %x rb %x block %x", chip, rb, block_in_chip);
+
 	/*create cmd list*/
 	plane_cnt = SUPPORT_MULTI_PROGRAM ? PLANE_CNT_OF_DIE : 1;
 
@@ -1248,7 +1250,7 @@ __s32 _read_sectors_for_spare(struct boot_physical_param *readop,__u8 dma_wait_m
 
 __s32  PHY_PageReadSpare(struct __PhysicOpPara_t *pPageAdr)
 {
-	__s32 ret;
+	__s32 ret = 0;
 	__u32 chip;
 	__u32 block_in_chip;
 	__u32 plane_cnt,i;
@@ -1257,9 +1259,9 @@ __s32  PHY_PageReadSpare(struct __PhysicOpPara_t *pPageAdr)
 	struct __NandUserData_t oob_buf;
 	struct boot_physical_param readop;
 
-//	PRECONDITION(pPageAdr);
+	PRECONDITION(pPageAdr->MDataPtr != NULL &&
+		     pPageAdr->SDataPtr != NULL);
 
-	ret = 0;
 	plane_cnt = SUPPORT_MULTI_PROGRAM ? PLANE_CNT_OF_DIE : 1;
 
 	/*get chip no*/
@@ -1275,61 +1277,58 @@ __s32  PHY_PageReadSpare(struct __PhysicOpPara_t *pPageAdr)
 		return -ERR_INVALIDPHYADDR;
 	}
 
+	DBG("chip %x block %x", chip, block_in_chip);
+
 	for (i = 0; i < plane_cnt; i++){
 		/*init single page operation param*/
 		readop.chip = chip;
 		readop.block = block_in_chip  + i*MULTI_PLANE_BLOCK_OFFSET;
 		readop.page = pPageAdr->PageNum;
-
 		readop.mainbuf = (__u8 *)(pPageAdr->MDataPtr) + 512*SECTOR_CNT_OF_SINGLE_PAGE*i;
-	    if (pPageAdr->SDataPtr)
-		    readop.oobbuf = (__u8 *)(pPageAdr->SDataPtr) + 4*SECTOR_CNT_OF_SINGLE_PAGE*i;
-	    else
-		    readop.oobbuf = NULL;
-
+		if (pPageAdr->SDataPtr)
+			readop.oobbuf = (__u8 *)(pPageAdr->SDataPtr) + 4*SECTOR_CNT_OF_SINGLE_PAGE*i;
+		else
+			readop.oobbuf = NULL;
 		bitmap_in_single_page = FULL_BITMAP_OF_SINGLE_PAGE &
 			(pPageAdr->SectBitmap >> (i*SECTOR_CNT_OF_SINGLE_PAGE));
 		readop.sectorbitmap = bitmap_in_single_page;
 
 		if (bitmap_in_single_page){
-		/*bitmap of this plane is valid */
+			/*bitmap of this plane is valid */
 			if(bitmap_in_single_page == FULL_BITMAP_OF_SINGLE_PAGE)
-			/*align page, use page mode */
+				/*align page, use page mode */
 				ret |= _read_single_page(&readop,SUPPORT_DMA_IRQ);
 			else
-			/*not align page , normal mode*/
+				/*not align page , normal mode*/
 				ret |= _read_single_page_spare(&readop,SUPPORT_DMA_IRQ);
 		}
 	}
 
 	if (ret == -ERR_TIMEOUT)
 		PHY_ERR("PHY_PageReadSpare : read timeout\n");
-	if (ret == -ERR_ECC)
-	{
+	if (ret == -ERR_ECC) {
 		if(pPageAdr->SDataPtr != NULL)
 			sparebuf = (struct __NandUserData_t *)(pPageAdr->SDataPtr);
-		else
-		{
+		else {
 			oob_buf.LogicInfo= 0;
 			sparebuf =(struct __NandUserData_t *)(&oob_buf);
-
 		}
-
-		if((sparebuf->LogicInfo == 0xffff)&&(sparebuf->LogicPageNum == 0xffff)&&(sparebuf->PageStatus == 0xff))
-		{
+		if (sparebuf->LogicInfo == 0xffff &&
+		    sparebuf->LogicPageNum == 0xffff &&
+		    sparebuf->PageStatus == 0xff) {
 			//clear page
 			ret = 0;
 		}
-		else
-		{
-			PHY_ERR("PHY_PageReadSpare : too much ecc err,bank %x block %x,page %x \n",pPageAdr->BankNum,pPageAdr->BlkNum,
-					pPageAdr->PageNum);
+		else {
+			PHY_ERR("PHY_PageReadSpare : too much ecc err,bank %x block %x,page %x \n",
+				pPageAdr->BankNum,
+				pPageAdr->BlkNum,
+				pPageAdr->PageNum);
 		}
 	}
 
-	if(ret == ECC_LIMIT)
-	{
-		PHY_ERR("%s : %d : ecc limit\n",__FUNCTION__,__LINE__);
+	if(ret == ECC_LIMIT) {
+		PHY_ERR("%s : %d : ecc limit\n", __FUNCTION__, __LINE__);
 	}
 	return ret;
 }
@@ -1375,7 +1374,7 @@ void PHY_FreePageCheck(struct __PhysicOpPara_t  *pPageAdr)
 */
 __s32  PHY_PageWrite(struct __PhysicOpPara_t  *pPageAdr)
 {
-	__s32 ret;
+	__s32 ret = 0;
 	__u32 chip;
 	__u32 block_in_chip;
 	__u32 plane_cnt,i;
@@ -1386,7 +1385,6 @@ __s32  PHY_PageWrite(struct __PhysicOpPara_t  *pPageAdr)
 
 	//PHY_FreePageCheck(pPageAdr);
 
-	ret = 0;
 	plane_cnt = SUPPORT_MULTI_PROGRAM ? PLANE_CNT_OF_DIE : 1;
 	/*get chip no*/
 	chip = _cal_real_chip(pPageAdr->BankNum);
@@ -1400,6 +1398,8 @@ __s32  PHY_PageWrite(struct __PhysicOpPara_t  *pPageAdr)
 		PHY_ERR("PHY_PageWrite : beyond block of per chip  count\n");
 		return -ERR_INVALIDPHYADDR;
 	}
+
+	DBG("chip %x block %x", chip, block_in_chip);
 
 	//_wait_rb_ready(chip);
 
