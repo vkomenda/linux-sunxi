@@ -58,13 +58,15 @@ __s32 _write_signle_page (struct boot_physical_param *writeop,__u32 program1,__u
 	/*create cmd list*/
 	addr_cycle = (SECTOR_CNT_OF_SINGLE_PAGE == 1) ? 4 : 5;
 
+	DBG("0x%.2x -- address %d cycles -- data -- 0x%.2x", program1, addr_cycle, program2);
+
 	/*the cammand have no corresponding feature if IGNORE was set, */
 	_cal_addr_in_chip(writeop->block,writeop->page,0,addr,addr_cycle);
-	_add_cmd_list(cmd_list,program1,addr_cycle,addr,NFC_DATA_FETCH,NFC_IGNORE,NFC_IGNORE,NFC_NO_WAIT_RB);
-	_add_cmd_list(cmd_list + 1,0x85,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE);
-	_add_cmd_list(cmd_list + 2,program2,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE);
+	_add_cmd_list(&cmd_list[0],program1,addr_cycle,addr,NFC_DATA_FETCH,NFC_IGNORE,NFC_IGNORE,NFC_NO_WAIT_RB);
+//	_add_cmd_list(cmd_list + 1,0x85,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE);
+	_add_cmd_list(&cmd_list[1],program2,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE);
 
-	list_len = 3;
+	list_len = 2;
 	for(i = 0; i < list_len - 1; i++){
 		cmd_list[i].next = &(cmd_list[i+1]);
 	}
@@ -110,11 +112,11 @@ __s32 _write_signle_page_seq (struct boot_physical_param *writeop,__u32 program1
 
 	/*the cammand have no corresponding feature if IGNORE was set, */
 	_cal_addr_in_chip(writeop->block,writeop->page,0,addr,addr_cycle);
-	_add_cmd_list(cmd_list,program1,addr_cycle,addr,NFC_DATA_FETCH,NFC_IGNORE,NFC_IGNORE,NFC_NO_WAIT_RB);
-	_add_cmd_list(cmd_list + 1,0x85,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE);
-	_add_cmd_list(cmd_list + 2,program2,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE);
+	_add_cmd_list(&cmd_list[0],program1,addr_cycle,addr,NFC_DATA_FETCH,NFC_IGNORE,NFC_IGNORE,NFC_NO_WAIT_RB);
+//	_add_cmd_list(cmd_list + 1,0x85,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE);
+	_add_cmd_list(&cmd_list[1],program2,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE);
 
-	list_len = 3;
+	list_len = 2;
 	for(i = 0; i < list_len - 1; i++){
 		cmd_list[i].next = &(cmd_list[i+1]);
 	}
@@ -166,11 +168,11 @@ __s32 _write_signle_page_1K (struct boot_physical_param *writeop,__u32 program1,
 
 	/*the cammand have no corresponding feature if IGNORE was set, */
 	_cal_addr_in_chip(writeop->block,writeop->page,0,addr,addr_cycle);
-	_add_cmd_list(cmd_list,program1,addr_cycle,addr,NFC_DATA_FETCH,NFC_IGNORE,NFC_IGNORE,NFC_NO_WAIT_RB);
-	_add_cmd_list(cmd_list + 1,0x85,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE);
-	_add_cmd_list(cmd_list + 2,program2,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE);
+	_add_cmd_list(&cmd_list[0],program1,addr_cycle,addr,NFC_DATA_FETCH,NFC_IGNORE,NFC_IGNORE,NFC_NO_WAIT_RB);
+//	_add_cmd_list(cmd_list + 1,0x85,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE);
+	_add_cmd_list(&cmd_list[1],program2,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE,NFC_IGNORE);
 
-	list_len = 3;
+	list_len = 2;
 	for(i = 0; i < list_len - 1; i++){
 		cmd_list[i].next = &(cmd_list[i+1]);
 	}

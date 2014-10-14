@@ -1399,7 +1399,7 @@ __s32  PHY_PageWrite(struct __PhysicOpPara_t  *pPageAdr)
 		return -ERR_INVALIDPHYADDR;
 	}
 
-	DBG("chip %x block %x", chip, block_in_chip);
+	DBG("chip %x block %x planes %x", chip, block_in_chip, plane_cnt);
 
 	//_wait_rb_ready(chip);
 
@@ -1407,19 +1407,18 @@ __s32  PHY_PageWrite(struct __PhysicOpPara_t  *pPageAdr)
 		if(i == 0)
 			_wait_rb_ready_int(chip);
 		else
-		_wait_rb_ready(chip);
+			_wait_rb_ready(chip);
 
 		/*init single page operation param*/
 		writeop.chip = chip;
 		writeop.block = block_in_chip + i*MULTI_PLANE_BLOCK_OFFSET;
 		writeop.page = pPageAdr->PageNum;
 
-		    writeop.mainbuf = (__u8 *)(pPageAdr->MDataPtr) + 512*SECTOR_CNT_OF_SINGLE_PAGE*i;
-		    if (pPageAdr->SDataPtr)
-			    writeop.oobbuf = (__u8 *)(pPageAdr->SDataPtr) + 4*SECTOR_CNT_OF_SINGLE_PAGE*i;
-		    else
-			    writeop.oobbuf = NULL;
-
+		writeop.mainbuf = (__u8 *)(pPageAdr->MDataPtr) + 512*SECTOR_CNT_OF_SINGLE_PAGE*i;
+		if (pPageAdr->SDataPtr)
+			writeop.oobbuf = (__u8 *)(pPageAdr->SDataPtr) + 4*SECTOR_CNT_OF_SINGLE_PAGE*i;
+		else
+			writeop.oobbuf = NULL;
 
 		writeop.sectorbitmap = FULL_BITMAP_OF_SINGLE_PAGE;
 		if (i == 0){
@@ -1444,7 +1443,6 @@ __s32  PHY_PageWrite(struct __PhysicOpPara_t  *pPageAdr)
 			}
 		}
 		ret |= _write_signle_page(&writeop,program1,program2,SUPPORT_DMA_IRQ,SUPPORT_RB_IRQ);
-
 	}
 	if (ret == -ERR_TIMEOUT)
 		PHY_ERR("PHY_PageWrite : write timeout\n");

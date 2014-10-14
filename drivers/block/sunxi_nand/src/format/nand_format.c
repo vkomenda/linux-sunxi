@@ -200,8 +200,6 @@ __s32 _CalculatePhyOpPar(struct __PhysicOpPara_t *pPhyPar, __u32 nZone, __u32 nB
     return 0;
 }
 
-#endif
-
 
 /*
 ************************************************************************************************************************
@@ -224,86 +222,68 @@ __s32 _CalculatePhyOpPar(struct __PhysicOpPara_t *pPhyPar, __u32 nZone, __u32 nB
 */
 static __s32 _VirtualPageRead(__u32 nDieNum, __u32 nBlkNum, __u32 nPage, __u32 SectBitmap, void *pBuf, void *pSpare)
 {
-    __s32 i, result;
-    __u8  *tmpSrcData, *tmpDstData, *tmpSrcPtr[4], *tmpDstPtr[4];
-    struct __PhysicOpPara_t tmpPhyPage;
+	__s32 i, result;
+	int j;
+	__u8  *tmpSrcData, *tmpDstData, *tmpSrcPtr[4], *tmpDstPtr[4];
+	struct __PhysicOpPara_t tmpPhyPage;
 
-    DBG("[LOGIC] die %.2x block %.4x page %.2x sector bitmap %.8x",
-	nDieNum, nBlkNum, nPage, SectBitmap);
+	DBG("[LOGIC] die %.2x block %.3x page %.3x sector bitmap %.8x spare %x",
+	    nDieNum, nBlkNum, nPage, SectBitmap, (u32) pSpare);
 
-    //calculate the physical operation parameter by te die number, block number and page number
-    _CalculatePhyOpPar(&tmpPhyPage, nDieNum * ZONE_CNT_OF_DIE, nBlkNum, nPage);
+	//calculate the physical operation parameter by te die number, block number and page number
+	_CalculatePhyOpPar(&tmpPhyPage, nDieNum * ZONE_CNT_OF_DIE, nBlkNum, nPage);
 
-    //set the sector bitmap in the page, the main data buffer and the spare data buffer
-    tmpPhyPage.SectBitmap = SectBitmap;
-    tmpPhyPage.MDataPtr = pBuf;
+	//set the sector bitmap in the page, the main data buffer and the spare data buffer
+	tmpPhyPage.SectBitmap = SectBitmap;
+	tmpPhyPage.MDataPtr = pBuf;
 
-    DBG("[PHY]  bank %.2x block %.4x page %.2x sector bitmap %.8x",
-	tmpPhyPage.BankNum, tmpPhyPage.PageNum, tmpPhyPage.BlkNum, tmpPhyPage.SectBitmap);
+	DBG("[PHY]  bank %.2x block %.3x page %.3x sector bitmap %.8x",
+	    tmpPhyPage.BankNum, tmpPhyPage.PageNum, tmpPhyPage.BlkNum,
+	    tmpPhyPage.SectBitmap);
 
-    if(pSpare)
-    {
-        tmpPhyPage.SDataPtr = FORMAT_SPARE_BUF;
+	if (pSpare == NULL) {
+		tmpPhyPage.SDataPtr = NULL;
+		result = PHY_PageRead(&tmpPhyPage);
+	}
+	else {
+		tmpPhyPage.SDataPtr = FORMAT_SPARE_BUF;
 
-        //process the pointer to spare area data
-        for(i=0; i<2; i++)
-        {
-            if(SectBitmap & (1<<i))
-            {
-                tmpSrcPtr[i] = FORMAT_SPARE_BUF + 4 * i;
-                tmpDstPtr[i] = (__u8 *)pSpare + 4 * i;
-            }
-            else
-            {
-                tmpDstPtr[i] = NULL;
-            }
-        }
+		//process the pointer to spare area data
+		for(i=0; i<2; i++) {
+			if(SectBitmap & (1<<i)) {
+				tmpSrcPtr[i] = FORMAT_SPARE_BUF + 4 * i;
+				tmpDstPtr[i] = (__u8 *)pSpare + 4 * i;
+			}
+			else {
+				tmpDstPtr[i] = NULL;
+			}
+		}
 
-        for(i=0; i<2; i++)
-        {
-            if(SectBitmap & (1<<(i + SECTOR_CNT_OF_SINGLE_PAGE)))
-            {
-                tmpSrcPtr[i+2] = LML_SPARE_BUF + 4 * (i + SECTOR_CNT_OF_SINGLE_PAGE);
-                tmpDstPtr[i+2] = (__u8 *)pSpare + 8 + 4 * i;
-            }
-            else
-            {
-                tmpDstPtr[i+2] = NULL;
-            }
-        }
-#if(1)
+		for(i=0; i<2; i++) {
+			if(SectBitmap & (1<<(i + SECTOR_CNT_OF_SINGLE_PAGE))) {
+				tmpSrcPtr[i+2] = LML_SPARE_BUF + 4 * (i + SECTOR_CNT_OF_SINGLE_PAGE);
+				tmpDstPtr[i+2] = (__u8 *)pSpare + 8 + 4 * i;
+			}
+			else {
+				tmpDstPtr[i+2] = NULL;
+			}
+		}
 		result = PHY_PageReadSpare(&tmpPhyPage);
-#else
-		result = PHY_PageRead(&tmpPhyPage);
-#endif
-    }
-    else
-    {
-        tmpPhyPage.SDataPtr = NULL;
-		result = PHY_PageRead(&tmpPhyPage);
-    }
 
-
-
-    //process spare area data
-    if(pSpare)
-    {
-        //get the spare area data
-        for(i=0; i<4; i++)
-        {
-            if(tmpDstPtr[i] != NULL)
-            {
-                tmpSrcData = tmpSrcPtr[i];
-                tmpDstData = tmpDstPtr[i];
-
-                *tmpDstData++ = *tmpSrcData++;
-                *tmpDstData++ = *tmpSrcData++;
-                *tmpDstData++ = *tmpSrcData++;
-                *tmpDstData++ = *tmpSrcData++;
-            }
-        }
-    }
-    return result;
+		// get the spare area data
+		for (i=0; i<4; i++) {
+			if (tmpDstPtr[i] != NULL) {
+				tmpSrcData = tmpSrcPtr[i];
+				tmpDstData = tmpDstPtr[i];
+				for (j = 0; j < 4; j++)
+					*tmpDstData++ = *tmpSrcData++;
+				DBG("[#%d] spare data %.2x %.2x %.2x %.2x", i,
+				    tmpDstPtr[i][0], tmpDstPtr[i][1],
+				    tmpDstPtr[i][2], tmpDstPtr[i][3]);
+			}
+		}
+	}
+	return result;
 }
 
 
@@ -329,19 +309,20 @@ static __s32 _VirtualPageRead(__u32 nDieNum, __u32 nBlkNum, __u32 nPage, __u32 S
 static __s32 _VirtualPageWrite(__u32 nDieNum, __u32 nBlkNum, __u32 nPage, __u32 SectBitmap, void *pBuf, void *pSpare)
 {
     __s32 i, result;
+    int j;
     __u8  *tmpSrcData, *tmpDstData, *tmpSrcPtr[4], *tmpDstPtr[4];
     struct __PhysicOpPara_t tmpPhyPage;
 
     //calculate the physical operation parameter by te die number, block number and page number
     _CalculatePhyOpPar(&tmpPhyPage, nDieNum * ZONE_CNT_OF_DIE, nBlkNum, nPage);
 
-    DBG("bank %.2x page %.2x block %.4x sector bitmap %.8x",
-	tmpPhyPage.BankNum, tmpPhyPage.PageNum, tmpPhyPage.BlkNum, tmpPhyPage.SectBitmap);
-
     //set the sector bitmap in the page, the main data buffer and the spare data buffer
     tmpPhyPage.SectBitmap = SectBitmap;
     tmpPhyPage.MDataPtr = pBuf;
     tmpPhyPage.SDataPtr = FORMAT_SPARE_BUF;
+
+    DBG("[PHY] bank %.2x page %.3x block %.3x sector bitmap %.8x",
+	tmpPhyPage.BankNum, tmpPhyPage.PageNum, tmpPhyPage.BlkNum, tmpPhyPage.SectBitmap);
 
     //process spare area data
     if(pSpare)
@@ -380,15 +361,12 @@ static __s32 _VirtualPageWrite(__u32 nDieNum, __u32 nBlkNum, __u32 nPage, __u32 
             tmpSrcData = tmpSrcPtr[i];
             tmpDstData = tmpDstPtr[i];
 
-            if(tmpDstData != NULL)
-            {
-                *tmpDstData++ = *tmpSrcData++;
-                *tmpDstData++ = *tmpSrcData++;
-                *tmpDstData++ = *tmpSrcData++;
-                *tmpDstData++ = *tmpSrcData++;
-		DBG("[#%d] spare data to be written %.2x %.2x %.2x %.2x", i,
-		    tmpDstPtr[i][0], tmpDstPtr[i][1],
-		    tmpDstPtr[i][2], tmpDstPtr[i][3]);
+            if(tmpDstData != NULL) {
+		    for (j = 0; j < 4; j++)
+			    *tmpDstData++ = *tmpSrcData++;
+		    DBG("[#%d] spare data to be written %.2x %.2x %.2x %.2x", i,
+			tmpDstPtr[i][0], tmpDstPtr[i][1],
+			tmpDstPtr[i][2], tmpDstPtr[i][3]);
             }
         }
     }
@@ -2465,14 +2443,15 @@ static __s32 _RebuildZoneTbls(struct __ScanDieInfo_t *pDieInfo)
 *               < 0     format module init failed.
 ************************************************************************************************************************
 */
-#if(0)
+
+/*
 __s32 FMT_Init(void)
 {
     __s32 i;
 	__u32 TmpBlkSize;
 
 	DIE0_FIRST_BLK_NUM = 0;
-	/*get block number for boot*/
+	//get block number for boot
 	for (i = 0; ; i++)
 	{
 		TmpBlkSize = blks_array[i].blk_size;
@@ -2527,7 +2506,8 @@ __s32 FMT_Init(void)
 
     return 0;
 }
-#elif(1)
+*/
+
 __s32 FMT_Init(void)
 {
     __s32 i;
@@ -2596,7 +2576,6 @@ __s32 FMT_Init(void)
 
     return 0;
 }
-#endif
 
 /*
 ************************************************************************************************************************
