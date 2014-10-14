@@ -71,10 +71,13 @@ void _add_cmd_list(NFC_CMD_LIST *cmd,__u32 value,__u32 addr_cycle,__u8 *addr,__u
 /****************************************************************************
 *********************translate (block + page+ sector) into 5 bytes addr***************
 *****************************************************************************/
-void _cal_addr_in_chip(__u32 block, __u32 page, __u32 sector,__u8 *addr, __u8 cycle)
+int _cal_addr_in_chip(__u32 block, __u32 page, __u32 sector,__u8 *addr, __u8 cycle)
 {
 	__u32 row;
 	__u32 column;
+	int result = 0;
+
+	PRECONDITION(addr != NULL);
 
 	column = 512 * sector;
 	row = block * PAGE_CNT_OF_PHY_BLK + page;
@@ -106,14 +109,15 @@ void _cal_addr_in_chip(__u32 block, __u32 page, __u32 sector,__u8 *addr, __u8 cy
 			addr[4] = (row >> 16) & 0xff;
 			break;
 		default:
+			result = -EINVAL;
 			break;
 	}
-
+	return result;
 }
 
 
 
-#if 0
+/*
 __u8 _cal_real_chip(__u32 global_bank)
 {
 	__u8 chip;
@@ -137,7 +141,7 @@ __u8 _cal_real_chip(__u32 global_bank)
 
 	return 0xff;
 }
-#endif
+*/
 
 __u8 _cal_real_chip(__u32 global_bank)
 {
@@ -205,7 +209,7 @@ __u8 _cal_real_chip(__u32 global_bank)
 			break;
 		}
 	else {
-		PHY_ERR("wrong rb_mode %d or bank %d (chip WAS %d; info at %x)\n",
+		PHY_ERR("wrong rb_mode %x or bank %x (chip WAS %x; info at %x)\n",
 			RB_CONNECT_MODE, global_bank, chip, CHIP_CONNECT_INFO);
 		chip = 0xFF;
 	}
@@ -349,6 +353,8 @@ __s32 _read_single_page(struct boot_physical_param *readop, __u8 dma_wait_mode)
 	__u8 addr[5];
 	NFC_CMD_LIST cmd_list[4];
 	__u32 list_len,i;
+
+	PRECONDITION(readop != NULL);
 
 	//sparebuf = (__u8 *)MALLOC(SECTOR_CNT_OF_SINGLE_PAGE * 4);
 	/*create cmd list*/
@@ -716,7 +722,6 @@ __s32 PHY_SetDefaultParam(__u32 bank)
 {
 	__u32 chip = 0;
 	__u8 default_value[16];
-	__u8 temp_value[16];
 
 	if(SUPPORT_READ_RETRY) {
 		if(READ_RETRY_REG_CNT != 0 && READ_RETRY_CYCLE != 0 && READ_RETRY_MODE<0x10) { //hynix mode
@@ -810,7 +815,8 @@ __s32 PHY_Exit(void)
 		NFC_ReadRetryExit(READ_RETRY_TYPE);  // FIXME: Isn't RR set by PHY_SetDef.?
 	}
 
-	NFC_RandomDisable();
+	if (SUPPORT_RANDOM)
+		NFC_RandomDisable();
 	NFC_Exit();
 
 	pr_info("%s: end\n", __FUNCTION__);
@@ -888,6 +894,8 @@ __s32  PHY_ReadNandId(__s32 nChip, void *pChipID)
 	NFC_CMD_LIST cmd;
 	__u8 addr = 0;
 
+	PRECONDITION(pChipID != NULL);
+
 	NFC_SelectChip(nChip);
 
 	//_add_cmd_list(&cmd, 0x90,1 , &addr, NFC_DATA_FETCH, NFC_IGNORE, 5, NFC_NO_WAIT_RB);
@@ -910,6 +918,8 @@ __s32  PHY_ReadNandUniqueId(__s32 bank, void *pChipID)
 
 	NFC_CMD_LIST cmd;
 	__u8 addr = 0;
+
+	PRECONDITION(pChipID != NULL);
 
 	nChip = _cal_real_chip(bank);
 	NFC_SelectChip(nChip);
@@ -1051,16 +1061,17 @@ __s32 PHY_SimpleRead (struct boot_physical_param *readop)
 */
 __s32 PHY_SynchBank(__u32 nBank, __u32 bMode)
 {
-	__s32 ret,status;
+	__s32 ret = 0, status;
 	__u32 chip;
 	__u32 rb;
 	__u32 cmd_value;
 	__s32 timeout = 0xffff;
 
-	ret = 0;
 	/*get chip no*/
 	chip = _cal_real_chip(nBank);
 	rb = _cal_real_rb(chip);
+
+	DBG("chip %x rb %x", chip, rb);
 
 	if (0xff == chip){
 		PHY_ERR("PHY_SynchBank : beyond chip count\n");
