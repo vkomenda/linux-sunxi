@@ -226,15 +226,13 @@ static __s32 _VirtualPageRead(__u32 nDieNum, __u32 nBlkNum, __u32 nPage, __u32 S
     __u8  *tmpSrcData, *tmpDstData, *tmpSrcPtr[4], *tmpDstPtr[4];
     struct __PhysicOpPara_t tmpPhyPage;
 
-    CAPTION;
-
     DBG("[LOGIC] die %.2x block %.4x page %.2x sector bitmap %.8x",
 	nDieNum, nBlkNum, nPage, SectBitmap);
 
     //calculate the physical operation parameter by te die number, block number and page number
     _CalculatePhyOpPar(&tmpPhyPage, nDieNum * ZONE_CNT_OF_DIE, nBlkNum, nPage);
 
-    DBG("[PHY] bank %.2x block %.4x page %.2x sector bitmap %.8x",
+    DBG("[PHY]  bank %.2x block %.4x page %.2x sector bitmap %.8x",
 	tmpPhyPage.BankNum, tmpPhyPage.PageNum, tmpPhyPage.BlkNum, tmpPhyPage.SectBitmap);
 
     //set the sector bitmap in the page, the main data buffer and the spare data buffer
@@ -386,8 +384,8 @@ static __s32 _VirtualPageWrite(__u32 nDieNum, __u32 nBlkNum, __u32 nPage, __u32 
                 *tmpDstData++ = *tmpSrcData++;
                 *tmpDstData++ = *tmpSrcData++;
 		DBG("[#%d] spare data to be written %.2x %.2x %.2x %.2x", i,
-		    *tmpDstPtr[i],   *tmpDstPtr[i+1],
-		    *tmpDstPtr[i+2], *tmpDstPtr[i+3]);
+		    tmpDstPtr[i][0], tmpDstPtr[i][1],
+		    tmpDstPtr[i][2], tmpDstPtr[i][3]);
             }
         }
     }
@@ -427,29 +425,25 @@ static __s32 _VirtualPageWrite(__u32 nDieNum, __u32 nBlkNum, __u32 nPage, __u32 
 */
 static __s32 _VirtualBlockErase(__u32 nDieNum, __u32 nBlkNum)
 {
-    __s32 i, result = 0;
-    struct __PhysicOpPara_t tmpPhyBlk;
+	__s32 i, result = 0;
+	struct __PhysicOpPara_t tmpPhyBlk;
 
-    //erase every block belonged to different banks
-    for(i=0; i<INTERLEAVE_BANK_CNT; i++)
-    {
-        //calculate the physical operation parameter by te die number, block number and page number
-        _CalculatePhyOpPar(&tmpPhyBlk, nDieNum * ZONE_CNT_OF_DIE, nBlkNum, i);
+	DBG("die %x block %x", nDieNum, nBlkNum);
 
-        PHY_BlockErase(&tmpPhyBlk);
-    }
-
-    //check the result of the block erase
-    for(i=0; i<INTERLEAVE_BANK_CNT; i++)
-    {
-        result = PHY_SynchBank(i, SYNC_CHIP_MODE);
-        if(result < 0)
-        {
-            return -1;
+	//erase every block belonged to different banks
+	for(i = 0; i < INTERLEAVE_BANK_CNT && !result; i++) {
+		//calculate the physical operation parameter by te die number, block number and page number
+		_CalculatePhyOpPar(&tmpPhyBlk, nDieNum * ZONE_CNT_OF_DIE, nBlkNum, i);
+		result = PHY_BlockErase(&tmpPhyBlk);
+	}
+	//check the result of the block erase
+	for(i = 0; i < INTERLEAVE_BANK_CNT && !result; i++)
+		result = PHY_SynchBank(i, SYNC_CHIP_MODE);
+	if(result < 0) {
+		DBG("ERROR %d", result);
+		return result;
         }
-    }
-
-    return 0;
+	return 0;
 }
 
 
@@ -567,43 +561,42 @@ static __s32 _WriteBadBlkFlag(__u32 nDieNum, __u32 nBlock)
 *Return     : none
 ************************************************************************************************************************
 */
-static void _DumpDieInfo(struct __ScanDieInfo_t *pDieInfo)
+static int _DumpDieInfo(struct __ScanDieInfo_t *pDieInfo)
 {
-    int tmpZone, tmpLog;
+	int tmpZone, tmpLog;
 	struct __ScanZoneInfo_t *tmpZoneInfo;
 	struct __LogBlkType_t   *tmpLogBlk;
 
-    FORMAT_DBG("\n");
-    FORMAT_DBG("[FORMAT_DBG] ================== Die information ================\n");
-    FORMAT_DBG("[FORMAT_DBG]    Die number:         0x%x\n", pDieInfo->nDie);
-    FORMAT_DBG("[FORMAT_DBG]    Super block count:  0x%x\n", SuperBlkCntOfDie);
-    FORMAT_DBG("[FORMAT_DBG]    Free block count:   0x%x\n", pDieInfo->nFreeCnt);
-    FORMAT_DBG("[FORMAT_DBG]    Bad block count:    0x%x\n", pDieInfo->nBadCnt);
+	PRECONDITION(pDieInfo->ZoneInfo != NULL);
 
-    for(tmpZone=0; tmpZone<ZONE_CNT_OF_DIE; tmpZone++)
-    {
-        tmpZoneInfo = &pDieInfo->ZoneInfo[tmpZone];
-        FORMAT_DBG("[FORMAT_DBG] ---------------------------------------------------\n");
-        FORMAT_DBG("[FORMAT_DBG]    ZoneNum:             0x%x\n", tmpZone);
-        FORMAT_DBG("[FORMAT_DBG]    Data block Count:    0x%x\n", tmpZoneInfo->nDataBlkCnt);
-        FORMAT_DBG("[FORMAT_DBG]    Free block Count:    0x%x\n", tmpZoneInfo->nFreeBlkCnt);
-        FORMAT_DBG("[FORMAT_DBG]    Log block table: \n");
-	FORMAT_DBG("[Index]\t[LogicBlk]\t[PhyBlk]\t[DataBlk]\n");
-        for(tmpLog=0; tmpLog<MAX_LOG_BLK_CNT; tmpLog++)
-        {
-            tmpLogBlk = tmpLogBlk;
-            tmpLogBlk = &tmpZoneInfo->LogBlkTbl[tmpLog];
-            FORMAT_DBG("%x\t%.4x\t\t%.4x\t\t%.4x\n",
-		       tmpLog,
-		       tmpLogBlk->LogicBlkNum,
-		       tmpLogBlk->PhyBlk.PhyBlkNum,
-		       (tmpLogBlk->LogicBlkNum == 0xffff) ?
-		       0xffff :
-		       tmpZoneInfo->ZoneTbl[tmpLogBlk->LogicBlkNum].PhyBlkNum);
-        }
-    }
+	FORMAT_DBG("\n"
+		   "[FORMAT_DBG] ================== Die information ================\n");
+	FORMAT_DBG("[FORMAT_DBG]    Die number:         0x%x\n", pDieInfo->nDie);
+	FORMAT_DBG("[FORMAT_DBG]    Super block count:  0x%x\n", SuperBlkCntOfDie);
+	FORMAT_DBG("[FORMAT_DBG]    Free block count:   0x%x\n", pDieInfo->nFreeCnt);
+	FORMAT_DBG("[FORMAT_DBG]    Bad block count:    0x%x\n", pDieInfo->nBadCnt);
 
-    FORMAT_DBG("[FORMAT_DBG] ===================================================\n");
+	for(tmpZone=0; tmpZone<ZONE_CNT_OF_DIE; tmpZone++) {
+		tmpZoneInfo = &pDieInfo->ZoneInfo[tmpZone];
+		FORMAT_DBG("[FORMAT_DBG] ---------------------------------------------------\n");
+		FORMAT_DBG("[FORMAT_DBG]    ZoneNum:             0x%x\n", tmpZone);
+		FORMAT_DBG("[FORMAT_DBG]    Data block Count:    0x%x\n", tmpZoneInfo->nDataBlkCnt);
+		FORMAT_DBG("[FORMAT_DBG]    Free block Count:    0x%x\n", tmpZoneInfo->nFreeBlkCnt);
+		FORMAT_DBG("[FORMAT_DBG]    Log block table: \n");
+		FORMAT_DBG("[Index]\t[LogicBlk]\t[PhyBlk]\t[DataBlk]\n");
+		for(tmpLog=0; tmpLog<MAX_LOG_BLK_CNT; tmpLog++) {
+			tmpLogBlk = &tmpZoneInfo->LogBlkTbl[tmpLog];
+			FORMAT_DBG("%x\t%.4x\t\t%.4x\t\t%.4x\n",
+				   tmpLog,
+				   tmpLogBlk->LogicBlkNum,
+				   tmpLogBlk->PhyBlk.PhyBlkNum,
+				   (tmpLogBlk->LogicBlkNum == 0xffff) ?
+				   0xffff :
+				   tmpZoneInfo->ZoneTbl[tmpLogBlk->LogicBlkNum].PhyBlkNum);
+		}
+	}
+	FORMAT_DBG("[FORMAT_DBG] ===================================================\n");
+	return 0;
 }
 
 #endif
@@ -666,6 +659,8 @@ static __s32 _LeastBlkCntZone(struct __ScanDieInfo_t *pDieInfo)
     __s32 i, tmpZone, tmpBlkCnt, tmpLeastCntBlkZone = 0, tmpLeastBlkCnt = 0xffff;
     struct __LogBlkType_t *tmpLogBlkTbl;
 
+    PRECONDITION(pDieInfo->ZoneInfo != NULL);
+
     for(tmpZone=0; tmpZone<ZONE_CNT_OF_DIE; tmpZone++)
     {
         //skip valid block mapping table
@@ -715,6 +710,9 @@ static __s32 _LeastBlkCntZone(struct __ScanDieInfo_t *pDieInfo)
 static __s32 _MergeDataBlkToFreeBlk(struct __ScanDieInfo_t *pDieInfo, __u32 nDataBlk, __u32 nFreeBlk)
 {
     __s32 result;
+
+    PRECONDITION(pDieInfo->ZoneInfo != NULL &&
+		 pDieInfo->pPhyBlk  != NULL);
 
     //copy the data in the data block to the free block
     result = _VirtualBlockCopy(pDieInfo->nDie, nDataBlk, nFreeBlk);
@@ -2033,7 +2031,8 @@ static __s32 _WriteBlkMapTbl(struct __ScanDieInfo_t *pDieInfo)
         //skip the valid block mapping tables
         if(pDieInfo->TblBitmap & (1 << tmpZone))
         {
-            continue;
+		DBG("skipping a valid block map in zone %x", tmpZone);
+		continue;
         }
 
         tmpGlobzone = (pDieInfo->nDie) * ZONE_CNT_OF_DIE + tmpZone;
