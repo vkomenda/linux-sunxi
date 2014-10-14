@@ -64,7 +64,8 @@ __u32 DIE0_FIRST_BLK_NUM;
 *               < 0     calcualte parameter failed.
 ************************************************************************************************************************
 */
-#if(0)
+
+/*
 __s32 _CalculatePhyOpPar(struct __PhysicOpPara_t *pPhyPar, __u32 nZone, __u32 nBlock, __u32 nPage)
 {
 
@@ -130,7 +131,8 @@ __s32 _CalculatePhyOpPar(struct __PhysicOpPara_t *pPhyPar, __u32 nZone, __u32 nB
     //calculate physical operation parameter successful
     return 0;
 }
-#elif(1)
+*/
+
 __s32 _CalculatePhyOpPar(struct __PhysicOpPara_t *pPhyPar, __u32 nZone, __u32 nBlock, __u32 nPage)
 {
 
@@ -232,12 +234,13 @@ static __s32 _VirtualPageRead(__u32 nDieNum, __u32 nBlkNum, __u32 nPage, __u32 S
     //calculate the physical operation parameter by te die number, block number and page number
     _CalculatePhyOpPar(&tmpPhyPage, nDieNum * ZONE_CNT_OF_DIE, nBlkNum, nPage);
 
-    DBG("[PHY]  bank %.2x block %.4x page %.2x sector bitmap %.8x",
-	tmpPhyPage.BankNum, tmpPhyPage.PageNum, tmpPhyPage.BlkNum, tmpPhyPage.SectBitmap);
-
     //set the sector bitmap in the page, the main data buffer and the spare data buffer
     tmpPhyPage.SectBitmap = SectBitmap;
     tmpPhyPage.MDataPtr = pBuf;
+
+    DBG("[PHY]  bank %.2x block %.4x page %.2x sector bitmap %.8x",
+	tmpPhyPage.BankNum, tmpPhyPage.PageNum, tmpPhyPage.BlkNum, tmpPhyPage.SectBitmap);
+
     if(pSpare)
     {
         tmpPhyPage.SDataPtr = FORMAT_SPARE_BUF;
