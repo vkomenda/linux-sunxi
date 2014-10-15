@@ -263,6 +263,7 @@ __s32 _read_status(__u32 cmd_value, __u32 nBank)
 	__u8 addr[5];
 	__u32 addr_cycle;
 	NFC_CMD_LIST cmd_list;
+	int status;
 
 	addr_cycle = 0;
 
@@ -275,7 +276,9 @@ __s32 _read_status(__u32 cmd_value, __u32 nBank)
 		_cal_addr_in_chip(nBank*BLOCK_CNT_OF_DIE,0,0,addr,addr_cycle);
 	}
 	_add_cmd_list(&cmd_list, cmd_value, addr_cycle, addr, 1,NFC_IGNORE,1,NFC_IGNORE);
-	return (NFC_GetStatus(&cmd_list));
+	status = NFC_GetStatus(&cmd_list);
+	return status;
+
 }
 
 /********************************************************************
