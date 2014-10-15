@@ -58,6 +58,8 @@
 
 #ifdef CONFIG_SUNXI_NAND_TEST     //  open nand test module
 
+extern void dump(void *buf, __u32 len , __u8 nbyte,__u8 linelen);
+
 #define NAND_TEST  "[nand_test]:"
 
 #define RESULT_OK   (0)
@@ -153,13 +155,30 @@ static int nand_test_prepare_read(struct nand_test_card *test)
 static int create_BMT_prepare(struct nand_test_card* test)
 {
 	int i;
+	struct __BlkMapTblCache_t* cache;
 
 	// TODO: pointer correction assertions... cache initialisation?
 	if (!NandDriverInfo.BlkMapTblCachePool)
 		return -EFAULT;
 
-	for (i = 0; i < BLOCK_MAP_TBL_CACHE_CNT; i++)
-		NandDriverInfo.BlkMapTblCachePool->BlkMapTblCachePool[i].DirtyFlag = 1;
+	for (i = 0; i < BLOCK_MAP_TBL_CACHE_CNT; i++) {
+		cache = &NandDriverInfo.BlkMapTblCachePool->BlkMapTblCachePool[i];
+		if (cache->DataBlkTbl == NULL ||
+		    cache->LogBlkTbl  == NULL ||
+		    cache->FreeBlkTbl == NULL) {
+			pr_info("Map cache %d is not initialised. Skipping...\n", i);
+			continue;
+		}
+		cache->DirtyFlag = 1;
+		cache->ZoneNum   = 0;
+		if (NandDriverInfo.BlkMapTblCachePool->ActBlkMapTbl == NULL)
+			NandDriverInfo.BlkMapTblCachePool->ActBlkMapTbl = cache;
+	}
+
+	if (NandDriverInfo.BlkMapTblCachePool->ActBlkMapTbl == NULL) {
+		pr_info("There is no active block map\n");
+		return -ENODATA;
+	}
 
 	return 0;
 }
@@ -174,6 +193,64 @@ static int create_BMT_run(struct nand_test_card *test)
 	return BMM_WriteBackAllMapTbl();
 }
 
+static int oob_8_to_12_prepare(struct nand_test_card* test)
+{
+	if (PageCachePool.PageCache0 == NULL) {
+		pr_err("Page cache is not initialised.\n");
+		return -ENODATA;
+	}
+	return 0;
+}
+
+static int oob_8_to_12_cleanup(struct nand_test_card* test)
+{
+	return 0;
+}
+
+static int oob_8_to_12_run(struct nand_test_card *test)
+{
+	__u8 oob[64];
+	struct boot_physical_param nand_op;
+	int ret = 0, i;
+
+	oob[0] = 0xFF;
+	oob[1] = 0x4F;
+	oob[2] = 0x4F;
+	oob[3] = 0x42;
+
+	nand_op.chip = 0;
+	nand_op.page = 0;
+	nand_op.oobbuf = oob;
+	nand_op.mainbuf = PageCachePool.PageCache0;
+
+	for (i = 8; i<12; i++) {
+		nand_op.block = i;
+
+		ret = PHY_SimpleErase(&nand_op);
+		if (ret) {
+			pr_err("%s: chip 0 block %d erase ERROR\n",
+			       __FUNCTION__, i);
+			continue;
+		}
+		else
+			pr_info("%s: chip 0 block %d erase SUCCESS\n",
+				__FUNCTION__, i);
+
+		pr_info("The first 1K of the page cache:\n");
+		dump(PageCachePool.PageCache0, 1024, 1, 16);
+
+		ret = PHY_SimpleWrite_1K(&nand_op);
+		if (ret) {
+			pr_err("%s: chip 0 block %d page 0 write ERROR\n",
+			       __FUNCTION__, i);
+			continue;
+		}
+		else
+			pr_info("%s: chip 0 block %d page 0 write SUCCESS\n",
+				__FUNCTION__, i);
+	}
+	return ret;
+}
 
 
 /* read /write one sector with out verification*/
@@ -1001,7 +1078,14 @@ static const struct nand_test_case nand_test_cases[] = {
 	    .prepare = create_BMT_prepare,
 	    .run     = create_BMT_run,
 	    .cleanup = create_BMT_cleanup,
-    }
+    },
+    {       // 33
+	    .name = " erase pages from 8 to 12 and write an OOB marker there",
+	    .sector_cnt = 1,
+	    .prepare = oob_8_to_12_prepare,
+	    .run     = oob_8_to_12_run,
+	    .cleanup = oob_8_to_12_cleanup,
+    },
 };
 
 static DEFINE_MUTEX(nand_test_lock);
