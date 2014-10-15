@@ -68,7 +68,7 @@ __s32 _write_signle_page (struct boot_physical_param *writeop,__u32 program1,__u
 
 	list_len = 2;
 	for(i = 0; i < list_len - 1; i++){
-		cmd_list[i].next = &(cmd_list[i+1]);
+		cmd_list[i].next = &cmd_list[i+1];
 	}
 	rb = _cal_real_rb(writeop->chip);
 	NFC_SelectChip(writeop->chip);
