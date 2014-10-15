@@ -85,10 +85,10 @@ void _wait_twb(void)
 __s32 NFC_Write( NFC_CMD_LIST  *wcmd, void *mainbuf, void *sparebuf,  __u8 dma_wait_mode, __u8 rb_wait_mode,
 				    __u8 page_mode)
 {
-	__s32 ret;
+	__s32 ret = 0;
 	__s32 i;
 	__u32 cfg;
-	__u32 program_cmd,random_program_cmd;
+	__u32 program_cmd;   // ,random_program_cmd;
 	NFC_CMD_LIST *cur_cmd,*program_addr_cmd;
 	dma_addr_t this_dma_handle;
 
@@ -96,14 +96,16 @@ __s32 NFC_Write( NFC_CMD_LIST  *wcmd, void *mainbuf, void *sparebuf,  __u8 dma_w
 		return -1;
 	}
 
-	ret = 0;
 	_enter_nand_critical();
 
 	/*write in page_mode*/
 	program_addr_cmd = wcmd;
 	cur_cmd = wcmd;
-	cur_cmd = cur_cmd->next;
-	random_program_cmd = cur_cmd->value;
+	// FIXME: 16 nm Hynix does have a Random Input 0x85 command and
+	// theoretically this Allwinner contraption might work after further
+	// corrections.
+//	cur_cmd = cur_cmd->next;
+//	random_program_cmd = cur_cmd->value;
 	cur_cmd = cur_cmd->next;
 	program_cmd = cur_cmd->value;
 
@@ -130,11 +132,13 @@ __s32 NFC_Write( NFC_CMD_LIST  *wcmd, void *mainbuf, void *sparebuf,  __u8 dma_w
 	/*set NFC_REG_CNT*/
 	NFC_WRITE_REG(NFC_REG_CNT,1024);
 
-	/*set NFC_REG_RCMD_SET*/
+	/*
+	//set NFC_REG_RCMD_SET         FIXME: breaks write operations on 16 nm Hynix
 	cfg = 0;
 	cfg |= (program_cmd & 0xff);
 	cfg |= ((random_program_cmd & 0xff) << 8);
 	NFC_WRITE_REG(NFC_REG_WCMD_SET, cfg);
+	*/
 
 	/*set NFC_REG_SECTOR_NUM*/
 	NFC_WRITE_REG(NFC_REG_SECTOR_NUM, pagesize/1024);
@@ -184,11 +188,11 @@ __s32 NFC_Write( NFC_CMD_LIST  *wcmd, void *mainbuf, void *sparebuf,  __u8 dma_w
 __s32 NFC_Write_Seq( NFC_CMD_LIST  *wcmd, void *mainbuf, void *sparebuf,  __u8 dma_wait_mode, __u8 rb_wait_mode,
 				    __u8 page_mode)
 {
-	__s32 ret;
+	__s32 ret = 0;
 	__s32 i;
 	__u32 cfg;
 	__u32 ecc_mode_temp;
-	__u32 program_cmd,random_program_cmd;
+	__u32 program_cmd;  //,random_program_cmd;
 	NFC_CMD_LIST *cur_cmd,*program_addr_cmd;
 	dma_addr_t this_dma_handle;
 
@@ -196,14 +200,13 @@ __s32 NFC_Write_Seq( NFC_CMD_LIST  *wcmd, void *mainbuf, void *sparebuf,  __u8 d
 		return -1;
 	}
 
-	ret = 0;
 	_enter_nand_critical();
 
 	/*write in page_mode*/
 	program_addr_cmd = wcmd;
 	cur_cmd = wcmd;
-	cur_cmd = cur_cmd->next;
-	random_program_cmd = cur_cmd->value;
+//	cur_cmd = cur_cmd->next;
+//	random_program_cmd = cur_cmd->value;
 	cur_cmd = cur_cmd->next;
 	program_cmd = cur_cmd->value;
 
@@ -231,10 +234,12 @@ __s32 NFC_Write_Seq( NFC_CMD_LIST  *wcmd, void *mainbuf, void *sparebuf,  __u8 d
 	NFC_WRITE_REG(NFC_REG_CNT,1024);
 
 	/*set NFC_REG_RCMD_SET*/
+	/*
 	cfg = 0;
 	cfg |= (program_cmd & 0xff);
 	cfg |= ((random_program_cmd & 0xff) << 8);
 	NFC_WRITE_REG(NFC_REG_WCMD_SET, cfg);
+	*/
 
 	/*set NFC_REG_SECTOR_NUM*/
 	NFC_WRITE_REG(NFC_REG_SECTOR_NUM, pagesize/1024);
@@ -297,7 +302,7 @@ __s32 NFC_Write_1K(NFC_CMD_LIST *wcmd, void *mainbuf, void *sparebuf,
 	__s32 i;
 	__u32 cfg;
 	__u32 page_size_temp, ecc_mode_temp;
-	__u32 program_cmd,random_program_cmd;
+	__u32 program_cmd; // ,random_program_cmd;
 	NFC_CMD_LIST *cur_cmd,*program_addr_cmd;
 	dma_addr_t this_dma_handle;
 	__u32 saved_spare_area_loc;
@@ -309,10 +314,8 @@ __s32 NFC_Write_1K(NFC_CMD_LIST *wcmd, void *mainbuf, void *sparebuf,
 
 	/*write in page_mode*/
 	program_addr_cmd = wcmd;
-
-	cur_cmd = wcmd->next;
-	random_program_cmd = cur_cmd->value;
-
+//	cur_cmd = wcmd->next;
+//	random_program_cmd = cur_cmd->value;
 	cur_cmd = cur_cmd->next;
 	program_cmd = cur_cmd->value;
 
@@ -348,10 +351,12 @@ __s32 NFC_Write_1K(NFC_CMD_LIST *wcmd, void *mainbuf, void *sparebuf,
 	pr_info("%s: saved the spare area location %d", __FUNCTION__, saved_spare_area_loc);
 
 	/*set NFC_REG_RCMD_SET*/
+	/*
 	cfg = 0;
 	cfg |= (program_cmd & 0xff);
 	cfg |= ((random_program_cmd & 0xff) << 8);
 	NFC_WRITE_REG(NFC_REG_WCMD_SET, cfg);
+	*/
 
 	/*set NFC_REG_SECTOR_NUM*/
 	NFC_WRITE_REG(NFC_REG_SECTOR_NUM, 1024/1024);
