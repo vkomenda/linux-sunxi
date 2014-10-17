@@ -32,6 +32,7 @@ extern  struct __ZoneTblPstInfo_t       ZoneTblPstInfo[MAX_ZONE_CNT];
 extern  struct __NandStorageInfo_t  NandStorageInfo;
 extern  struct __NandPageCachePool_t    PageCachePool;
 
+extern void dump(void *buf, __u32 len , __u8 nbyte,__u8 linelen);
 
 //define some local variable
 static __u32 DieCntOfNand = 0;          //the count of dies in a nand chip
@@ -2274,16 +2275,17 @@ static __s32 _SearchZoneTbls(struct __ScanDieInfo_t *pDieInfo)
         if(tmpVar != ((__u32 *)FORMAT_PAGE_BUF)[511])
         {
             //the checksum of the log block table is invalid
-            FORMAT_DBG("[FORMAT_DBG] Find the table block for zone 0x%x of die 0x%x,"
-                       "but the log block tabl is invalid!\n",tmpZoneInDie, pDieInfo->nDie);
+            DBG("Found an INVALID block map for zone 0x%x of die 0x%x",
+		tmpZoneInDie, pDieInfo->nDie);
             continue;
         }
 
         //set the flag that which mark the zone table status, the current block mapping table is valid
         pDieInfo->TblBitmap |= (1 << tmpZoneInDie);
 
-        FORMAT_DBG("[FORMAT_DBG] Search block mapping table for zone 0x%x of die 0x%x successfully!\n",
-                    tmpZoneInDie, pDieInfo->nDie);
+        DBG("SUCCESS: Found a block map for zone 0x%x of die 0x%x",
+	    tmpZoneInDie, pDieInfo->nDie);
+	dump(FORMAT_PAGE_BUF, 512, 1, 32);
     }
 
     //check if all of the block mapping table of the die has been searched successfully
