@@ -55,6 +55,11 @@
 #include <linux/wait.h>
 #include <linux/sched.h>
 
+
+int nand_magic = 0;
+module_param(nand_magic, int, 0);
+
+
 #define BLK_ERR_MSG_ON
 #ifdef  BLK_ERR_MSG_ON
 #define dbg_err(fmt, args...) printk("[NAND]"fmt, ## args)

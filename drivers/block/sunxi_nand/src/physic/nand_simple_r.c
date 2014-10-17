@@ -29,6 +29,8 @@
 #include <linux/io.h>
 #include <linux/errno.h>
 
+extern int nand_magic;
+
 extern void dump(void *buf, __u32 len , __u8 nbyte,__u8 linelen);
 
 struct __NandStorageInfo_t  NandStorageInfo;
@@ -581,142 +583,104 @@ __s32 PHY_GetDefaultParam(__u32 bank)
 	__u8 default_value[64];
 	__u8 hynix_RRT[READ_RETRY_REG_CNT * 8];
 
-#ifdef OOB_MAGIC_TEST
-	__u32 i, j;
+// #ifdef OOB_MAGIC_TEST
+	int i, ret = 0;
 	__u8 oob[64];
-	__u8 *pdata;
 	struct boot_physical_param nand_op;
 	__u8 retry, otp_ok_flag;
-#endif // OOB_MAGIC_TEST;
+// #endif // OOB_MAGIC_TEST;
 
 	chip = _cal_real_chip(bank);
 	NFC_SelectChip(chip);
 	rb = _cal_real_rb(chip);
 	NFC_SelectRb(rb);
 
-#ifndef OOB_MAGIC_TEST
-	NFC_GetHynixOTPParam(chip, hynix_RRT, READ_RETRY_TYPE);
-	NFC_SetDefaultParam(chip, default_value, READ_RETRY_TYPE);
-#else
 	if (!PageCachePool.PageCache0){
+		DBG("page cache init");
 		PageCachePool.PageCache0 = (__u8 *)MALLOC(SECTOR_CNT_OF_SUPER_PAGE * 512);
 		if (!PageCachePool.PageCache0)
-			return -1;
+			return -ENOMEM;
 	}
-	pdata = (__u8*) PageCachePool.PageCache0;
 
-	if((READ_RETRY_MODE >= 2) && (READ_RETRY_MODE < 0x10)) {
-		for (retry = 0, otp_ok_flag = 0; (!otp_ok_flag) && retry < 3; retry++) {
-			for(i = 8; i<12; i++) {
+	// FIXME: load any required OTP parameters for non-Hynix chips
+	NFC_GetHynixOTPParam(chip, hynix_RRT, READ_RETRY_TYPE);
+	NFC_SetDefaultParam(chip, default_value, READ_RETRY_TYPE);
+
+// #ifndef OOB_MAGIC_TEST
+	if (nand_magic == 0)
+		return 0;
+// #else
+
+	for (retry = 0, otp_ok_flag = 0; (!otp_ok_flag) && retry < 3; retry++) {
+		for(i = 8; i<12; i++) {
+			nand_op.chip = chip;
+			nand_op.block = i;
+			nand_op.page = 0;
+			nand_op.mainbuf = PageCachePool.PageCache0;
+			nand_op.oobbuf = oob;
+
+			ret = PHY_SimpleRead_1K(&nand_op);
+			if (ret < 0)
+				pr_warn("%s: OOB MAGIC read error %d\n", __FUNCTION__, ret);
+			else if (oob[0] == 0x00 &&
+				 oob[1] == 0x4F &&
+				 oob[2] == 0x4F &&
+				 oob[3] == 0x42) {
+				otp_ok_flag = 1;
+				pr_info("%s: GOOD MAGIC found on chip %d block %d\n",
+					__FUNCTION__, chip, i);
+				break;
+			}
+			else {
+				pr_warn("%s: BAD MAGIC found on chip %d, block %d, page 0:\n",
+					__FUNCTION__, chip, i);
+				dump(oob, 8, 1, 8);
+			}
+		}
+
+		if (!otp_ok_flag) {
+			DBG("magic write begin");
+
+			oob[0] = 0x00;
+			oob[1] = 0x4F;
+			oob[2] = 0x4F;
+			oob[3] = 0x42;
+
+//				NFC_LSBInit(READ_RETRY_TYPE);
+//				NFC_LSBEnable(chip, READ_RETRY_TYPE);
+			for (i = 8; i<12; i++) {
 				nand_op.chip = chip;
 				nand_op.block = i;
 				nand_op.page = 0;
 				nand_op.mainbuf = PageCachePool.PageCache0;
 				nand_op.oobbuf = oob;
 
-				ret = PHY_SimpleRead_1K(&nand_op);
-				if (ret < 0)
-					pr_warn("%s: OOB MAGIC read error %d\n", __FUNCTION__, ret);
-				else if (oob[0] == 0    &&
-					 oob[1] == 0x4F &&
-					 oob[2] == 0x4F &&
-					 oob[3] == 0x42) {
-
-					otp_ok_flag = 1;
-					// FIXME: ditch this for-loop
-					for (j = 0;
-					     otp_ok_flag && j < READ_RETRY_REG_CNT * (1 + READ_RETRY_CYCLE);
-					     j++) {
-						if ((pdata[j] +
-						     pdata[READ_RETRY_REG_CNT * (1 + READ_RETRY_CYCLE) + j])
-						    != 0xff) {
-							otp_ok_flag = 0;
-							pr_warn("%s: RRT check FAILED\n", __FUNCTION__);
-						}
-//						else
-//							pr_info("%s: RRT check PASSED\n", __FUNCTION__);
-					}
-					if (otp_ok_flag) {
-						pr_info("%s: GOOD MAGIC found on chip %d block %d\n",
-							__FUNCTION__, chip, i);
-						break;
-					}
+				ret = PHY_SimpleErase(&nand_op);
+				if(ret<0) {
+					pr_err("%s: chip %d block %d erase ERROR\n",
+					       __FUNCTION__, chip, i);
+					continue;
 				}
-				else {
-					otp_ok_flag = 0;
-					pr_warn("%s: BAD MAGIC found on chip %d, block %d, page 0:\n",
+				else
+					pr_info("%s: chip %d block %d erase SUCCESS\n",
 						__FUNCTION__, chip, i);
-					dump(oob, 8, 1, 8);
+				ret = PHY_SimpleWrite_1K(&nand_op);
+				if(ret<0) {
+					pr_err("%s: chip %d block %d page 0 write ERROR\n",
+					       __FUNCTION__, chip, i);
+					continue;
 				}
+				else
+					pr_info("%s: chip %d block %d page 0 write SUCCESS\n",
+						__FUNCTION__, chip, i);
 			}
-
-			if(otp_ok_flag) {
-				NFC_SetDefaultParam(chip, default_value, READ_RETRY_TYPE);
-				// break;   ...function returns the call
-			}
-			else {
-				pr_info("%s: magic write begin\n", __FUNCTION__);
-
-				NFC_GetHynixOTPParam(chip, hynix_RRT, READ_RETRY_TYPE);
-				NFC_SetDefaultParam(chip, default_value, READ_RETRY_TYPE);
-
-				for(j = 0; j < READ_RETRY_REG_CNT * (1 + READ_RETRY_CYCLE); j++) {
-					pdata[j] = hynix_RRT[j];
-					pdata[READ_RETRY_REG_CNT * (1 + READ_RETRY_CYCLE) + j] =
-						0xFF - pdata[j];
-				}
-
-				oob[0] = 0;
-				oob[1] = 0x4F;
-				oob[2] = 0x4F;
-				oob[3] = 0x42;
-				/* The following word is needed for testing word
-				 * alignment during a spare area write. */
-				oob[4] = 0x24;
-				oob[5] = 0x35;
-				oob[6] = 0x46;
-				oob[7] = 0x57;
-
-//				NFC_LSBInit(READ_RETRY_TYPE);
-//				NFC_LSBEnable(chip, READ_RETRY_TYPE);
-				for (i = 8; i<12; i++) {
-					nand_op.chip = chip;
-					nand_op.block = i;
-					nand_op.page = 0;
-					nand_op.mainbuf = PageCachePool.PageCache0;
-					nand_op.oobbuf = oob;
-
-					ret = PHY_SimpleErase(&nand_op);
-					if(ret<0) {
-						pr_err("%s: chip %d block %d erase ERROR\n",
-						       __FUNCTION__, chip, i);
-						continue;
-					}
-					else
-						pr_info("%s: chip %d block %d erase SUCCESS\n",
-							__FUNCTION__, chip, i);
-					ret = PHY_SimpleWrite_1K(&nand_op);
-					if(ret<0) {
-						pr_err("%s: chip %d block %d page 0 write ERROR\n",
-						       __FUNCTION__, chip, i);
-						continue;
-					}
-					else
-						pr_info("%s: chip %d block %d page 0 write SUCCESS\n",
-							__FUNCTION__, chip, i);
-				}
 //				NFC_LSBDisable(chip, READ_RETRY_TYPE);
 //				NFC_LSBExit(READ_RETRY_TYPE);
 
-				pr_info("%s: magic write end\n", __FUNCTION__);
-			}
+			DBG("magic write end");
 		}
 	}
-	else {  // FIXME: get non-Hynix OTP parameters
-//		NFC_GetHynixOTPParam(chip, default_value, READ_RETRY_TYPE);
-//		NFC_SetDefaultParam(chip, default_value, READ_RETRY_TYPE);
-	}
-#endif // OOB_MAGIC_TEST
+// #endif // OOB_MAGIC_TEST
 
 	return 0;
 }

@@ -252,6 +252,94 @@ static int oob_8_to_12_run(struct nand_test_card *test)
 	return ret;
 }
 
+static int erase_8_to_12_prepare(struct nand_test_card* test)
+{
+	return 0;
+}
+
+static int erase_8_to_12_cleanup(struct nand_test_card* test)
+{
+	return 0;
+}
+
+static int erase_8_to_12_run(struct nand_test_card *test)
+{
+	struct boot_physical_param nand_op;
+	int ret = 0, i;
+
+	memset(&nand_op, 0, sizeof(struct boot_physical_param));
+	nand_op.chip = 0;
+	nand_op.page = 0;
+	nand_op.oobbuf = NULL;
+	nand_op.mainbuf = NULL;
+
+	for (i = 8; i < 12; i++) {
+		nand_op.block = i;
+
+		ret = PHY_SimpleErase(&nand_op);
+		if (ret) {
+			pr_err("%s: chip 0 block %d erase ERROR\n",
+			       __FUNCTION__, i);
+			continue;
+		}
+		else
+			pr_info("%s: chip 0 block %d erase SUCCESS\n",
+				__FUNCTION__, i);
+	}
+	return ret;
+}
+
+#define TEST_PAGE_SIZE  (SECTOR_CNT_OF_SUPER_PAGE * SECTOR_SIZE)
+#define TEST_SPARE_SIZE (SECTOR_CNT_OF_SUPER_PAGE * 4)
+
+static int read_block0_page0_prepare(struct nand_test_card *test)
+{
+	PRECONDITION(FORMAT_SPARE_BUF != NULL &&
+		     FORMAT_PAGE_BUF  != NULL);
+
+        memset(FORMAT_PAGE_BUF,  0xFF, TEST_PAGE_SIZE);
+	memset(FORMAT_SPARE_BUF, 0xFF, TEST_SPARE_SIZE);
+	return 0;
+}
+
+static int read_block0_page0_cleanup(struct nand_test_card *test)
+{
+	return 0;
+}
+
+static void calcPhyAddr(struct __PhysicOpPara_t* op,
+			int zone, int lblock, int lpage)
+{
+	int die;
+
+	die = zone / ZONE_CNT_OF_DIE;
+	op->BankNum = die / DIE_CNT_OF_CHIP;
+	op->PageNum = lpage;
+	op->BlkNum  = lblock +
+		(die % DIE_CNT_OF_CHIP) *
+		(BLOCK_CNT_OF_DIE / PLANE_CNT_OF_DIE);
+}
+
+static int read_block0_page0_run(struct nand_test_card *test)
+{
+	struct __PhysicOpPara_t op;
+	int result = 0;
+
+	calcPhyAddr(&op, 0, 0, 0);
+	op.SectBitmap = 0xFFFFFFFF;
+	op.MDataPtr = FORMAT_PAGE_BUF;
+	op.SDataPtr = FORMAT_SPARE_BUF;
+	result = PHY_PageReadSpare(&op);
+
+	if (!result) {
+		pr_info("=== Block 0, Page 0 [Data] ===\n");
+		dump(FORMAT_PAGE_BUF, TEST_PAGE_SIZE, 1, 32);
+		pr_info("=== Block 0, Page 0 [Spare] ===\n");
+		dump(FORMAT_SPARE_BUF, TEST_SPARE_SIZE, 1, 32);
+	}
+
+	return result;
+}
 
 /* read /write one sector with out verification*/
 static int nand_test_simple_transfer(struct nand_test_card *test,
@@ -1073,18 +1161,32 @@ static const struct nand_test_case nand_test_cases[] = {
 	    .cleanup = nand_test_cleanup,
     },
     {       // 32
-	    .name = " create block map table",
-	    .sector_cnt = 1,
+	    .name = "create block map table",
+	    .sector_cnt = 0,
 	    .prepare = create_BMT_prepare,
 	    .run     = create_BMT_run,
 	    .cleanup = create_BMT_cleanup,
     },
     {       // 33
-	    .name = " erase pages from 8 to 12 and write an OOB marker there",
-	    .sector_cnt = 1,
+	    .name = "erase pages from 8 to 12 and write an OOB marker there",
+	    .sector_cnt = 0,
 	    .prepare = oob_8_to_12_prepare,
 	    .run     = oob_8_to_12_run,
 	    .cleanup = oob_8_to_12_cleanup,
+    },
+    {       // 34
+	    .name = "erase pages from 8 to 12",
+	    .sector_cnt = 0,
+	    .prepare = erase_8_to_12_prepare,
+	    .run     = erase_8_to_12_run,
+	    .cleanup = erase_8_to_12_cleanup,
+    },
+    {       // 35
+	    .name = "dump block 0, page 0",
+	    .sector_cnt = 0,
+	    .prepare = read_block0_page0_prepare,
+	    .run     = read_block0_page0_run,
+	    .cleanup = read_block0_page0_cleanup,
     },
 };
 
