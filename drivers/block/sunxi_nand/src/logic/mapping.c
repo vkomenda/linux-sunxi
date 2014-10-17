@@ -250,9 +250,8 @@ static __s32 _write_back_page_map_tbl(__u32 nLogBlkPst)
     }
 
 rewrite:
-//PRINT("-------------------write back page tbl for blk %x\n",TableBlk);
     /*write page map table*/
-    MEMSET((void *)&UserData,0xff,sizeof(struct __NandUserData_t) * 2);
+    MEMSET(UserData, 0xff, sizeof(struct __NandUserData_t) * 2);
     UserData[0].PageStatus = 0xaa;
     MEMSET(LML_PROCESS_TBL_BUF,0xff,SECTOR_CNT_OF_SUPER_PAGE * SECTOR_SIZE);
 
@@ -275,7 +274,7 @@ rewrite:
 	}
 
     param.MDataPtr = LML_PROCESS_TBL_BUF;
-    param.SDataPtr = (void *)&UserData;
+    param.SDataPtr = (void *)UserData;
     param.SectBitmap = FULL_BITMAP_OF_SUPER_PAGE;
 
 //rewrite:
@@ -314,7 +313,7 @@ static __s32 _rebuild_page_map_tbl(__u32 nLogBlkPst)
     TableBlk = LOG_BLK_TBL[nLogBlkPst].PhyBlk.PhyBlkNum;
 
     param.MDataPtr = LML_PROCESS_TBL_BUF;
-    param.SDataPtr = (void *)&UserData;
+    param.SDataPtr = (void *)UserData;
     param.SectBitmap = 0x3;
 
 	//PRINT("-----------------------rebuild page table for blk %x\n",TableBlk);
@@ -366,7 +365,7 @@ static __s32 _read_page_map_tbl(__u32 nLogBlkPst)
 
     /*read page map table*/
     param.MDataPtr = LML_PROCESS_TBL_BUF;
-    param.SDataPtr = (void *)&UserData;
+    param.SDataPtr = (void *)UserData;
     param.SectBitmap = 0xf;
 
     LML_CalculatePhyOpPar(&param, CUR_MAP_ZONE, TableBlk, TablePage);
@@ -414,14 +413,14 @@ static __s32 _read_page_map_tbl(__u32 nLogBlkPst)
 /*post current zone map table in cache*/
 static __s32 _page_map_tbl_cache_post(__u32 nLogBlkPst)
 {
-    __u8 poisition;
+    __u8 loc;
     __u8 i;
 
     struct __BlkMapTblCache_t *TmpBmt = BLK_MAP_CACHE;
 
     /*find the cache to be post*/
-    poisition = _find_page_tbl_post_location();
-    PAGE_MAP_CACHE = &(PAGE_MAP_CACHE_POOL->PageMapTblCachePool[poisition]);
+    loc = _find_page_tbl_post_location();
+    PAGE_MAP_CACHE = &(PAGE_MAP_CACHE_POOL->PageMapTblCachePool[loc]);
 
     if (PAGE_MAP_CACHE->DirtyFlag && (PAGE_MAP_CACHE->ZoneNum != 0xff)){
     /*write back page  map table*/
@@ -436,7 +435,7 @@ static __s32 _page_map_tbl_cache_post(__u32 nLogBlkPst)
 
             if (i == BLOCK_MAP_TBL_CACHE_CNT){
                 MAPPING_ERR("_page_map_tbl_cache_post : position %d ,page map zone %d,blk map zone %d\n",
-							poisition,PAGE_MAP_CACHE->ZoneNum,BLK_MAP_CACHE->ZoneNum);
+			    loc,PAGE_MAP_CACHE->ZoneNum,BLK_MAP_CACHE->ZoneNum);
                 return -1;
             }
 
@@ -624,33 +623,33 @@ static __s32 _blk_map_tbl_cache_hit(__u32 nZone)
 /*find post cache, clear cache or LRU cache */
 static __u32 _find_blk_tbl_post_location(void)
 {
-    __u32 i;
-    __u8 location;
-    __u16 access_cnt ;
+	__u32 i;
+	__u8 location;
+	__u16 access_cnt ;
 
-    /*try to find clear cache*/
-    for (i = 0; i < BLOCK_MAP_TBL_CACHE_CNT; i++)
-    {
-        if (BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i].ZoneNum == 0xff)
-            return i;
-    }
-    /*try to find least used cache recently*/
-    location = 0;
-    access_cnt = BLK_MAP_CACHE_POOL->BlkMapTblCachePool[0].AccessCnt;
+	/*try to find clear cache*/
+	for (i = 0; i < BLOCK_MAP_TBL_CACHE_CNT; i++) {
+		if (BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i].ZoneNum == 0xff) {
+			DBG("block map cache is not initialised");
+			return i;
+		}
+	}
+	/*try to find least used cache recently*/
+	location = 0;
+	access_cnt = BLK_MAP_CACHE_POOL->BlkMapTblCachePool[0].AccessCnt;
 
-    for (i = 1; i < BLOCK_MAP_TBL_CACHE_CNT; i++){
-        if (access_cnt < BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i].AccessCnt){
-            location = i;
-            access_cnt = BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i].AccessCnt;
-        }
-    }
+	for (i = 1; i < BLOCK_MAP_TBL_CACHE_CNT; i++) {
+		if (access_cnt < BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i].AccessCnt) {
+			location = i;
+			access_cnt = BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i].AccessCnt;
+			DBG("cache %x location %x access count %x", i, location, access_cnt);
+		}
+	}
+	/*clear access counter*/
+	for (i = 0; i < BLOCK_MAP_TBL_CACHE_CNT; i++)
+		BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i].AccessCnt = 0;
 
-    /*clear access counter*/
-    for (i = 0; i < BLOCK_MAP_TBL_CACHE_CNT; i++)
-        BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i].AccessCnt = 0;
-
-    return location;
-
+	return location;
 }
 
 static __s32 _write_back_all_page_map_tbl(__u8 nZone)
@@ -682,11 +681,11 @@ static __s32 _write_back_block_map_tbl(__u8 nZone)
 {
     __s32 TablePage;
     __u32 TableBlk;
-    struct  __NandUserData_t  UserData[2];
-    struct  __PhysicOpPara_t  param;
+    struct __NandUserData_t UserData[2];
+    struct __PhysicOpPara_t param;
     struct __SuperPhyBlkType_t BadBlk,NewBlk;
 
-    pr_info("%s in zone %d\n", __FUNCTION__, nZone);
+    DBG("zone %x", nZone);
 
     if (!BLK_MAP_CACHE ||
 	!DATA_BLK_TBL ||
@@ -822,6 +821,8 @@ static __s32 _read_block_map_tbl(__u8 nZone)
     __u32 TableBlk;
     struct  __PhysicOpPara_t  param;
 
+    DBG("zone %x", nZone);
+
     /*set table block number and table page number*/
     TableBlk = NandDriverInfo.ZoneTblPstInfo[nZone].PhyBlkNum;
     TablePage = NandDriverInfo.ZoneTblPstInfo[nZone].TablePst;
@@ -881,30 +882,36 @@ static __s32 _read_block_map_tbl(__u8 nZone)
 /*post current zone map table in cache*/
 static __s32 _blk_map_tbl_cache_post(__u32 nZone)
 {
-    __u8 poisition;
+	__u8 loc;
+	int status = 0;
 
-    pr_info("%s in zone %d", __FUNCTION__, nZone);
-    /*find the cache to be post*/
-    poisition = _find_blk_tbl_post_location();
-    BLK_MAP_CACHE = &(BLK_MAP_CACHE_POOL->BlkMapTblCachePool[poisition]);
+	PRECONDITION(BLK_MAP_CACHE_POOL->BlkMapTblCachePool != NULL);
 
-    /* write back new table in flash if dirty*/
-    if (BLK_MAP_CACHE->DirtyFlag){
-        if (0 != _write_back_block_map_tbl(CUR_MAP_ZONE)){
-            MAPPING_ERR("_blk_map_tbl_cache_post : write back zone tbl err\n");
-            return -1;
-        }
-    }
+	/*find the cache to be post*/
+	loc = _find_blk_tbl_post_location();
 
-    /*fetch current zone map table*/
-    if (0 != _read_block_map_tbl(nZone)){
-        MAPPING_ERR("_blk_map_tbl_cache_post : read zone tbl err\n");
-            return -1;
-    }
-    CUR_MAP_ZONE = nZone;
-    BLK_MAP_CACHE->DirtyFlag = 0;
+	DBG("zone %x location %x", nZone, loc);
 
-    return 0;
+	BLK_MAP_CACHE = &BLK_MAP_CACHE_POOL->BlkMapTblCachePool[loc];
+
+	/* write back new table in flash if dirty*/
+	if (BLK_MAP_CACHE->DirtyFlag) {
+		DBG("the block map cache is dirty; writing it back...");
+		if ((status = _write_back_block_map_tbl(CUR_MAP_ZONE)) != 0) {
+			DBG("ERROR %d while writing back block map", status);
+			return status;
+		}
+	}
+
+	/*fetch current zone map table*/
+	if ((status = _read_block_map_tbl(nZone)) != 0) {
+		DBG("ERROR %d while reading block map", status);
+	}
+	else {
+		CUR_MAP_ZONE = nZone;
+		BLK_MAP_CACHE->DirtyFlag = 0;
+	}
+	return status;
 }
 
 /*
@@ -981,12 +988,12 @@ __s32 BMM_WriteBackAllMapTbl(void)
 
 	if (!ret) {
 		if (i == 0)
-			pr_info("%s: map table write omitted\n", __FUNCTION__);
+			DBG("map table write omitted");
 		else
-			pr_info("%s: map table written OK\n", __FUNCTION__);
+			DBG("map table written OK");
 	}
 	else
-		pr_err("%s: map table write ERROR %d\n", __FUNCTION__, ret);
+		DBG("map table write ERROR %d", ret);
 
 	return ret;
 }

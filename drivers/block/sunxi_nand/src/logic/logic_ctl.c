@@ -294,7 +294,8 @@ static __s32 _WritePageCacheToNand(void)
 *               < 0     calcualte parameter failed.
 ************************************************************************************************************************
 */
-#if(0)
+
+/*
 __s32 LML_CalculatePhyOpPar(struct __PhysicOpPara_t *pPhyPar, __u32 nZone, __u32 nBlock, __u32 nPage)
 {
 
@@ -360,7 +361,8 @@ __s32 LML_CalculatePhyOpPar(struct __PhysicOpPara_t *pPhyPar, __u32 nZone, __u32
     //calculate physical operation parameter successful
     return 0;
 }
-#elif(1)
+*/
+
 __s32 LML_CalculatePhyOpPar(struct __PhysicOpPara_t *pPhyPar, __u32 nZone, __u32 nBlock, __u32 nPage)
 {
 
@@ -427,13 +429,6 @@ __s32 LML_CalculatePhyOpPar(struct __PhysicOpPara_t *pPhyPar, __u32 nZone, __u32
     //calculate physical operation parameter successful
     return 0;
 }
-
-#endif
-
-
-
-
-
 
 /*
 ************************************************************************************************************************
