@@ -158,8 +158,7 @@ static int create_BMT_prepare(struct nand_test_card* test)
 	struct __BlkMapTblCache_t* cache;
 
 	// TODO: pointer correction assertions... cache initialisation?
-	if (!NandDriverInfo.BlkMapTblCachePool)
-		return -EFAULT;
+	PRECONDITION(NandDriverInfo.BlkMapTblCachePool != NULL);
 
 	for (i = 0; i < BLOCK_MAP_TBL_CACHE_CNT; i++) {
 		cache = &NandDriverInfo.BlkMapTblCachePool->BlkMapTblCachePool[i];
@@ -292,17 +291,17 @@ static int erase_8_to_12_run(struct nand_test_card *test)
 #define TEST_PAGE_SIZE  (SECTOR_CNT_OF_SUPER_PAGE * SECTOR_SIZE)
 #define TEST_SPARE_SIZE (SECTOR_CNT_OF_SUPER_PAGE * 4)
 
-static int read_block0_page0_prepare(struct nand_test_card *test)
+static int read_13pages_prepare(struct nand_test_card *test)
 {
 	PRECONDITION(FORMAT_SPARE_BUF != NULL &&
 		     FORMAT_PAGE_BUF  != NULL);
 
-        memset(FORMAT_PAGE_BUF,  0xFF, TEST_PAGE_SIZE);
-	memset(FORMAT_SPARE_BUF, 0xFF, TEST_SPARE_SIZE);
+        memset(FORMAT_PAGE_BUF,  0, TEST_PAGE_SIZE);
+	memset(FORMAT_SPARE_BUF, 0, TEST_SPARE_SIZE);
 	return 0;
 }
 
-static int read_block0_page0_cleanup(struct nand_test_card *test)
+static int read_13pages_cleanup(struct nand_test_card *test)
 {
 	return 0;
 }
@@ -320,22 +319,72 @@ static void calcPhyAddr(struct __PhysicOpPara_t* op,
 		(BLOCK_CNT_OF_DIE / PLANE_CNT_OF_DIE);
 }
 
-static int read_block0_page0_run(struct nand_test_card *test)
+static int read_13pages_run(struct nand_test_card *test)
 {
 	struct __PhysicOpPara_t op;
-	int result = 0;
+	int i, result = 0;
 
-	calcPhyAddr(&op, 0, 0, 0);
-	op.SectBitmap = 0xFFFFFFFF;
-	op.MDataPtr = FORMAT_PAGE_BUF;
-	op.SDataPtr = FORMAT_SPARE_BUF;
-	result = PHY_PageReadSpare(&op);
+	for (i = 0; i < 13; i++) {
+		calcPhyAddr(&op, 0, 0, i);
+		op.SectBitmap = 0xFFFFFFFF;
+		op.MDataPtr = FORMAT_PAGE_BUF;
+		op.SDataPtr = FORMAT_SPARE_BUF;
+		result = PHY_PageReadSpare(&op);
 
-	if (!result) {
-		pr_info("=== Block 0, Page 0 [Data] ===\n");
-		dump(FORMAT_PAGE_BUF, TEST_PAGE_SIZE, 1, 32);
-		pr_info("=== Block 0, Page 0 [Spare] ===\n");
-		dump(FORMAT_SPARE_BUF, TEST_SPARE_SIZE, 1, 32);
+		if (!result) {
+			pr_info("=== Block 0, Page 0x%x [Data] ===\n", i);
+			dump(FORMAT_PAGE_BUF, TEST_PAGE_SIZE, 1, 32);
+			pr_info("=== Block 0, Page 0x%x [Spare] ===\n", i);
+			dump(FORMAT_SPARE_BUF, TEST_SPARE_SIZE, 1, 32);
+		}
+		else {
+			pr_err("Block %x Page %x read error %d\n",
+			       op.BlkNum, op.PageNum, result);
+		}
+	}
+
+	return result;
+}
+
+static int read_page7_prepare(struct nand_test_card *test)
+{
+	PRECONDITION(FORMAT_SPARE_BUF != NULL &&
+		     FORMAT_PAGE_BUF  != NULL);
+
+        memset(FORMAT_PAGE_BUF,  0, TEST_PAGE_SIZE);
+	memset(FORMAT_SPARE_BUF, 0, TEST_SPARE_SIZE);
+	return 0;
+}
+
+static int read_page7_cleanup(struct nand_test_card *test)
+{
+	return 0;
+}
+
+static int read_page7_run(struct nand_test_card *test)
+{
+	struct __PhysicOpPara_t op;
+	int i, result = 0;
+
+	for (i = 0; i < 5; i++) {
+		calcPhyAddr(&op, 0, i, 7);
+		op.SectBitmap = 0xFFFFFFFF;
+		op.MDataPtr = FORMAT_PAGE_BUF;
+		op.SDataPtr = FORMAT_SPARE_BUF;
+		result = PHY_PageReadSpare(&op);
+
+		if (!result) {
+			pr_info("=== Block %x, Page %x [Data] ===\n",
+				op.BlkNum, op.PageNum);
+			dump(FORMAT_PAGE_BUF, TEST_PAGE_SIZE, 1, 32);
+			pr_info("=== Block %x, Page %x [Spare] ===\n",
+				op.BlkNum, op.PageNum);
+			dump(FORMAT_SPARE_BUF, TEST_SPARE_SIZE, 1, 32);
+		}
+		else {
+			pr_err("Block %x Page %x read error %d\n",
+			       op.BlkNum, op.PageNum, result);
+		}
 	}
 
 	return result;
@@ -1182,11 +1231,18 @@ static const struct nand_test_case nand_test_cases[] = {
 	    .cleanup = erase_8_to_12_cleanup,
     },
     {       // 35
-	    .name = "dump block 0, page 0",
+	    .name = "Dump the first 13 pages of Block 0",
 	    .sector_cnt = 0,
-	    .prepare = read_block0_page0_prepare,
-	    .run     = read_block0_page0_run,
-	    .cleanup = read_block0_page0_cleanup,
+	    .prepare = read_13pages_prepare,
+	    .run     = read_13pages_run,
+	    .cleanup = read_13pages_cleanup,
+    },
+    {       // 36
+	    .name = "Dump Page 7 of the first 5 blocks",
+	    .sector_cnt = 0,
+	    .prepare = read_page7_prepare,
+	    .run     = read_page7_run,
+	    .cleanup = read_page7_cleanup,
     },
 };
 
