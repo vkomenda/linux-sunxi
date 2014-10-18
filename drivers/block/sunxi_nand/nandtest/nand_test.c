@@ -390,6 +390,66 @@ static int read_page7_run(struct nand_test_card *test)
 	return result;
 }
 
+static int print_map_caches_prepare(struct nand_test_card* test)
+{
+	PRECONDITION(BLK_MAP_CACHE_POOL != NULL &&
+		     BLK_MAP_CACHE_POOL->BlkMapTblCachePool != NULL &&
+		     PAGE_MAP_CACHE_POOL != NULL &&
+		     PAGE_MAP_CACHE_POOL->PageMapTblCachePool != NULL);
+	return 0;
+}
+
+static int print_map_caches_cleanup(struct nand_test_card* test)
+{
+	return 0;
+}
+
+static void show_block_map_cache(struct __BlkMapTblCache_t* m)
+{
+	pr_info("--- Block Map Cache at %x ---\n"
+	        " zone %x\n dirty? %x\n accesses %x\n"
+		" data block table at %x\n"
+		" logic block table at %x\n"
+		" free block table at %x\n"
+		" last free block position %x\n"
+		"------\n",
+		(u32) m, m->ZoneNum, m->DirtyFlag, m->AccessCnt,
+		(u32) m->DataBlkTbl, (u32) m->LogBlkTbl,
+		(u32) m->FreeBlkTbl, m->LastFreeBlkPst);
+}
+
+static void show_page_map_cache(struct __PageMapTblCache_t* m)
+{
+	pr_info("--- Page Map Cache at %x ---\n"
+	        " zone %x\n logic block position %x\n accesses %x\n"
+		" page map table at %x\n"
+		" dirty? %x\n"
+		"------\n",
+		(u32) m, m->ZoneNum, m->LogBlkPst, m->AccessCnt,
+		(u32) m->PageMapTbl, m->DirtyFlag);
+}
+
+static int print_map_caches_run(struct nand_test_card* test)
+{
+	int i;
+	struct __BlkMapTblCache_t*  bmc;
+	struct __PageMapTblCache_t* pmc;
+
+	for (i = 0; i < BLOCK_MAP_TBL_CACHE_CNT; i++) {
+		bmc = &BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i];
+		pr_info("=== Block Map Cache #%d (raw) ===\n", i);
+		dump(bmc, sizeof(struct __BlkMapTblCache_t), 1, 32);
+		show_block_map_cache(bmc);
+	}
+	for (i = 0; i < PAGE_MAP_TBL_CACHE_CNT; i++) {
+		pmc = &PAGE_MAP_CACHE_POOL->PageMapTblCachePool[i];
+		pr_info("=== Page Map Cache #%d ===\n", i);
+		dump(pmc, sizeof(struct __PageMapTblCache_t), 1, 32);
+		show_page_map_cache(pmc);
+        }
+	return 0;
+}
+
 /* read /write one sector with out verification*/
 static int nand_test_simple_transfer(struct nand_test_card *test,
                                     unsigned dev_addr,unsigned start,
@@ -1243,6 +1303,13 @@ static const struct nand_test_case nand_test_cases[] = {
 	    .prepare = read_page7_prepare,
 	    .run     = read_page7_run,
 	    .cleanup = read_page7_cleanup,
+    },
+    {       // 37
+	    .name = "Dump block and page map caches",
+	    .sector_cnt = 0,
+	    .prepare = print_map_caches_prepare,
+	    .run     = print_map_caches_run,
+	    .cleanup = print_map_caches_cleanup,
     },
 };
 
