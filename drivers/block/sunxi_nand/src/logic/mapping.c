@@ -72,6 +72,8 @@ static __u32 _GetTblCheckSum(__u32 *pTblBuf, __u32 nLength)
     __u32   i;
     __u32   tmpCheckSum = 0;
 
+    CAPTION;
+
     for(i= 0; i<nLength; i++)
     {
         tmpCheckSum += pTblBuf[i];
@@ -97,6 +99,8 @@ static __u32 _GetTblCheckSum(__u32 *pTblBuf, __u32 nLength)
 __s32 PMM_InitMapTblCache(void)
 {
     __u32   i;
+
+    CAPTION;
 
     PAGE_MAP_CACHE_POOL = &PageMapTblCachePool;
 
@@ -133,6 +137,8 @@ static void _CalPageTblAccessCount(void)
 {
     __u32   i;
 
+    CAPTION;
+
     for(i=0; i<PAGE_MAP_TBL_CACHE_CNT; i++)
     {
         PAGE_MAP_CACHE_POOL->PageMapTblCachePool[i].AccessCnt++;
@@ -159,6 +165,8 @@ __s32 PMM_ExitMapTblCache(void)
 {
     __u32   i;
 
+    CAPTION;
+
     for (i = 0; i<PAGE_MAP_TBL_CACHE_CNT; i++)
     {
         FREE(PAGE_MAP_CACHE_POOL->PageMapTblCachePool[i].PageMapTbl,PAGE_CNT_OF_SUPER_BLK * sizeof(struct __PageMapTblItem_t));
@@ -172,6 +180,8 @@ __s32 PMM_ExitMapTblCache(void)
 static __s32 _page_map_tbl_cache_hit(__u32 nLogBlkPst)
 {
     __u32 i;
+
+    CAPTION;
 
     for(i=0; i<PAGE_MAP_TBL_CACHE_CNT; i++)
     {
@@ -193,6 +203,8 @@ static __u32 _find_page_tbl_post_location(void)
 {
     __u32   i, location = 0;
     __u16   access_cnt;
+
+    CAPTION;
 
     /*try to find clear cache*/
     for(i=0; i<PAGE_MAP_TBL_CACHE_CNT; i++)
@@ -229,6 +241,7 @@ static __s32 _write_back_page_map_tbl(__u32 nLogBlkPst)
     struct  __PhysicOpPara_t  param;
     struct  __SuperPhyBlkType_t BadBlk,NewBlk;
 
+    DBG("logic block position %x", nLogBlkPst);
 
     /*check page poisition, merge if no free page*/
     TablePage = LOG_BLK_TBL[nLogBlkPst].LastUsedPage + 1;
@@ -309,6 +322,8 @@ static __s32 _rebuild_page_map_tbl(__u32 nLogBlkPst)
     struct  __NandUserData_t  UserData[2];
     struct  __PhysicOpPara_t  param;
 
+    DBG("logic block position %x", nLogBlkPst);
+
     MEMSET(PAGE_MAP_TBL,0xff, PAGE_CNT_OF_SUPER_BLK*sizeof(struct __PageMapTblItem_t));
     TableBlk = LOG_BLK_TBL[nLogBlkPst].PhyBlk.PhyBlkNum;
 
@@ -352,6 +367,7 @@ static __s32 _read_page_map_tbl(__u32 nLogBlkPst)
     struct  __NandUserData_t  UserData[2];
     struct  __PhysicOpPara_t  param;
 
+    DBG("logic block position %x", nLogBlkPst);
 
     /*check page poisition, merge if no free page*/
     TablePage = LOG_BLK_TBL[nLogBlkPst].LastUsedPage;
@@ -415,8 +431,9 @@ static __s32 _page_map_tbl_cache_post(__u32 nLogBlkPst)
 {
     __u8 loc;
     __u8 i;
-
     struct __BlkMapTblCache_t *TmpBmt = BLK_MAP_CACHE;
+
+    DBG("logic block position %x", nLogBlkPst);
 
     /*find the cache to be post*/
     loc = _find_page_tbl_post_location();
@@ -481,6 +498,9 @@ static __s32 _page_map_tbl_cache_post(__u32 nLogBlkPst)
 __s32 PMM_SwitchMapTbl(__u32 nLogBlkPst)
 {
     __s32   result = 0;
+
+    DBG("logic block position %x", nLogBlkPst);
+
     if (0 !=_page_map_tbl_cache_hit(nLogBlkPst))
     {
         result = (_page_map_tbl_cache_post(nLogBlkPst));
@@ -508,6 +528,8 @@ __s32 PMM_SwitchMapTbl(__u32 nLogBlkPst)
 __s32 BMM_InitMapTblCache(void)
 {
     __u32 i;
+
+    CAPTION;
 
     BLK_MAP_CACHE_POOL = &BlkMapTblCachePool;
 
@@ -568,6 +590,8 @@ static void _CalBlkTblAccessCount(void)
 {
     __u32   i;
 
+    CAPTION;
+
     for (i=0; i<BLOCK_MAP_TBL_CACHE_CNT; i++)
     {
         BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i].AccessCnt++;
@@ -594,6 +618,8 @@ __s32 BMM_ExitMapTblCache(void)
 {
     __u32 i;
 
+    CAPTION;
+
     for (i=0; i<BLOCK_MAP_TBL_CACHE_CNT; i++)
     {
 
@@ -608,6 +634,8 @@ __s32 BMM_ExitMapTblCache(void)
 static __s32 _blk_map_tbl_cache_hit(__u32 nZone)
 {
     __u32 i;
+
+    CAPTION;
 
     for (i = 0; i < BLOCK_MAP_TBL_CACHE_CNT; i++){
         if (BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i].ZoneNum == nZone){
@@ -626,6 +654,8 @@ static __u32 _find_blk_tbl_post_location(void)
 	__u32 i;
 	__u8 location;
 	__u16 access_cnt ;
+
+	CAPTION;
 
 	/*try to find clear cache*/
 	for (i = 0; i < BLOCK_MAP_TBL_CACHE_CNT; i++) {
@@ -655,6 +685,8 @@ static __u32 _find_blk_tbl_post_location(void)
 static __s32 _write_back_all_page_map_tbl(__u8 nZone)
 {
     __u32 i;
+
+    CAPTION;
 
     for(i=0; i<PAGE_MAP_TBL_CACHE_CNT; i++)
     {
@@ -931,6 +963,8 @@ __s32 BMM_SwitchMapTbl(__u32 nZone)
 {
 	__s32   result = 0;
 
+	CAPTION;
+
 	if (_blk_map_tbl_cache_hit(nZone) != 0) {
 		MAPPING_DBG("BMM_SwitchMapTbl : post zone %d cache\n", nZone);
 		result = _blk_map_tbl_cache_post(nZone);
@@ -1005,6 +1039,8 @@ static __s32 _write_dirty_flag(__u8 nZone)
     struct  __PhysicOpPara_t  param;
     struct  __NandUserData_t  UserData[2];
 
+    CAPTION;
+
     /*set table block number and table page number*/
     TableBlk = NandDriverInfo.ZoneTblPstInfo[nZone].PhyBlkNum;
     TablePage = NandDriverInfo.ZoneTblPstInfo[nZone].TablePst;
@@ -1040,6 +1076,8 @@ static __s32 _write_dirty_flag(__u8 nZone)
 */
 __s32 BMM_SetDirtyFlag(void)
 {
+	CAPTION;
+
 	if (BLK_MAP_CACHE_POOL &&
 	    BLK_MAP_CACHE &&
 	    !BLK_MAP_CACHE->DirtyFlag) {
