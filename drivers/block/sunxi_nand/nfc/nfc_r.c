@@ -175,24 +175,36 @@ __s32 _check_ecc(__u32 eblock_cnt)
 	__u8 ecc_cnt[16];
 
 	ecc_mode = (NFC_READ_REG(NFC_REG_ECC_CTL)>>12)&0xf;
-	if(ecc_mode == 0)
+	switch (ecc_mode) {
+	case 0:
 		max_ecc_bit_cnt = 16;
-	if(ecc_mode == 1)
+		break;
+	case 1:
 		max_ecc_bit_cnt = 24;
-	if(ecc_mode == 2)
+		break;
+	case 2:
 		max_ecc_bit_cnt = 28;
-	if(ecc_mode == 3)
+		break;
+	case 3:
 		max_ecc_bit_cnt = 32;
-	if(ecc_mode == 4)
+		break;
+	case 4:
 		max_ecc_bit_cnt = 40;
-	if(ecc_mode == 5)
+		break;
+	case 5:
 		max_ecc_bit_cnt = 48;
-	if(ecc_mode == 6)
+		break;
+	case 6:
 		max_ecc_bit_cnt = 56;
-	if(ecc_mode == 7)
+		break;
+	case 7:
 		max_ecc_bit_cnt = 60;
-	if(ecc_mode == 8)
+		break;
+	case 8:
+	default:
 		max_ecc_bit_cnt = 64;
+		break;
+	}
 
 	//check ecc errro
 	cfg = NFC_READ_REG(NFC_REG_ECC_ST)&0xffff;

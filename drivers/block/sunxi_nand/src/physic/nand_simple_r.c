@@ -84,35 +84,35 @@ int _cal_addr_in_chip(__u32 block, __u32 page, __u32 sector,__u8 *addr, __u8 cyc
 	column = 512 * sector;
 	row = block * PAGE_CNT_OF_PHY_BLK + page;
 
-	switch(cycle){
-		case 1:
-			addr[0] = 0x00;
-			break;
-		case 2:
-			addr[0] = column & 0xff;
-			addr[1] = (column >> 8) & 0xff;
-			break;
-		case 3:
-			addr[0] = row & 0xff;
-			addr[1] = (row >> 8) & 0xff;
-			addr[2] = (row >> 16) & 0xff;
-			break;
-		case 4:
-			addr[0] = column && 0xff;
-			addr[1] = (column >> 8) & 0xff;
-			addr[2] = row & 0xff;
-			addr[3] = (row >> 8) & 0xff;
-			break;
-		case 5:
-			addr[0] = column & 0xff;
-			addr[1] = (column >> 8) & 0xff;
-			addr[2] = row & 0xff;
-			addr[3] = (row >> 8) & 0xff;
-			addr[4] = (row >> 16) & 0xff;
-			break;
-		default:
-			result = -EINVAL;
-			break;
+	switch(cycle) {
+	case 1:
+		addr[0] = 0x00;
+		break;
+	case 2:
+		addr[0] = column & 0xff;
+		addr[1] = (column >> 8) & 0xff;
+		break;
+	case 3:
+		addr[0] = row & 0xff;
+		addr[1] = (row >> 8) & 0xff;
+		addr[2] = (row >> 16) & 0xff;
+		break;
+	case 4:
+		addr[0] = column && 0xff;
+		addr[1] = (column >> 8) & 0xff;
+		addr[2] = row & 0xff;
+		addr[3] = (row >> 8) & 0xff;
+		break;
+	case 5:
+		addr[0] = column & 0xff;
+		addr[1] = (column >> 8) & 0xff;
+		addr[2] = row & 0xff;
+		addr[3] = (row >> 8) & 0xff;
+		addr[4] = (row >> 16) & 0xff;
+		break;
+	default:
+		result = -EINVAL;
+		break;
 	}
 	return result;
 }
@@ -353,13 +353,13 @@ __s32 _read_single_page(struct boot_physical_param *readop, __u8 dma_wait_mode)
 	__u32 k = 0;
 	__u32 rb;
 	__u32 random_seed;
-	__u8 sparebuf[4*16];
+	__u8 sparebuf[64];
 	__u8 default_value[16];
 	__u8 addr[5];
 	NFC_CMD_LIST cmd_list[4];
 	__u32 list_len,i;
 
-	PRECONDITION(readop != NULL);
+	DBG("chip %x block %x page %x", readop->chip, readop->block, readop->page);
 
 	//sparebuf = (__u8 *)MALLOC(SECTOR_CNT_OF_SINGLE_PAGE * 4);
 	/*create cmd list*/
@@ -525,7 +525,7 @@ __s32 _read_single_page(struct boot_physical_param *readop, __u8 dma_wait_mode)
 		_pending_dma_irq_sem();
 
 	if (readop->oobbuf)
-		MEMCPY(readop->oobbuf,sparebuf, 2 * 4);
+		MEMCPY(readop->oobbuf,sparebuf, 8);
 
 	NFC_DeSelectChip(readop->chip);
 	NFC_DeSelectRb(rb);

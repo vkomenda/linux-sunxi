@@ -59,6 +59,8 @@
 #ifdef CONFIG_SUNXI_NAND_TEST     //  open nand test module
 
 extern void dump(void *buf, __u32 len , __u8 nbyte,__u8 linelen);
+extern __s32 _read_single_page_spare(struct boot_physical_param *readop,
+				     __u8 dma_wait_mode);
 
 #define NAND_TEST  "[nand_test]:"
 
@@ -288,8 +290,8 @@ static int erase_8_to_12_run(struct nand_test_card *test)
 	return ret;
 }
 
-#define TEST_PAGE_SIZE  (SECTOR_CNT_OF_SUPER_PAGE * SECTOR_SIZE)
-#define TEST_SPARE_SIZE (SECTOR_CNT_OF_SUPER_PAGE * 4)
+#define TEST_PAGE_SIZE  (SECTOR_CNT_OF_SINGLE_PAGE * SECTOR_SIZE)
+#define TEST_SPARE_SIZE (SECTOR_CNT_OF_SINGLE_PAGE * 4)
 
 static int read_13pages_prepare(struct nand_test_card *test)
 {
@@ -328,7 +330,7 @@ static int read_13pages_run(struct nand_test_card *test)
 		memset(FORMAT_PAGE_BUF,  0, TEST_PAGE_SIZE);
 		memset(FORMAT_SPARE_BUF, 0, TEST_SPARE_SIZE);
 		calcPhyAddr(&op, 0, 0, i);
-		op.SectBitmap = 0xFFFFFFFF;
+		op.SectBitmap = FULL_BITMAP_OF_SINGLE_PAGE;
 		op.MDataPtr = FORMAT_PAGE_BUF;
 		op.SDataPtr = FORMAT_SPARE_BUF;
 		result = PHY_PageReadSpare(&op);
@@ -344,7 +346,6 @@ static int read_13pages_run(struct nand_test_card *test)
 			       op.BlkNum, op.PageNum, result);
 		}
 	}
-
 	return result;
 }
 
@@ -476,7 +477,7 @@ static int erase_block_run(struct nand_test_card* test)
 	int ret = 0;
 
 	op.chip    = 0;
-	op.block   = 0x400;
+	op.block   = 0x100;
 	op.page    = 0;     // not used
 	op.oobbuf  = NULL;  // not used
 	op.mainbuf = NULL;  // not used
@@ -523,12 +524,13 @@ static int write_page_run(struct nand_test_card* test)
 	int ret = 0;
 
 	op.chip    = 0;
-	op.block   = 0x400;
+	op.block   = 0x100;
 	op.page    = 1;
 	op.oobbuf  = PageCachePool.PageCache0;
 	op.mainbuf = PageCachePool.SpareCache;
 
-	ret = PHY_SimpleRead_Seq(&op);
+//	ret = PHY_SimpleRead_1K(&op);
+	ret = _read_single_page_spare(&op, SUPPORT_DMA_IRQ);
 	if (!ret)
 		show_page_spare();
 	else
@@ -536,7 +538,7 @@ static int write_page_run(struct nand_test_card* test)
 		       op.block, op.page, ret);
 
 	memset(content, 0x37, TEST_PAGE_SIZE);
-	memset(oob, 0, TEST_SPARE_SIZE);
+	memset(oob,     0,    TEST_SPARE_SIZE);
 	oob[1] = 0x75;
 	oob[2] = 0x13;
 	oob[3] = 0x07;
@@ -554,7 +556,8 @@ static int write_page_run(struct nand_test_card* test)
 		pr_err("Block %x Page %x write ERROR %d\n",
 		       op.block, op.page, ret);
 
-	ret = PHY_SimpleRead_Seq(&op);
+//	ret = PHY_SimpleRead_1K(&op);
+	ret = _read_single_page_spare(&op, SUPPORT_DMA_IRQ);
 	if (!ret)
 		show_page_spare();
 	else
@@ -586,12 +589,13 @@ static int read_page_run(struct nand_test_card* test)
 	int ret = 0;
 
 	op.chip    = 0;
-	op.block   = 0x400;
+	op.block   = 0x100;
 	op.page    = 1;
 	op.mainbuf = PageCachePool.PageCache0;
 	op.oobbuf  = PageCachePool.SpareCache;
 
-	ret = PHY_SimpleRead_Seq(&op);
+//	ret = PHY_SimpleRead_1K(&op);
+	ret = _read_single_page_spare(&op, SUPPORT_DMA_IRQ);
 	if (!ret)
 		show_page_spare();
 	else
@@ -1463,21 +1467,21 @@ static const struct nand_test_case nand_test_cases[] = {
 	    .cleanup = print_map_caches_cleanup,
     },
     {       // 38
-	    .name = "Erase block 0x400",
+	    .name = "Erase block 0x100",
 	    .sector_cnt = 0,
 	    .prepare = erase_block_prepare,
 	    .run     = erase_block_run,
 	    .cleanup = erase_block_cleanup,
     },
     {       // 39
-	    .name = "Write page 1 in block 0x400",
+	    .name = "Write page 1 in block 0x100",
 	    .sector_cnt = 0,
 	    .prepare = write_page_prepare,
 	    .run     = write_page_run,
 	    .cleanup = write_page_cleanup,
     },
     {       // 40
-	    .name = "Read page 1 in block 0x400",
+	    .name = "Read page 1 in block 0x100",
 	    .sector_cnt = 0,
 	    .prepare = read_page_prepare,
 	    .run     = read_page_run,
