@@ -309,6 +309,7 @@ __s32 PHY_SimpleWrite_1K (struct boot_physical_param *writeop)
 
 	return ret;
 }
+
 //#pragma arm section code="PHY_SimpleErase"
 __s32 PHY_SimpleErase (struct boot_physical_param *eraseop )
 {
