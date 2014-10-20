@@ -295,9 +295,6 @@ static int read_13pages_prepare(struct nand_test_card *test)
 {
 	PRECONDITION(FORMAT_SPARE_BUF != NULL &&
 		     FORMAT_PAGE_BUF  != NULL);
-
-        memset(FORMAT_PAGE_BUF,  0, TEST_PAGE_SIZE);
-	memset(FORMAT_SPARE_BUF, 0, TEST_SPARE_SIZE);
 	return 0;
 }
 
@@ -324,7 +321,12 @@ static int read_13pages_run(struct nand_test_card *test)
 	struct __PhysicOpPara_t op;
 	int i, result = 0;
 
+	pr_info("Page size 0x%x, spare size 0x%x\n",
+		TEST_PAGE_SIZE, TEST_SPARE_SIZE);
+
 	for (i = 0; i < 13; i++) {
+		memset(FORMAT_PAGE_BUF,  0, TEST_PAGE_SIZE);
+		memset(FORMAT_SPARE_BUF, 0, TEST_SPARE_SIZE);
 		calcPhyAddr(&op, 0, 0, i);
 		op.SectBitmap = 0xFFFFFFFF;
 		op.MDataPtr = FORMAT_PAGE_BUF;
@@ -366,7 +368,12 @@ static int read_page7_run(struct nand_test_card *test)
 	struct __PhysicOpPara_t op;
 	int i, result = 0;
 
+	pr_info("Page size 0x%x, spare size 0x%x\n",
+		TEST_PAGE_SIZE, TEST_SPARE_SIZE);
+
 	for (i = 0; i < 5; i++) {
+		memset(FORMAT_PAGE_BUF,  0, TEST_PAGE_SIZE);
+		memset(FORMAT_SPARE_BUF, 0, TEST_SPARE_SIZE);
 		calcPhyAddr(&op, 0, i, 7);
 		op.SectBitmap = 0xFFFFFFFF;
 		op.MDataPtr = FORMAT_PAGE_BUF;
@@ -374,10 +381,10 @@ static int read_page7_run(struct nand_test_card *test)
 		result = PHY_PageReadSpare(&op);
 
 		if (!result) {
-			pr_info("=== Block %x, Page %x [Data] ===\n",
+			pr_info("=== Block %x, Page %x [Data] (raw) ===\n",
 				op.BlkNum, op.PageNum);
 			dump(FORMAT_PAGE_BUF, TEST_PAGE_SIZE, 1, 32);
-			pr_info("=== Block %x, Page %x [Spare] ===\n",
+			pr_info("=== Block %x, Page %x [Spare] (raw) ===\n",
 				op.BlkNum, op.PageNum);
 			dump(FORMAT_SPARE_BUF, TEST_SPARE_SIZE, 1, 32);
 		}
@@ -407,7 +414,7 @@ static int print_map_caches_cleanup(struct nand_test_card* test)
 static void show_block_map_cache(struct __BlkMapTblCache_t* m)
 {
 	pr_info("--- Block Map Cache at %x ---\n"
-	        " zone %x\n dirty? %x\n accesses %x\n"
+		" zone %x\n dirty? %x\n accesses %x\n"
 		" data block table at %x\n"
 		" logic block table at %x\n"
 		" free block table at %x\n"
@@ -435,6 +442,9 @@ static int print_map_caches_run(struct nand_test_card* test)
 	struct __BlkMapTblCache_t*  bmc;
 	struct __PageMapTblCache_t* pmc;
 
+	pr_info("%d block map caches, %d page map caches",
+		BLOCK_MAP_TBL_CACHE_CNT, PAGE_MAP_TBL_CACHE_CNT);
+
 	for (i = 0; i < BLOCK_MAP_TBL_CACHE_CNT; i++) {
 		bmc = &BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i];
 		pr_info("=== Block Map Cache #%d (raw) ===\n", i);
@@ -443,12 +453,153 @@ static int print_map_caches_run(struct nand_test_card* test)
 	}
 	for (i = 0; i < PAGE_MAP_TBL_CACHE_CNT; i++) {
 		pmc = &PAGE_MAP_CACHE_POOL->PageMapTblCachePool[i];
-		pr_info("=== Page Map Cache #%d ===\n", i);
+		pr_info("=== Page Map Cache #%d (raw) ===\n", i);
 		dump(pmc, sizeof(struct __PageMapTblCache_t), 1, 32);
 		show_page_map_cache(pmc);
         }
 	return 0;
 }
+
+static int erase_block_prepare(struct nand_test_card* test)
+{
+	return 0;
+}
+
+static int erase_block_cleanup(struct nand_test_card* test)
+{
+	return 0;
+}
+
+static int erase_block_run(struct nand_test_card* test)
+{
+	struct boot_physical_param op;
+	int ret = 0;
+
+	op.chip    = 0;
+	op.block   = 0x400;
+	op.page    = 0;     // not used
+	op.oobbuf  = NULL;  // not used
+	op.mainbuf = NULL;  // not used
+
+	ret = PHY_SimpleErase(&op);
+	if (ret) {
+		pr_err("Block %x erase ERROR %d\n", op.block, ret);
+	}
+	else
+		pr_info("Block %x erase SUCCESS\n", op.block);
+	return ret;
+}
+
+static int write_page_prepare(struct nand_test_card* test)
+{
+	PRECONDITION(PageCachePool.PageCache0 != NULL &&
+		     PageCachePool.SpareCache != NULL);
+
+        memset(PageCachePool.PageCache0, 0, TEST_PAGE_SIZE);
+	memset(PageCachePool.SpareCache, 0, TEST_SPARE_SIZE);
+	return 0;
+}
+
+static int write_page_cleanup(struct nand_test_card* test)
+{
+	memset(PageCachePool.PageCache0, 0, TEST_PAGE_SIZE);
+	memset(PageCachePool.SpareCache, 0, TEST_SPARE_SIZE);
+	return 0;
+}
+
+static void show_page_spare(void)
+{
+	pr_info("=== Page cache ===\n");
+	dump(PageCachePool.PageCache0, TEST_PAGE_SIZE, 1, 32);
+	pr_info("=== Spare cache ===\n");
+	dump(PageCachePool.SpareCache, TEST_SPARE_SIZE, 1, 32);
+}
+
+static int write_page_run(struct nand_test_card* test)
+{
+	u8 content[TEST_PAGE_SIZE];
+	u8 oob[TEST_SPARE_SIZE];
+	struct boot_physical_param op;
+	int ret = 0;
+
+	op.chip    = 0;
+	op.block   = 0x400;
+	op.page    = 1;
+	op.oobbuf  = PageCachePool.PageCache0;
+	op.mainbuf = PageCachePool.SpareCache;
+
+	ret = PHY_SimpleRead_Seq(&op);
+	if (!ret)
+		show_page_spare();
+	else
+		pr_err("Block %x Page %x read ERROR %d\n",
+		       op.block, op.page, ret);
+
+	memset(content, 0x37, TEST_PAGE_SIZE);
+	memset(oob, 0, TEST_SPARE_SIZE);
+	oob[1] = 0x75;
+	oob[2] = 0x13;
+	oob[3] = 0x07;
+	oob[4] = 0x96;
+	oob[5] = 0x39;
+
+	op.mainbuf = content;
+	op.oobbuf = oob;
+
+	ret = PHY_SimpleWrite(&op);
+	if (!ret)
+		pr_info("Block %x Page %x write SUCCESS\n",
+			op.block, op.page);
+	else
+		pr_err("Block %x Page %x write ERROR %d\n",
+		       op.block, op.page, ret);
+
+	ret = PHY_SimpleRead_Seq(&op);
+	if (!ret)
+		show_page_spare();
+	else
+		pr_err("Block %x Page %x read ERROR %d\n",
+		       op.block, op.page, ret);
+	return ret;
+}
+
+static int read_page_prepare(struct nand_test_card* test)
+{
+	PRECONDITION(PageCachePool.PageCache0 != NULL &&
+		     PageCachePool.SpareCache != NULL);
+
+        memset(PageCachePool.PageCache0, 0, TEST_PAGE_SIZE);
+	memset(PageCachePool.SpareCache, 0, TEST_SPARE_SIZE);
+	return 0;
+}
+
+static int read_page_cleanup(struct nand_test_card* test)
+{
+	memset(PageCachePool.PageCache0, 0, TEST_PAGE_SIZE);
+	memset(PageCachePool.SpareCache, 0, TEST_SPARE_SIZE);
+	return 0;
+}
+
+static int read_page_run(struct nand_test_card* test)
+{
+	struct boot_physical_param op;
+	int ret = 0;
+
+	op.chip    = 0;
+	op.block   = 0x400;
+	op.page    = 1;
+	op.mainbuf = PageCachePool.PageCache0;
+	op.oobbuf  = PageCachePool.SpareCache;
+
+	ret = PHY_SimpleRead_Seq(&op);
+	if (!ret)
+		show_page_spare();
+	else
+		pr_err("Block %x Page %x read ERROR %d\n",
+		       op.block, op.page, ret);
+	return ret;
+}
+
 
 /* read /write one sector with out verification*/
 static int nand_test_simple_transfer(struct nand_test_card *test,
@@ -1310,6 +1461,27 @@ static const struct nand_test_case nand_test_cases[] = {
 	    .prepare = print_map_caches_prepare,
 	    .run     = print_map_caches_run,
 	    .cleanup = print_map_caches_cleanup,
+    },
+    {       // 38
+	    .name = "Erase block 0x400",
+	    .sector_cnt = 0,
+	    .prepare = erase_block_prepare,
+	    .run     = erase_block_run,
+	    .cleanup = erase_block_cleanup,
+    },
+    {       // 39
+	    .name = "Write page 1 in block 0x400",
+	    .sector_cnt = 0,
+	    .prepare = write_page_prepare,
+	    .run     = write_page_run,
+	    .cleanup = write_page_cleanup,
+    },
+    {       // 40
+	    .name = "Read page 1 in block 0x400",
+	    .sector_cnt = 0,
+	    .prepare = read_page_prepare,
+	    .run     = read_page_run,
+	    .cleanup = read_page_cleanup,
     },
 };
 
