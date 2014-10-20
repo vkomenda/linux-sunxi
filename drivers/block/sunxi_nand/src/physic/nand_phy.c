@@ -88,10 +88,12 @@ __s32 _read_single_page_seq(struct boot_physical_param *readop,__u8 dma_wait_mod
 	__u32 random_seed;
 
 	//__u8 *sparebuf;
-	__u8 sparebuf[4*16];
+	__u8 sparebuf[64];
 	__u8 addr[5];
 	NFC_CMD_LIST cmd_list[4];
 	__u32 list_len,i;
+
+	DBG("chip %x block %x page %x", readop->chip, readop->block, readop->page);
 
 	//sparebuf = (__u8 *)MALLOC(SECTOR_CNT_OF_SINGLE_PAGE * 4);
 	/*create cmd list*/
@@ -149,7 +151,7 @@ __s32 _read_single_page_seq(struct boot_physical_param *readop,__u8 dma_wait_mod
 		_pending_dma_irq_sem();
 
 	if (readop->oobbuf){
-		MEMCPY(readop->oobbuf,sparebuf, 2 * 4);
+		MEMCPY(readop->oobbuf,sparebuf, 8);
 	}
 
 	NFC_DeSelectChip(readop->chip);
@@ -164,10 +166,12 @@ __s32 _read_single_page_1K(struct boot_physical_param *readop,__u8 dma_wait_mode
 	__s32 ret;
 	__u32 rb;
 	__u32 random_seed;
-	__u8 sparebuf[4*16];
+	__u8 sparebuf[64];
 	__u8 addr[5];
 	NFC_CMD_LIST cmd_list[4];
 	__u32 list_len,i;
+
+	DBG("chip %x block %x page %x", readop->chip, readop->block, readop->page);
 
 	//sparebuf = (__u8 *)MALLOC(SECTOR_CNT_OF_SINGLE_PAGE * 4);
 	/*create cmd list*/
@@ -199,24 +203,31 @@ __s32 _read_single_page_1K(struct boot_physical_param *readop,__u8 dma_wait_mode
 	NFC_SelectChip(readop->chip);
 	NFC_SelectRb(rb);
 
-	//random_seed = _cal_random_seed(readop->page);
-	random_seed = 0xB0BA; //0x4a80;
-	NFC_SetRandomSeed(random_seed);
-	NFC_RandomEnable();
-	ret = NFC_Read_1K(cmd_list, readop->mainbuf, sparebuf, dma_wait_mode, NFC_PAGE_MODE);
-	NFC_RandomDisable();
-	if (ret) {
-		pr_warn("%s: NFC_Read_1K (randomised) error %d", __FUNCTION__, ret);
+	if (SUPPORT_RANDOM) {
+		//random_seed = _cal_random_seed(readop->page);
+		random_seed = 0xB0BA; //0x4a80;
+		NFC_SetRandomSeed(random_seed);
+		NFC_RandomEnable();
+		ret = NFC_Read_1K(cmd_list, readop->mainbuf, sparebuf, dma_wait_mode, NFC_PAGE_MODE);
+		NFC_RandomDisable();
+		if (ret) {
+			pr_warn("%s: NFC_Read_1K (randomised) error %d", __FUNCTION__, ret);
+			ret = NFC_Read_1K(cmd_list, readop->mainbuf, sparebuf, dma_wait_mode, NFC_PAGE_MODE);
+			if (ret)
+				pr_warn("%s: NFC_Read_1K (non-randomised) error %d", __FUNCTION__, ret);
+		}
+	}
+	else {
 		ret = NFC_Read_1K(cmd_list, readop->mainbuf, sparebuf, dma_wait_mode, NFC_PAGE_MODE);
 		if (ret)
-			pr_warn("%s: NFC_Read_1K (not randomised) error %d", __FUNCTION__, ret);
+			pr_warn("%s: NFC_Read_1K (non-randomised) error %d", __FUNCTION__, ret);
 	}
 
 	if (dma_wait_mode)
 		_pending_dma_irq_sem();
 
 	if (readop->oobbuf)
-		MEMCPY(readop->oobbuf, sparebuf, 2 * 4);
+		MEMCPY(readop->oobbuf, sparebuf, 64);
 
 	NFC_DeSelectChip(readop->chip);
 	NFC_DeSelectRb(rb);
@@ -232,12 +243,14 @@ __s32 _read_single_page_spare(struct boot_physical_param *readop,__u8 dma_wait_m
 	__u32 k = 0;
 	__u32 rb;
 	__u32 random_seed;
-	__u8 sparebuf[4*16];
+	__u8 sparebuf[64];
 	__u8 default_value[16];
 	__u8 addr[5];
 	NFC_CMD_LIST cmd_list[4];
 	__u32 list_len,i;
 	__u32 free_page_flag = 0;
+
+	DBG("chip %x block %x page %x", readop->chip, readop->block, readop->page);
 
 	//sparebuf = (__u8 *)MALLOC(SECTOR_CNT_OF_SINGLE_PAGE * 4);
 	/*create cmd list*/
@@ -429,7 +442,7 @@ __s32 _read_single_page_spare(struct boot_physical_param *readop,__u8 dma_wait_m
 		_pending_dma_irq_sem();
 
 	if (readop->oobbuf)
-		MEMCPY(readop->oobbuf,sparebuf, 2 * 4);
+		MEMCPY(readop->oobbuf, sparebuf, 8);
 
 	NFC_DeSelectChip(readop->chip);
 	NFC_DeSelectRb(rb);
