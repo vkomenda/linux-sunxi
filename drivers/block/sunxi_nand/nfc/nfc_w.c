@@ -22,6 +22,7 @@
 
 #include <linux/dma-mapping.h>
 #include "nfc_i.h"
+#include "../src/include/nand_type.h"  // for debug macros
 
 extern __u32 pagesize;
 extern __s32 _wait_cmdfifo_free(void);
@@ -622,7 +623,10 @@ __s32 _read_in_page_mode_seq(NFC_CMD_LIST  *rcmd,void *mainbuf,void *sparebuf,__
 }
 
 
-__s32 _read_in_page_mode_1K(NFC_CMD_LIST  *rcmd,void *mainbuf,void *sparebuf,__u8 dma_wait_mode)
+__s32 _read_in_page_mode_1K(NFC_CMD_LIST  *rcmd,
+			    void *mainbuf,
+			    void *sparebuf,
+			    __u8 dma_wait_mode)
 {
 	__s32 ret;
 	__s32 i;
@@ -724,18 +728,19 @@ __s32 _read_in_page_mode_1K(NFC_CMD_LIST  *rcmd,void *mainbuf,void *sparebuf,__u
 		return ret;
 	}
 	/*get user data*/
-	for (i = 0; i < 2;  i++)
+	for (i = 0; i < 2;  i++) {             // FIXME: beware of out-of-bounds array writes
 		*((__u32*) sparebuf + i) =
 			NFC_READ_REG(NFC_REG_USER_DATA(i));
+	}
 //			NFC_READ_REG(__NFC_REG(NFC_REG_o_SPARE_AREA + (4 * i)));
 
 //	*((__u32*) sparebuf) = NFC_READ_REG(NFC_REG_USER_DATA(0));
 //	*((__u32*) sparebuf) = NFC_READ_REG(NFC_REG_SPARE_AREA);
 
-	pr_info("%s: out-of-band output\n %.8x %.8x [%.8x]", __FUNCTION__,
-		*((__u32*) sparebuf),
-		*((__u32*) sparebuf + 1),
-		*((__u32*) sparebuf + 2));
+
+	pr_info("%s: OOB output %x %x \n", __FUNCTION__,
+		*(u32*)  sparebuf,
+		*(u32*) (sparebuf + 1));
 
 	/*ecc check and disable ecc*/
 	ret = _check_ecc(1); // was in AW version: (pagesize/1024);
@@ -767,10 +772,19 @@ __s32 _read_in_page_mode_spare(NFC_CMD_LIST  *rcmd,void *mainbuf,void *sparebuf,
 	__u32 read_data_cmd,random_read_cmd0,random_read_cmd1;
 	dma_addr_t this_dma_handle;
 
+	PRECONDITION(rcmd != NULL &&
+		     mainbuf != NULL &&
+		     sparebuf != NULL);
+
 	ret = 0;
 	read_addr_cmd = rcmd;
 	cur_cmd = rcmd;
 	cur_cmd = cur_cmd->next;
+
+	if (cur_cmd == NULL) {
+		DBG();
+	}
+
 	random_read_cmd0 = cur_cmd->value;
 	cur_cmd = cur_cmd->next;
 	random_read_cmd1 = cur_cmd->value;
@@ -831,7 +845,7 @@ __s32 _read_in_page_mode_spare(NFC_CMD_LIST  *rcmd,void *mainbuf,void *sparebuf,
 	_enable_ecc(1);
 	NFC_WRITE_REG(NFC_REG_CMD,cfg);
 
-    NAND_WaitDmaFinish();//
+	NAND_WaitDmaFinish();//
 
 	/*wait cmd fifo free and cmd finish*/
 	ret = _wait_cmdfifo_free();
@@ -844,7 +858,7 @@ __s32 _read_in_page_mode_spare(NFC_CMD_LIST  *rcmd,void *mainbuf,void *sparebuf,
 		return ret;
 	}
 	/*get user data*/
-	for (i = 0; i < 2048/1024;  i++){
+	for (i = 0; i < 32;  i++){
 		*(((__u32*) sparebuf) + i) = NFC_READ_REG(NFC_REG_USER_DATA(i));
 	}
 
@@ -898,9 +912,11 @@ __s32 NFC_Read_Spare(NFC_CMD_LIST  *rcmd, void *mainbuf, void *sparebuf, __u8 dm
 
 	__s32 ret ;
 
+	CAPTION;
+
 	_enter_nand_critical();
 
-	ret = _read_in_page_mode_spare(rcmd, mainbuf,sparebuf, dma_wait_mode);
+	ret = _read_in_page_mode_spare(rcmd, mainbuf, sparebuf, dma_wait_mode);
 
 	/*switch to ahb*/
 	NFC_WRITE_REG(NFC_REG_CTL, (NFC_READ_REG(NFC_REG_CTL)) & (~NFC_RAM_METHOD));
