@@ -1,11 +1,12 @@
 #ifndef	_NAND_PRIVATE_H_
 #define	_NAND_PRIVATE_H_
 
-#include    "../include/type_def.h"
-#include	"../src/include/nand_physic.h"
-#include	"../src/include/nand_format.h"
-#include	"../src/include/nand_logic.h"
-#include	"../src/include/nand_scan.h"
+#include "../include/type_def.h"
+#include "../src/include/nand_physic.h"
+#include "../src/include/nand_format.h"
+#include "../src/include/nand_logic.h"
+#include "../src/include/nand_scan.h"
+#include "../src/include/nfc.h"
 
 /*
 typedef struct
@@ -44,4 +45,3 @@ extern block_device_operations nand_dev_op;
 //extern __dev_devop_t nand_dev_op;
 
 #endif /*_NAND_PRIVATE_H_*/
-
