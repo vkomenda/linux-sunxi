@@ -1,25 +1,3 @@
-/*
- * drivers/block/sunxi_nand/nfd/nand_private.h
- *
- * (C) Copyright 2007-2012
- * Allwinner Technology Co., Ltd. <www.allwinnertech.com>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
- */
-
 #ifndef	_NAND_PRIVATE_H_
 #define	_NAND_PRIVATE_H_
 
@@ -28,13 +6,6 @@
 #include	"../src/include/nand_format.h"
 #include	"../src/include/nand_logic.h"
 #include	"../src/include/nand_scan.h"
-
-extern struct __NandDriverGlobal_t NandDriverInfo;
-
-extern struct __NandStorageInfo_t  NandStorageInfo;
-
-#define DiskSize  (SECTOR_CNT_OF_SINGLE_PAGE * PAGE_CNT_OF_PHY_BLK * BLOCK_CNT_OF_DIE * \
-            DIE_CNT_OF_CHIP * NandStorageInfo.ChipCnt  / 1024 * DATA_BLK_CNT_OF_ZONE)
 
 /*
 typedef struct

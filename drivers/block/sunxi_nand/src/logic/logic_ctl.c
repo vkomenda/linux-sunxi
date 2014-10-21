@@ -1,36 +1,40 @@
 /*
- * drivers/block/sunxi_nand/src/logic/logic_ctl.c
- *
- * (C) Copyright 2007-2012
- * Allwinner Technology Co., Ltd. <www.allwinnertech.com>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
- */
-
-#include <linux/module.h>
+* (C) Copyright 2007-2012
+* Allwinner Technology Co., Ltd. <www.allwinnertech.com>
+* Neil Peng<penggang@allwinnertech.com>
+*
+* See file CREDITS for list of people who contributed to this
+* project.
+*
+* This program is free software; you can redistribute it and/or
+* modify it under the terms of the GNU General Public License as
+* published by the Free Software Foundation; either version 2 of
+* the License, or (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with this program; if not, write to the Free Software
+* Foundation, Inc., 59 Temple Place, Suite 330, Boston,
+* MA 02111-1307 USA
+*/
 #include "../include/nand_logic.h"
 
-struct __NandDriverGlobal_t     NandDriverInfo;
-struct __LogicArchitecture_t    LogicArchiPar;
-struct __ZoneTblPstInfo_t       ZoneTblPstInfo[MAX_ZONE_CNT];
+struct __NandDriverGlobal_t     NandDriverInfo={0};
+struct __LogicArchitecture_t    LogicArchiPar={0};
+struct __ZoneTblPstInfo_t       ZoneTblPstInfo[MAX_ZONE_CNT]={0};
+struct __NandPartInfo_t         NandPartInfo[NAND_MAX_PART_CNT]={0};
+struct nand_disk nand_disk_array[NAND_MAX_PART_CNT]={0};
+__u32 nand_part_cnt=0;
 //define the parameter for manage the cached page
-static struct __GlobalLogicPageType_t  CachePage;
+static struct __GlobalLogicPageType_t  CachePage={0};
 
 //define the parameter for manage the logical page read and write
-static struct __LogicCtlPar_t LogicalCtl;
+static struct __LogicCtlPar_t LogicalCtl={0};
+
 
 
 
@@ -55,7 +59,8 @@ static struct __LogicCtlPar_t LogicalCtl;
 static __s32 _CalculateSectPar(__u32 nSectNum, __u32 nSectCnt, struct __GlobalLogicPageType_t *pHeadPage,
                                     __u32 *pMidPageCnt, struct __GlobalLogicPageType_t *pTailPage)
 {
-    __u32   tmpSectCnt, tmpBitmap;
+    __u32   tmpSectCnt;
+	__u64	tmpBitmap;
 
     LOGICCTL_DBG("[LOGICCTL_DBG]: Calculate logical sectors parameter, Lba:0x%x, Cnt:0x%x\n", nSectNum, nSectCnt);
 
@@ -122,7 +127,7 @@ static __s32 _CalculateSectPar(__u32 nSectNum, __u32 nSectCnt, struct __GlobalLo
 *               < 0     calcualte page parameter failed.
 ************************************************************************************************************************
 */
-static __s32 _CalculateLogicPagePar(struct __LogicPageType_t *pLogicPage, __u32 nPage, __u32 nBitmap)
+static __s32 _CalculateLogicPagePar(struct __LogicPageType_t *pLogicPage, __u32 nPage, __u64 nBitmap)
 {
     __u32   tmpPage, tmpBlk, tmpZone;
 
@@ -158,14 +163,14 @@ static __s32 _CalculateLogicPagePar(struct __LogicPageType_t *pLogicPage, __u32 
 *               < 0     update page data failed.
 ************************************************************************************************************************
 */
-static __s32 _UpdateReadPageData(__u32 nSectBitmap, void * pBuf)
+static __s32 _UpdateReadPageData(__u64 nSectBitmap, void * pBuf)
 {
     __s32   i;
     __u8    *tmpSrc = LML_WRITE_PAGE_CACHE, *tmpDst = pBuf;
 
     for(i=0; i<SECTOR_CNT_OF_LOGIC_PAGE; i++)
     {
-        if(nSectBitmap & CachePage.SectorBitmap & (1<<i))
+        if(nSectBitmap & CachePage.SectorBitmap & ((__u64)1<<i))
         {
             MEMCPY(tmpDst, tmpSrc, SECTOR_SIZE);
         }
@@ -193,7 +198,7 @@ static __s32 _UpdateReadPageData(__u32 nSectBitmap, void * pBuf)
 *               < 0     merge page data failed.
 ************************************************************************************************************************
 */
-static __s32 _MergeCachePageData(__u32 nPage, __u32 nBitmap, __u8 *pBuf)
+static __s32 _MergeCachePageData(__u32 nPage, __u64 nBitmap, __u8 *pBuf)
 {
     __s32   i;
     __u8    *tmpSrc = pBuf, *tmpDst = LML_WRITE_PAGE_CACHE;
@@ -208,7 +213,7 @@ static __s32 _MergeCachePageData(__u32 nPage, __u32 nBitmap, __u8 *pBuf)
 
     for(i=0; i<SECTOR_CNT_OF_LOGIC_PAGE; i++)
     {
-        if(nBitmap & (1<<i))
+        if(nBitmap & ((__u64)1<<i))
         {
             //the sector of the write page is valid, copy data to the page cache
             MEMCPY(tmpDst, tmpSrc, SECTOR_SIZE);
@@ -241,7 +246,8 @@ static __s32 _MergeCachePageData(__u32 nPage, __u32 nBitmap, __u8 *pBuf)
 static __s32 _WritePageCacheToNand(void)
 {
     __s32   result = 0;
-    __u32   tmpPage, tmpBitmap;
+    __u32   tmpPage;
+	__u64	tmpBitmap;
     __u8    *tmpBuf;
 
     tmpPage = CachePage.LogicPageNum;
@@ -294,8 +300,7 @@ static __s32 _WritePageCacheToNand(void)
 *               < 0     calcualte parameter failed.
 ************************************************************************************************************************
 */
-
-/*
+#if(0)
 __s32 LML_CalculatePhyOpPar(struct __PhysicOpPara_t *pPhyPar, __u32 nZone, __u32 nBlock, __u32 nPage)
 {
 
@@ -361,8 +366,7 @@ __s32 LML_CalculatePhyOpPar(struct __PhysicOpPara_t *pPhyPar, __u32 nZone, __u32
     //calculate physical operation parameter successful
     return 0;
 }
-*/
-
+#elif(1)
 __s32 LML_CalculatePhyOpPar(struct __PhysicOpPara_t *pPhyPar, __u32 nZone, __u32 nBlock, __u32 nPage)
 {
 
@@ -430,6 +434,13 @@ __s32 LML_CalculatePhyOpPar(struct __PhysicOpPara_t *pPhyPar, __u32 nZone, __u32
     return 0;
 }
 
+#endif
+
+
+
+
+
+
 /*
 ************************************************************************************************************************
 *                       READ PAGE DATA FROM VIRTUAL BLOCK
@@ -447,7 +458,7 @@ __s32 LML_CalculatePhyOpPar(struct __PhysicOpPara_t *pPhyPar, __u32 nZone, __u32
 __s32 LML_VirtualPageRead(struct __PhysicOpPara_t *pVirtualPage)
 {
     __s32 i, result;
-    __u32 tmpBitmap;
+    __u64 tmpBitmap;
     __u8  *tmpSpare, *tmpSrcData, *tmpDstData, *tmpSrcPtr[4], *tmpDstPtr[4];
     struct __PhysicOpPara_t tmpPhyPage;
 
@@ -462,7 +473,7 @@ __s32 LML_VirtualPageRead(struct __PhysicOpPara_t *pVirtualPage)
         //process the pointer to spare area data
         for(i=0; i<2; i++)
         {
-            if(tmpBitmap & (1<<i))
+            if(tmpBitmap & ((__u64)1<<i))
             {
                 tmpSrcPtr[i] = LML_SPARE_BUF + 4 * i;
                 tmpDstPtr[i] = tmpSpare + 4 * i;
@@ -475,7 +486,7 @@ __s32 LML_VirtualPageRead(struct __PhysicOpPara_t *pVirtualPage)
 
         for(i=0; i<2; i++)
         {
-            if(tmpBitmap & (1<<(i + SECTOR_CNT_OF_SINGLE_PAGE)))
+            if(tmpBitmap & ((__u64)1<<(i + SECTOR_CNT_OF_SINGLE_PAGE)))
             {
                 tmpSrcPtr[i+2] = LML_SPARE_BUF + 4 * (i + SECTOR_CNT_OF_SINGLE_PAGE);
                 tmpDstPtr[i+2] = tmpSpare + 8 + 4 * i;
@@ -537,7 +548,7 @@ __s32 LML_VirtualPageRead(struct __PhysicOpPara_t *pVirtualPage)
 __s32 LML_VirtualPageWrite( struct __PhysicOpPara_t *pVirtualPage)
 {
     __s32 i, result;
-    __u32 tmpBitmap;
+    __u64 tmpBitmap;
     __u8  *tmpSpare, *tmpSrcData, *tmpDstData, *tmpSrcPtr[4], *tmpDstPtr[4];
     struct __PhysicOpPara_t tmpPhyPage;
 
@@ -553,7 +564,7 @@ __s32 LML_VirtualPageWrite( struct __PhysicOpPara_t *pVirtualPage)
         //process the pointer to spare area data
         for(i=0; i<2; i++)
         {
-            if(tmpBitmap & (1<<i))
+            if(tmpBitmap & ((__u64)1<<i))
             {
                 tmpSrcPtr[i] = tmpSpare + 4 * i;
                 tmpDstPtr[i] = LML_SPARE_BUF + 4 * i;
@@ -566,7 +577,7 @@ __s32 LML_VirtualPageWrite( struct __PhysicOpPara_t *pVirtualPage)
 
         for(i=0; i<2; i++)
         {
-            if(tmpBitmap & (1<<(i + SECTOR_CNT_OF_SINGLE_PAGE)))
+            if(tmpBitmap & ((__u64)1<<(i + SECTOR_CNT_OF_SINGLE_PAGE)))
             {
                 tmpSrcPtr[i+2] = tmpSpare + 8 + 4 * i;
                 tmpDstPtr[i+2] = LML_SPARE_BUF + 4 * (i + SECTOR_CNT_OF_SINGLE_PAGE);
@@ -728,7 +739,7 @@ static __s32 _CloseWritePage(void)
 *               < 0     read failed.
 ************************************************************************************************************************
 */
-__s32 LML_PageRead(__u32 nPage, __u32 nBitmap, void* pBuf)
+__s32 LML_PageRead(__u32 nPage, __u64 nBitmap, void* pBuf)
 {
     __s32 result;
     __u32 tmpSuperBlk, tmpSuperPage;
@@ -846,7 +857,7 @@ __s32 LML_PageRead(__u32 nPage, __u32 nBitmap, void* pBuf)
 *               < 0     write failed.
 ************************************************************************************************************************
 */
-__s32 LML_PageWrite(__u32 nPage, __u32 nBitmap, void* pBuf)
+__s32 LML_PageWrite(__u32 nPage, __u64 nBitmap, void* pBuf)
 {
     __s32 result;
     struct __LogicPageType_t tmpLogicPage;
@@ -854,7 +865,7 @@ __s32 LML_PageWrite(__u32 nPage, __u32 nBitmap, void* pBuf)
     struct __NandUserData_t tmpSpare[2];
     struct __LogBlkType_t tmpLogBlk;
 
-
+		
     //check if the bitmap of valid sectors is full, if not, report error
     if(nBitmap != FULL_BITMAP_OF_LOGIC_PAGE)
     {
@@ -973,7 +984,7 @@ __TRY_WRITE_PHYSIC_PAGE:
     tmpPhyPage.SDataPtr = (void *)tmpSpare;
 
     #if !CFG_SUPPORT_CHECK_WRITE_SYNCH
-
+	
 	if (LogicalCtl.OpMode == 'w')
     {
     	//synch currently write bank
@@ -982,8 +993,8 @@ __TRY_WRITE_PHYSIC_PAGE:
     	{
         	//the last write operation on current bank is failed, the block is bad, need proccess it
         	LOGICCTL_DBG("[LOGICCTL_DBG] Find a bad block when write logical page! bank:0x%x, block:0x%x, page:0x%x\n",
-                tmpPhyPage.BankNum, tmpPhyPage.BlkNum, tmpPhyPage.PageNum);
-
+                tmpPhyPage.BankNum, tmpPhyPage.BlkNum, tmpPhyPage.PageNum);			
+			
         	//process the bad block
         	result = LML_BadBlkManage(&LogicalCtl.LogBlkNum, LogicalCtl.ZoneNum, LogicalCtl.LogPageNum, &LogicalCtl.LogBlkNum);
         	if(result < 0)
@@ -1096,22 +1107,23 @@ __s32 LML_FlushPageCache(void)
 __s32 LML_Read(__u32 nSectNum, __u32 nSectorCnt, void* pBuf)
 {
     __s32   i, result;
-    __u32   tmpMidPageCnt, tmpPageNum, tmpBitmap, tmpPageCnt;
+    __u32   tmpMidPageCnt, tmpPageNum, tmpPageCnt;
+	__u64	tmpBitmap;
     __u8    *tmpBuf;
     struct __GlobalLogicPageType_t tmpHeadPage, tmpTailPage;
 
-    LOGICCTL_DBG("[LOGICCTL_DBG] LML_Read, sector number:0x%x, sector cnt:0x%x, Buffer:0x%x\n", nSectNum, nSectorCnt, (unsigned int) pBuf);
+    LOGICCTL_DBG("[LOGICCTL_DBG] LML_Read, sector number:0x%x, sector cnt:0x%x, Buffer:0x%x\n", nSectNum, nSectorCnt, pBuf);
 
 		if(((__u32)pBuf)&0x3)
 	  {
 	      LOGICCTL_ERR("[LOGICCTL_ERR] LML_Write, invalid bufaddr: 0x%x \n", (__u32)(pBuf));
 				return -ERR_ADDRBEYOND;
 	  }
-
+	  
     //check if the parameter is valid
     if(((nSectNum + nSectorCnt) > LogicalCtl.DiskCap)||(nSectNum>LogicalCtl.DiskCap-1)||(nSectorCnt>LogicalCtl.DiskCap-1))
     {
-        LOGICCTL_ERR("[LOGICCTL_ERR] LML_Read, the addr of read(start:%x, cnt:%x) is beyond the disk volume %x!!!\n",
+        LOGICCTL_ERR("[LOGICCTL_ERR] LML_Read, the addr of read(start:%x, cnt:%x) is beyond the disk volume %x!!!\n", 
 						nSectNum, nSectorCnt,LogicalCtl.DiskCap);
         return -ERR_ADDRBEYOND;
     }
@@ -1128,7 +1140,7 @@ __s32 LML_Read(__u32 nSectNum, __u32 nSectorCnt, void* pBuf)
     //calculate the buffer address for page align
     for(i=0; i<SECTOR_CNT_OF_LOGIC_PAGE; i++)
     {
-        if(tmpHeadPage.SectorBitmap & (1<<i))
+        if(tmpHeadPage.SectorBitmap & ((__u64)1<<i))
         {
             break;
         }
@@ -1187,7 +1199,6 @@ __s32 LML_Read(__u32 nSectNum, __u32 nSectorCnt, void* pBuf)
 
     return 0;
 }
-EXPORT_SYMBOL(LML_Read);
 
 /*
 extern dump(void * buf, __u32 len, __u8 nbyte, __u8 linelen);
@@ -1205,7 +1216,7 @@ void echo_write_data (__u32 nSectNum, __u32 nSectorCnt, void* pBuf)
 	}
 
 	return;
-
+	
 }*/
 
 /*
@@ -1226,19 +1237,20 @@ void echo_write_data (__u32 nSectNum, __u32 nSectorCnt, void* pBuf)
 __s32 LML_Write(__u32 nSectNum, __u32 nSectorCnt, void* pBuf)
 {
     __s32   i, result;
-    __u32   tmpMidPageCnt, tmpPageNum, tmpBitmap, tmpPageCnt;
+    __u32   tmpMidPageCnt, tmpPageNum, tmpPageCnt;
+	__u64	tmpBitmap;
     __u8    *tmpBuf;
     struct __GlobalLogicPageType_t tmpHeadPage, tmpTailPage;
-
+    
 	 	if(((__u32)pBuf)&0x3)
 	  {
 	      LOGICCTL_ERR("[LOGICCTL_ERR] LML_Write, invalid bufaddr: 0x%x \n", (__u32)(pBuf));
 				return -ERR_ADDRBEYOND;
 	  }
-
+	
     if(((nSectNum + nSectorCnt) > LogicalCtl.DiskCap)||(nSectNum>LogicalCtl.DiskCap-1)||(nSectorCnt>LogicalCtl.DiskCap-1))
     {
-        LOGICCTL_ERR("[LOGICCTL_ERR] LML_Write, the addr of write(start:%x, cnt:%x) is beyond the disk volume %x!!!\n",
+        LOGICCTL_ERR("[LOGICCTL_ERR] LML_Write, the addr of write(start:%x, cnt:%x) is beyond the disk volume %x!!!\n", 
 						nSectNum, nSectorCnt,LogicalCtl.DiskCap);
 				return -ERR_ADDRBEYOND;
     }
@@ -1255,7 +1267,7 @@ __s32 LML_Write(__u32 nSectNum, __u32 nSectorCnt, void* pBuf)
     //calculate the buffer address for page align
     for(i=0; i<SECTOR_CNT_OF_LOGIC_PAGE; i++)
     {
-        if(tmpHeadPage.SectorBitmap & (1<<i))
+        if(tmpHeadPage.SectorBitmap & ((__u64)1<<i))
         {
             break;
         }
@@ -1323,7 +1335,6 @@ __s32 LML_Write(__u32 nSectNum, __u32 nSectorCnt, void* pBuf)
     }
 	 return 0;
 }
-EXPORT_SYMBOL(LML_Write);
 
 
 /*
@@ -1341,55 +1352,70 @@ EXPORT_SYMBOL(LML_Write);
 */
 __s32 LML_Init(void)
 {
-	__s32   result;
+    __s32  i, result;
 
-	CachePage.LogicPageNum = 0xffffffff;
-	CachePage.SectorBitmap = 0x00000000;
+    CachePage.LogicPageNum = 0xffffffff;
+    CachePage.SectorBitmap = 0x00000000;
 
-	LogicalCtl.OpMode = 'n';
-	LogicalCtl.ZoneNum = 0xff;
-	LogicalCtl.LogicBlkNum = 0xffff;
-	LogicalCtl.LogicPageNum = 0xffff;
-	LogicalCtl.LogPageNum = 0xffff;
-	LogicalCtl.DataBlkNum.BlkEraseCnt = 0xffff;
-	LogicalCtl.DataBlkNum.PhyBlkNum = 0xffff;
-	LogicalCtl.LogBlkNum.BlkEraseCnt = 0xffff;
-	LogicalCtl.LogBlkNum.PhyBlkNum = 0xffff;
-	LogicalCtl.DiskCap = SECTOR_CNT_OF_SINGLE_PAGE * PAGE_CNT_OF_PHY_BLK * BLOCK_CNT_OF_DIE * \
-		DIE_CNT_OF_CHIP * NandDriverInfo.NandStorageInfo->ChipCnt  / BLOCK_CNT_OF_ZONE * DATA_BLK_CNT_OF_ZONE;
+    LogicalCtl.OpMode = 'n';
+    LogicalCtl.ZoneNum = 0xff;
+    LogicalCtl.LogicBlkNum = 0xffff;
+    LogicalCtl.LogicPageNum = 0xffff;
+    LogicalCtl.LogPageNum = 0xffff;
+    LogicalCtl.DataBlkNum.BlkEraseCnt = 0xffff;
+    LogicalCtl.DataBlkNum.PhyBlkNum = 0xffff;
+    LogicalCtl.LogBlkNum.BlkEraseCnt = 0xffff;
+    LogicalCtl.LogBlkNum.PhyBlkNum = 0xffff;
+    LogicalCtl.DiskCap = SECTOR_CNT_OF_SINGLE_PAGE * PAGE_CNT_OF_PHY_BLK * BLOCK_CNT_OF_DIE * \
+            DIE_CNT_OF_CHIP * NandDriverInfo.NandStorageInfo->ChipCnt  / BLOCK_CNT_OF_ZONE * DATA_BLK_CNT_OF_ZONE;
 
-	//request page buffer for process data
-	if (!NandDriverInfo.PageCachePool->PageCache1)
-		NandDriverInfo.PageCachePool->PageCache1 = MALLOC(SECTOR_CNT_OF_LOGIC_PAGE * SECTOR_SIZE);
-	if (!NandDriverInfo.PageCachePool->PageCache1) {
-		LOGICCTL_ERR("[LOGICCTL_ERR] Request memory for nand flash page cache failed!!");
-		return -ERR_MALLOC;
+	// init nand part info
+	NandPartInfo[0].PartType = 0;
+	NandPartInfo[0].PartStartLogicBlk = 0;
+	NandPartInfo[0].PartEndLogicBlk = LogicalCtl.DiskCap/(SECTOR_CNT_OF_SUPER_PAGE * PAGE_CNT_OF_LOGIC_BLK);
+	for(i=1;i<NAND_MAX_PART_CNT;i++)
+	{
+		NandPartInfo[i].PartType = 0xffff;
+		NandPartInfo[i].PartStartLogicBlk = 0xffff;
+		NandPartInfo[i].PartEndLogicBlk = 0xffff;
 	}
 
-	if (!NandDriverInfo.PageCachePool->PageCache2)
-		NandDriverInfo.PageCachePool->PageCache2 = MALLOC(SECTOR_CNT_OF_LOGIC_PAGE * SECTOR_SIZE);
-	if (!NandDriverInfo.PageCachePool->PageCache2) {
-		LOGICCTL_ERR("[LOGICCTL_ERR] Request memory for nand flash page cache failed!!");
-		return -ERR_MALLOC;
-	}
+    //request page buffer for process data
+    NandDriverInfo.PageCachePool->PageCache1 = (__u8 *)MALLOC(SECTOR_CNT_OF_LOGIC_PAGE * SECTOR_SIZE);
+    if(!NandDriverInfo.PageCachePool->PageCache1)
+    {
+        LOGICCTL_ERR("[LOGICCTL_ERR] Request memory for nand flash page cache failed!!\n");
+        return -ERR_MALLOC;
+    }
+    //NandDriverInfo.PageCachePool->PageCache2 = NULL;
+     NandDriverInfo.PageCachePool->PageCache2 = (__u8 *)MALLOC(SECTOR_CNT_OF_LOGIC_PAGE * SECTOR_SIZE);
+    if(!NandDriverInfo.PageCachePool->PageCache2)
+    {
+        LOGICCTL_ERR("[LOGICCTL_ERR] Request memory for nand flash page cache failed!!\n");
+        return -ERR_MALLOC;
+    }
 
-	//request buffer for process spare area data
-	MEMSET(LML_SPARE_BUF, 0xff, SECTOR_CNT_OF_SUPER_PAGE * 4);
+    //request buffer for process spare area data
+    MEMSET(LML_SPARE_BUF, 0xff, SECTOR_CNT_OF_SUPER_PAGE * 4);
 
-	//init the mapping tabel manage module
-	result = BMM_InitMapTblCache();
-	if(result < 0) {
-		LOGICCTL_ERR("[LOGICCTL_ERR] Init the mapping table manage module failed! Err:0x%x\n", result);
-		return -ERR_MAPPING;
-	}
+    //init the mapping tabel manage module
+    result = BMM_InitMapTblCache();
+    if(result < 0)
+    {
+        LOGICCTL_ERR("[LOGICCTL_ERR] Init the mapping table manage module failed! Err:0x%x\n", result);
+        return -ERR_MAPPING;
+    }
 
-	result = PMM_InitMapTblCache();
-	if(result < 0) {
-		LOGICCTL_ERR("[LOGICCTL_ERR] Init the mapping table manage module failed! Err:0x%x\n", result);
-		return -ERR_MAPPING;
-	}
+    result = PMM_InitMapTblCache();
+    if(result < 0)
+    {
+        LOGICCTL_ERR("[LOGICCTL_ERR] Init the mapping table manage module failed! Err:0x%x\n", result);
+        return -ERR_MAPPING;
+    }
 
-	return 0;
+    NAND_PartInit();
+
+    return 0;
 }
 
 
@@ -1408,24 +1434,20 @@ __s32 LML_Init(void)
 */
 __s32 LML_Exit(void)
 {
-	pr_info("%s: start\n", __FUNCTION__);
+     //flush page cache to nand flash
+    LML_FlushPageCache();
 
-	//flush page cache to nand flash
-	LML_FlushPageCache();
+    //write all mapping table to nand flash
+    BMM_WriteBackAllMapTbl();
 
-	//write all mapping table to nand flash
-	BMM_WriteBackAllMapTbl();
+    //free the mapping module
+    PMM_ExitMapTblCache();
+    BMM_ExitMapTblCache();
 
-	//free the mapping module
-	PMM_ExitMapTblCache();
-	BMM_ExitMapTblCache();
-
-	FREE(NandDriverInfo.PageCachePool->PageCache1,SECTOR_CNT_OF_LOGIC_PAGE * SECTOR_SIZE);
+    FREE(NandDriverInfo.PageCachePool->PageCache1,SECTOR_CNT_OF_LOGIC_PAGE * SECTOR_SIZE);
 	FREE(NandDriverInfo.PageCachePool->PageCache2,SECTOR_CNT_OF_LOGIC_PAGE * SECTOR_SIZE);
 
-	pr_info("%s: end\n", __FUNCTION__);
-
-	return 0;
+    return 0;
 }
 
 // 2010-12-04 modified
@@ -1438,3 +1460,50 @@ __u32 NAND_GetDiskSize(void)
 
     return disksize;
 }
+
+__s32 NAND_SetPartInfo(void *part_table)
+{
+	__u32 i;
+	struct __NandPartTable_t *nandpart;
+
+	nandpart = (struct __NandPartTable_t *)part_table;
+
+	DBUG_MSG("NAND_SetPartInfo \n");
+
+	if(nandpart->magic != NAND_PART_TABLE_MAGIC)
+	{
+		PRINT("Nand Part magic error!\n");
+		return -1;
+	}
+	if(nandpart->part_cnt > NAND_MAX_PART_CNT)
+	{
+		PRINT("Nand Part Cnt is invalid!\n");
+		return -1;
+	}
+
+    DBUG_MSG("Nand Part info:\n");
+	DBUG_MSG("Nand Logic Block Size: 0x%x \n", (PAGE_CNT_OF_LOGIC_BLK*SECTOR_CNT_OF_LOGIC_PAGE));
+
+	for(i=0; i<nandpart->part_cnt;i++)
+	{
+		DBUG_MSG("part_num: %d, start_sec: %x, sec_cnt: %x\n", i, nandpart->start_sec[i], nandpart->sec_cnt[i]);
+		if(nandpart->start_sec[i]%(PAGE_CNT_OF_LOGIC_BLK*SECTOR_CNT_OF_LOGIC_PAGE))
+			PRINT("nand part %d start sec is not align\n");
+		if(nandpart->sec_cnt[i]%(PAGE_CNT_OF_LOGIC_BLK*SECTOR_CNT_OF_LOGIC_PAGE))
+			PRINT("nand part %d sec count is not align\n");
+
+		NandPartInfo[i].PartType = nandpart->part_type[i];
+		NandPartInfo[i].PartStartLogicBlk = nandpart->start_sec[i]/(PAGE_CNT_OF_LOGIC_BLK*SECTOR_CNT_OF_LOGIC_PAGE);
+		NandPartInfo[i].PartEndLogicBlk =NandPartInfo[i].PartStartLogicBlk + nandpart->sec_cnt[i]/(PAGE_CNT_OF_LOGIC_BLK*SECTOR_CNT_OF_LOGIC_PAGE);
+		LOGICCTL_DBG("Part %d: part_type: 0x%x\n", \
+			i, NandPartInfo[i].PartType);
+		LOGICCTL_DBG("   startblock: 0x%x, endblock 0x%x\n", \
+			NandPartInfo[i].PartStartLogicBlk, NandPartInfo[i].PartEndLogicBlk);
+	}
+
+	return 0;
+}
+
+
+
+
