@@ -1,30 +1,32 @@
 /*
- * drivers/block/sunxi_nand/src/include/nand_logic.h
- *
- * (C) Copyright 2007-2012
- * Allwinner Technology Co., Ltd. <www.allwinnertech.com>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
- */
-
+* (C) Copyright 2007-2012
+* Allwinner Technology Co., Ltd. <www.allwinnertech.com>
+* Neil Peng<penggang@allwinnertech.com>
+*
+* See file CREDITS for list of people who contributed to this
+* project.
+*
+* This program is free software; you can redistribute it and/or
+* modify it under the terms of the GNU General Public License as
+* published by the Free Software Foundation; either version 2 of
+* the License, or (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with this program; if not, write to the Free Software
+* Foundation, Inc., 59 Temple Place, Suite 330, Boston,
+* MA 02111-1307 USA
+*/
 #ifndef __NAND_LOGIC_H__
 #define __NAND_LOGIC_H__
 
 #include "nand_type.h"
 #include "nand_physic.h"
+#include "mbr.h"
 
 
 //==============================================================================
@@ -232,7 +234,7 @@ __s32 LML_FlushPageCache(void);
 *               < 0     read failed.
 ************************************************************************************************************************
 */
-__s32 LML_PageRead(__u32 nPage, __u32 nBitmap, void* pBuf);
+__s32 LML_PageRead(__u32 nPage, __u64 nBitmap, void* pBuf);
 
 
 /*
@@ -251,7 +253,7 @@ __s32 LML_PageRead(__u32 nPage, __u32 nBitmap, void* pBuf);
 *               < 0     write failed.
 ************************************************************************************************************************
 */
-__s32 LML_PageWrite(__u32 nPage, __u32 nBitmap, void* pBuf);
+__s32 LML_PageWrite(__u32 nPage, __u64 nBitmap, void* pBuf);
 
 
 /*
@@ -559,6 +561,7 @@ __s32 LML_VirtualPageWrite( struct __PhysicOpPara_t *pVirtualPage);
 __s32 LML_VirtualPageRead(struct __PhysicOpPara_t *pVirtualPage);
 
 __s32 NAND_CacheFlush(void);
+__s32 NAND_CacheFlushDev(__u32 dev_num);
 __s32 NAND_CacheRead(__u32 blk, __u32 nblk, void *buf);
 __s32 NAND_CacheWrite(__u32 blk, __u32 nblk, void *buf);
 __s32 NAND_CacheOpen(void);
@@ -567,6 +570,7 @@ __s32 NAND_CacheClose(void);
 
 // 2010-12-04 modified
 __u32 NAND_GetDiskSize(void);
+__s32 NAND_SetPartInfo(void *part_table);
 
 
 #endif  //ifndef __NAND_LOGIC_H__

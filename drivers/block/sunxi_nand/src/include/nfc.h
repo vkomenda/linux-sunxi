@@ -1,31 +1,33 @@
 /*
- * drivers/block/sunxi_nand/nfc/nfc.h
- *
- * (C) Copyright 2007-2012
- * Allwinner Technology Co., Ltd. <www.allwinnertech.com>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
- */
-
+* (C) Copyright 2007-2012
+* Allwinner Technology Co., Ltd. <www.allwinnertech.com>
+* Neil Peng<penggang@allwinnertech.com>
+*
+* See file CREDITS for list of people who contributed to this
+* project.
+*
+* This program is free software; you can redistribute it and/or
+* modify it under the terms of the GNU General Public License as
+* published by the Free Software Foundation; either version 2 of
+* the License, or (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with this program; if not, write to the Free Software
+* Foundation, Inc., 59 Temple Place, Suite 330, Boston,
+* MA 02111-1307 USA
+*/
 #ifndef _NFC_H_
-#define _NFC_H_
+#define _NFC_H_                   
 
-#include <mach/platform.h>
-
-#define NAND_IO_BASE		SW_VA_NANDFLASHC_IO_BASE
+#include "nand_drv_cfg.h" 
+                                       
+extern __u32 nand_io_base;                    
+#define NAND_IO_BASE    (nand_io_base)
 #define __NFC_REG(x)    (*(volatile unsigned int   *)(NAND_IO_BASE + x))
 /*
 *********************************************************************************************************
@@ -53,7 +55,7 @@
 #define NFC_REG_o_ECC_CNT1         0x0044
 #define NFC_REG_o_ECC_CNT2         0x0048
 #define NFC_REG_o_ECC_CNT3         0x004c
-#define NFC_REG_o_USER_DATA_BASE   0x0050
+#define NFC_REG_o_USER_DATA_BASE   0x0050    
 #define NFC_REG_o_SPARE_AREA       0x00A0
 #define NFC_o_RAM0_BASE            0x0400
 #define NFC_o_RAM1_BASE            0x0800
@@ -86,7 +88,7 @@
 /*define bit use in NFC_CTL*/
 #define NFC_EN					(1 << 0)
 #define NFC_RESET				(1 << 1)
-#define NFC_BUS_WIDTH			(1 << 2)
+#define NFC_BUS_WIDYH			(1 << 2)
 #define NFC_RB_SEL				(1 << 3)
 #define NFC_CE_SEL				(7 << 24)
 #define NFC_CE_CTL				(1 << 6)
@@ -115,75 +117,75 @@
 
 
 /*define bit use in NFC_CMD*/
-#define NFC_CMD_LOW_BYTE        (0xff << 0)
-#define NFC_CMD_HIGH_BYTE       (0xff << 8)
-#define NFC_ADR_NUM             (0x7 << 16)
-#define NFC_SEND_ADR            (1 << 19)
-#define NFC_ACCESS_DIR          (1 << 20)
-#define NFC_DATA_TRANS          (1 << 21)
-#define NFC_SEND_CMD1           (1 << 22)
-#define NFC_WAIT_FLAG           (1 << 23)
-#define NFC_SEND_CMD2           (1 << 24)
-#define NFC_SEQ                 (1 << 25)
-#define NFC_DATA_SWAP_METHOD    (1 << 26)
-#define NFC_ROW_AUTO_INC        (1 << 27)
+#define NFC_CMD_LOW_BYTE		(0xff << 0)
+#define NFC_CMD_HIGH_BYTE		(0xff << 8)
+#define NFC_ADR_NUM				(0x7 << 16)
+#define NFC_SEND_ADR			(1 << 19)
+#define NFC_ACCESS_DIR			(1 << 20)
+#define NFC_DATA_TRANS			(1 << 21)
+#define NFC_SEND_CMD1			(1 << 22)
+#define NFC_WAIT_FLAG			(1 << 23)
+#define NFC_SEND_CMD2			(1 << 24)
+#define NFC_SEQ					(1 << 25)
+#define NFC_DATA_SWAP_METHOD	(1 << 26)
+#define NFC_ROW_AUTO_INC		(1 << 27)
 #define NFC_SEND_CMD3           (1 << 28)
 #define NFC_SEND_CMD4           (1 << 29)
-#define NFC_CMD_TYPE            (3 << 30)
+#define NFC_CMD_TYPE			(3 << 30)
 
 /* define bit use in NFC_RCMD_SET*/
-#define NFC_READ_CMD            (0xff<< 0)
-#define NFC_RANDOM_READ_CMD0    (0xff << 8)
-#define NFC_RANDOM_READ_CMD1    (0xff << 16)
+#define NFC_READ_CMD			(0xff<< 0)
+#define NFC_RANDOM_READ_CMD0 	(0xff << 8)
+#define NFC_RANDOM_READ_CMD1 	(0xff << 16)
 
 /*define bit use in NFC_WCMD_SET*/
-#define NFC_PROGRAM_CMD		(0xff << 0)
+#define NFC_PROGRAM_CMD			(0xff << 0)
 #define NFC_RANDOM_WRITE_CMD	(0xff << 8)
-#define NFC_READ_CMD0		(0xff << 16)
+#define NFC_READ_CMD0			(0xff << 16)
 #define NFC_READ_CMD1	        (0xff << 24)
 
 /*define bit use in NFC_ECC_CTL*/
-#define NFC_ECC_EN              (1 << 0)
-#define NFC_ECC_PIPELINE        (1 << 3)
+#define NFC_ECC_EN				(1 << 0)
+#define NFC_ECC_PIPELINE		(1 << 3)
 #define NFC_ECC_EXCEPTION       (1 << 4)
-#define NFC_ECC_BLOCK_SIZE      (1 << 5)
+#define NFC_ECC_BLOCK_SIZE		(1 << 5)
 #define NFC_RANDOM_EN           (1 << 9 )
 #define NFC_RANDOM_DIRECTION    (1 << 10 )
-#define NFC_ECC_MODE            (0xf << 12)
-//#define NFC_RANDOM_SEED         (0x7fff << 16)
+#define NFC_ECC_MODE			(0xf << 12)
+#define NFC_RANDOM_SEED         (0x7fff << 16))
 
-#define NFC_IRQ_MAJOR           13
+#define NFC_IRQ_MAJOR		    13
 /*cmd flag bit*/
-#define NFC_PAGE_MODE           1
-#define NFC_NORMAL_MODE         0
+#define NFC_PAGE_MODE  			0x1
+#define NFC_NORMAL_MODE  		0x0
 
-#define NFC_DATA_FETCH 		1
-#define NFC_NO_DATA_FETCH 	0
-#define NFC_MAIN_DATA_FETCH 	1
-#define NFC_SPARE_DATA_FETCH	0
-#define NFC_WAIT_RB		1
-#define NFC_NO_WAIT_RB		0
-#define NFC_IGNORE		0
+#define NFC_DATA_FETCH 			0x1
+#define NFC_NO_DATA_FETCH 		0x0
+#define NFC_MAIN_DATA_FETCH 	0x1
+#define NFC_SPARE_DATA_FETCH	0X0
+#define NFC_WAIT_RB				0x1
+#define NFC_NO_WAIT_RB			0x0
+#define NFC_IGNORE				0x0
 
-#define NFC_INT_RB		0
-#define NFC_INT_CMD		1
-#define NFC_INT_DMA		2
-#define NFC_INT_BATCh		5
+#define NFC_INT_RB				0
+#define NFC_INT_CMD				1
+#define NFC_INT_DMA				2
+#define NFC_INT_BATCh			5
 
 typedef struct cmd_list{
 	struct	cmd_list *next;
-	__u8	*addr;
-	__u8	addr_cycle;
+	__u8	*addr;	
+	__u8	addr_cycle;	
 	__u8	data_fetch_flag;
 	__u8	main_data_fetch;
-	__u8	wait_rb_flag;
+	__u8	wait_rb_flag;	
 	__u32 	bytecnt;
-	__u32	value;
+	__u32	value;	
 }NFC_CMD_LIST;
 
-typedef struct NFC_init_info{
+typedef struct NFC_init_info{   
 	__u8	bus_width;// bus width 8 bit
-	__u8	rb_sel; // ready busy
+	__u8	rb_sel; // ready busy 
 	__u8	ce_ctl; // chip select
 	__u8	ce_ctl1;
 	__u8	pagesize; // 1024 ,2048 ,
@@ -194,9 +196,9 @@ typedef struct NFC_init_info{
 
 __s32 NFC_ReadRetryInit(__u32 read_retry_type);
 __s32 NFC_ReadRetryExit(__u32 read_retry_type);
-__s32 NFC_ReadRetry_off(__u32 chip); //sandisk readretry exit
-__s32 NFC_GetHynixOTPParam(__u32 chip, __u8 *default_value, __u32 read_retry_type);
-__s32 NFC_SetDefaultParam(__u32 chip, __u8 *default_value, __u32 read_retry_type);
+__s32 NFC_GetDefaultParam(__u32 chip, __u8 *defautl_value, __u32 read_retry_type);
+void NFC_GetOTPValue(__u32 chip, __u8* otp_value, __u32 read_retry_type);
+__s32 NFC_SetDefaultParam(__u32 chip, __u8 *defautl_value, __u32 read_retry_type);
 __s32 NFC_ReadRetry(__u32 chip, __u32 retry_count, __u32 read_retry_type);
 __s32 NFC_LSBEnable(__u32 chip, __u32 read_retry_type);
 __s32 NFC_LSBDisable(__u32 chip, __u32 read_retry_type);
@@ -228,9 +230,35 @@ __s32 NFC_CheckRbReady(__u32 rb);
 __s32 NFC_ChangMode(NFC_INIT_INFO * nand_info);
 __s32 NFC_SetEccMode(__u8 ecc_mode);
 __s32 NFC_ResetChip(NFC_CMD_LIST * reset_cmd);
+__s32 NFC_ReadRetry_off(__u32 chip); //sandisk readretry exit
 __u32 NFC_QueryINT(void);
 void NFC_EnableInt(__u8 minor_int);
 void NFC_DisableInt(__u8 minor_int);
 void NFC_InitDDRParam(__u32 chip, __u32 param);
+
+#define NFC_READ_REG(reg)   		(reg)
+#define NFC_WRITE_REG(reg,data) 	(reg) = (data)
+
+#define ERR_ECC 	12
+#define ECC_LIMIT 	10
+#define ERR_TIMEOUT 14
+#define READ_RETRY_MAX_TYPE_NUM 5
+#define READ_RETRY_MAX_REG_NUM	16
+#define READ_RETRY_MAX_CYCLE	20
+#define LSB_MODE_MAX_REG_NUM	8
+
+/* define various unit data input or output*/
+#define NFC_READ_RAM_B(ram)    		(*((volatile __u8 *)(NAND_IO_BASE + ram)))
+#define NFC_WRITE_RAM_B(ram,data)  	(*((volatile __u8 *)(NAND_IO_BASE + ram)) = (data))
+#define NFC_READ_RAM_HW(ram)   		(*((volatile __u16 *)(NAND_IO_BASE + ram)))
+#define NFC_WRITE_RAM_HW(ram,data) 	(*((volatile __u16 *)(NAND_IO_BASE + ram)) = (data))
+#define NFC_READ_RAM_W(ram)   		(*((volatile __u32 *)(NAND_IO_BASE + ram)))
+#define NFC_WRITE_RAM_W(ram,data) 	(*((volatile __u32 *)(NAND_IO_BASE + ram)) = (data))
+
+#ifdef USE_PHYSICAL_ADDRESS
+#define NFC_IS_SDRAM(addr)			((addr >= DRAM_BASE)?1:0)
+#else
+#define NFC_IS_SDRAM(addr)			( ((addr >= DRAM_BASE))&&(addr < SRAM_BASE)?1:0)
+#endif
 
 #endif    // #ifndef _NFC_H_

@@ -1,25 +1,26 @@
 /*
- * drivers/block/sunxi_nand/src/include/nand_scan.h
- *
- * (C) Copyright 2007-2012
- * Allwinner Technology Co., Ltd. <www.allwinnertech.com>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
- */
-
+* (C) Copyright 2007-2012
+* Allwinner Technology Co., Ltd. <www.allwinnertech.com>
+* Neil Peng<penggang@allwinnertech.com>
+*
+* See file CREDITS for list of people who contributed to this
+* project.
+*
+* This program is free software; you can redistribute it and/or
+* modify it under the terms of the GNU General Public License as
+* published by the Free Software Foundation; either version 2 of
+* the License, or (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with this program; if not, write to the Free Software
+* Foundation, Inc., 59 Temple Place, Suite 330, Boston,
+* MA 02111-1307 USA
+*/
 #ifndef __NAND_SCAN_H__
 #define __NAND_SCAN_H__
 
@@ -39,6 +40,7 @@
 #define SPANSION_NAND           0x01                //spansion nand flash manufacture number
 #define POWER_NAND              0x92                //power nand flash manufacture number
 #define SANDISK                 0x45                //sandisk nand flash manufacture number
+
 
 //==============================================================================
 //  define the function __s32erface for nand storage scan module
@@ -60,5 +62,11 @@
 */
 __s32  SCN_AnalyzeNandSystem(void);
 
+__u32 NAND_GetValidBlkRatio(void);
+__s32 NAND_SetValidBlkRatio(__u32 ValidBlkRatio);
+__u32 NAND_GetFrequencePar(void);
+__s32 NAND_SetFrequencePar(__u32 FrequencePar);
+__u32 NAND_GetNandVersion(void);
+__s32 NAND_GetParam(boot_nand_para_t * nand_param);
 
 #endif  //ifndef __NAND_SCAN_H__

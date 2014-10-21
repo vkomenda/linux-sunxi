@@ -1,58 +1,58 @@
 /*
- * drivers/block/sunxi_nand/src/logic/mapping.c
- *
- * (C) Copyright 2007-2012
- * Allwinner Technology Co., Ltd. <www.allwinnertech.com>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
- */
-
-#include "linux/errno.h"
-
+* (C) Copyright 2007-2012
+* Allwinner Technology Co., Ltd. <www.allwinnertech.com>
+* Neil Peng<penggang@allwinnertech.com>
+*
+* See file CREDITS for list of people who contributed to this
+* project.
+*
+* This program is free software; you can redistribute it and/or
+* modify it under the terms of the GNU General Public License as
+* published by the Free Software Foundation; either version 2 of
+* the License, or (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with this program; if not, write to the Free Software
+* Foundation, Inc., 59 Temple Place, Suite 330, Boston,
+* MA 02111-1307 USA
+*/
 #include "../include/nand_logic.h"
 
 extern struct __NandDriverGlobal_t     NandDriverInfo;
+extern __u32 DieCntOfNand;
 
-struct __BlkMapTblCachePool_t BlkMapTblCachePool;
-struct __PageMapTblCachePool_t PageMapTblCachePool;
+struct __BlkMapTblCachePool_t BlkMapTblCachePool={0};
+struct __PageMapTblCachePool_t PageMapTblCachePool={0};
 
 void dump(void *buf, __u32 len , __u8 nbyte,__u8 linelen)
 {
 	__u32 i;
 	__u32 tmplen = len/nbyte;
-
-//	PRINT("/********************************************/\n");
-
+		
+	PRINT("/********************************************/\n");
+	
 	for (i = 0; i < tmplen; i++)
 	{
 		if (nbyte == 1)
-			PRINT("%.2x ",((__u8 *)buf)[i]);
+			PRINT("%x  ",((__u8 *)buf)[i]);
 		else if (nbyte == 2)
-			PRINT("%.4x ",((__u16 *)buf)[i]);
+			PRINT("%x  ",((__u16 *)buf)[i]);
 		else if (nbyte == 4)
-			PRINT("%.8x ",((__u32 *)buf)[i]);
+			PRINT("%x  ",((__u32 *)buf)[i]);
 		else
 			break;
-
+			
 		if(i%linelen == (linelen - 1))
 			PRINT("\n");
 	}
 
 	return;
-
+	
 }
 
 /*
@@ -71,8 +71,6 @@ static __u32 _GetTblCheckSum(__u32 *pTblBuf, __u32 nLength)
 {
     __u32   i;
     __u32   tmpCheckSum = 0;
-
-    CAPTION;
 
     for(i= 0; i<nLength; i++)
     {
@@ -100,8 +98,6 @@ __s32 PMM_InitMapTblCache(void)
 {
     __u32   i;
 
-    CAPTION;
-
     PAGE_MAP_CACHE_POOL = &PageMapTblCachePool;
 
     for(i = 0; i<PAGE_MAP_TBL_CACHE_CNT; i++)
@@ -118,7 +114,7 @@ __s32 PMM_InitMapTblCache(void)
         }
     }
 
-    return 0;
+    return NAND_OP_TRUE;
 }
 
 
@@ -136,8 +132,6 @@ __s32 PMM_InitMapTblCache(void)
 static void _CalPageTblAccessCount(void)
 {
     __u32   i;
-
-    CAPTION;
 
     for(i=0; i<PAGE_MAP_TBL_CACHE_CNT; i++)
     {
@@ -165,14 +159,12 @@ __s32 PMM_ExitMapTblCache(void)
 {
     __u32   i;
 
-    CAPTION;
-
     for (i = 0; i<PAGE_MAP_TBL_CACHE_CNT; i++)
     {
         FREE(PAGE_MAP_CACHE_POOL->PageMapTblCachePool[i].PageMapTbl,PAGE_CNT_OF_SUPER_BLK * sizeof(struct __PageMapTblItem_t));
     }
 
-    return 0;
+    return NAND_OP_TRUE;
 }
 
 
@@ -181,8 +173,6 @@ static __s32 _page_map_tbl_cache_hit(__u32 nLogBlkPst)
 {
     __u32 i;
 
-    CAPTION;
-
     for(i=0; i<PAGE_MAP_TBL_CACHE_CNT; i++)
     {
         if((PAGE_MAP_CACHE_POOL->PageMapTblCachePool[i].ZoneNum == CUR_MAP_ZONE)\
@@ -190,11 +180,11 @@ static __s32 _page_map_tbl_cache_hit(__u32 nLogBlkPst)
         {
 
             PAGE_MAP_CACHE = &(PAGE_MAP_CACHE_POOL->PageMapTblCachePool[i]);
-            return 0;
+            return NAND_OP_TRUE;
         }
     }
 
-    return -1;
+    return NAND_OP_FALSE;
 
 }
 
@@ -203,8 +193,6 @@ static __u32 _find_page_tbl_post_location(void)
 {
     __u32   i, location = 0;
     __u16   access_cnt;
-
-    CAPTION;
 
     /*try to find clear cache*/
     for(i=0; i<PAGE_MAP_TBL_CACHE_CNT; i++)
@@ -241,7 +229,6 @@ static __s32 _write_back_page_map_tbl(__u32 nLogBlkPst)
     struct  __PhysicOpPara_t  param;
     struct  __SuperPhyBlkType_t BadBlk,NewBlk;
 
-    DBG("logic block position %x", nLogBlkPst);
 
     /*check page poisition, merge if no free page*/
     TablePage = LOG_BLK_TBL[nLogBlkPst].LastUsedPage + 1;
@@ -250,7 +237,7 @@ static __s32 _write_back_page_map_tbl(__u32 nLogBlkPst)
         /*block id full,need merge*/
         if (LML_MergeLogBlk(SPECIAL_MERGE_MODE,LOG_BLK_TBL[nLogBlkPst].LogicBlkNum)){
             MAPPING_ERR("write back page tbl : merge err\n");
-            return -1;
+            return NAND_OP_FALSE;
         }
 
         if (PAGE_MAP_CACHE->ZoneNum != 0xff){
@@ -259,12 +246,13 @@ static __s32 _write_back_page_map_tbl(__u32 nLogBlkPst)
             TableBlk = LOG_BLK_TBL[nLogBlkPst].PhyBlk.PhyBlkNum;
         }
         else
-            return 0;
+            return NAND_OP_TRUE;
     }
 
 rewrite:
+//PRINT("-------------------write back page tbl for blk %x\n",TableBlk);
     /*write page map table*/
-    MEMSET(UserData, 0xff, sizeof(struct __NandUserData_t) * 2);
+    MEMSET((void *)&UserData,0xff,sizeof(struct __NandUserData_t) * 2);
     UserData[0].PageStatus = 0xaa;
     MEMSET(LML_PROCESS_TBL_BUF,0xff,SECTOR_CNT_OF_SUPER_PAGE * SECTOR_SIZE);
 
@@ -274,30 +262,30 @@ rewrite:
 
 		for(page = 0; page < PAGE_CNT_OF_SUPER_BLK; page++)
 			*((__u16 *)LML_PROCESS_TBL_BUF + page) = PAGE_MAP_TBL[page].PhyPageNum;
-
+		
 		((__u32 *)LML_PROCESS_TBL_BUF)[511] = \
         	_GetTblCheckSum((__u32 *)LML_PROCESS_TBL_BUF, PAGE_CNT_OF_SUPER_BLK*2/(sizeof (__u32)));
 	}
-
+	
 	else
-	{
+	{   
 		MEMCPY(LML_PROCESS_TBL_BUF, PAGE_MAP_TBL,PAGE_CNT_OF_SUPER_BLK*sizeof(struct __PageMapTblItem_t));
     	((__u32 *)LML_PROCESS_TBL_BUF)[511] = \
         	_GetTblCheckSum((__u32 *)LML_PROCESS_TBL_BUF, PAGE_CNT_OF_SUPER_BLK*sizeof(struct __PageMapTblItem_t)/(sizeof (__u32)));
 	}
-
+	
     param.MDataPtr = LML_PROCESS_TBL_BUF;
-    param.SDataPtr = (void *)UserData;
+    param.SDataPtr = (void *)&UserData;
     param.SectBitmap = FULL_BITMAP_OF_SUPER_PAGE;
-
+		 
 //rewrite:
     LML_CalculatePhyOpPar(&param, CUR_MAP_ZONE, TableBlk, TablePage);
     LML_VirtualPageWrite(&param);
-    if (0 != PHY_SynchBank(param.BankNum, SYNC_CHIP_MODE)){
+    if (NAND_OP_TRUE != PHY_SynchBank(param.BankNum, SYNC_CHIP_MODE)){
         BadBlk.PhyBlkNum = TableBlk;
-        if (0 != LML_BadBlkManage(&BadBlk,CUR_MAP_ZONE,TablePage,&NewBlk)){
+        if (NAND_OP_TRUE != LML_BadBlkManage(&BadBlk,CUR_MAP_ZONE,TablePage,&NewBlk)){
             MAPPING_ERR("write page map table : bad block mange err after write\n");
-            return -1;
+            return NAND_OP_FALSE;
         }
         TableBlk = NewBlk.PhyBlkNum;
         LOG_BLK_TBL[nLogBlkPst].PhyBlk = NewBlk;
@@ -308,7 +296,7 @@ rewrite:
     PAGE_MAP_CACHE->ZoneNum = 0xff;
     PAGE_MAP_CACHE->LogBlkPst = 0xff;
 
-    return 0;
+    return NAND_OP_TRUE;
 
 }
 
@@ -322,23 +310,21 @@ static __s32 _rebuild_page_map_tbl(__u32 nLogBlkPst)
     struct  __NandUserData_t  UserData[2];
     struct  __PhysicOpPara_t  param;
 
-    DBG("logic block position %x", nLogBlkPst);
-
     MEMSET(PAGE_MAP_TBL,0xff, PAGE_CNT_OF_SUPER_BLK*sizeof(struct __PageMapTblItem_t));
     TableBlk = LOG_BLK_TBL[nLogBlkPst].PhyBlk.PhyBlkNum;
 
     param.MDataPtr = LML_PROCESS_TBL_BUF;
-    param.SDataPtr = (void *)UserData;
+    param.SDataPtr = (void *)&UserData;
     param.SectBitmap = 0x3;
 
 	//PRINT("-----------------------rebuild page table for blk %x\n",TableBlk);
-
+	
     for(TablePage = 0; TablePage < PAGE_CNT_OF_SUPER_BLK; TablePage++){
         LML_CalculatePhyOpPar(&param, CUR_MAP_ZONE, TableBlk, TablePage);
         ret = LML_VirtualPageRead(&param);
         if (ret < 0){
             MAPPING_ERR("rebuild logic block %x page map table : read err\n",LOG_BLK_TBL[nLogBlkPst].LogicBlkNum);
-            return -1;
+            return NAND_OP_FALSE;
         }
 
         //status = UserData[0].PageStatus;
@@ -354,7 +340,7 @@ static __s32 _rebuild_page_map_tbl(__u32 nLogBlkPst)
     PAGE_MAP_CACHE->DirtyFlag = 1;
 	BMM_SetDirtyFlag();
 
-	return 0;
+	return NAND_OP_TRUE;
 }
 
 static __s32 _read_page_map_tbl(__u32 nLogBlkPst)
@@ -367,7 +353,6 @@ static __s32 _read_page_map_tbl(__u32 nLogBlkPst)
     struct  __NandUserData_t  UserData[2];
     struct  __PhysicOpPara_t  param;
 
-    DBG("logic block position %x", nLogBlkPst);
 
     /*check page poisition, merge if no free page*/
     TablePage = LOG_BLK_TBL[nLogBlkPst].LastUsedPage;
@@ -376,19 +361,19 @@ static __s32 _read_page_map_tbl(__u32 nLogBlkPst)
     if (TablePage == 0xffff){
         /*log block is empty*/
         MEMSET(PAGE_MAP_TBL, 0xff,PAGE_CNT_OF_SUPER_BLK*sizeof(struct __PageMapTblItem_t) );
-        return 0;
+        return NAND_OP_TRUE;
     }
 
     /*read page map table*/
     param.MDataPtr = LML_PROCESS_TBL_BUF;
-    param.SDataPtr = (void *)UserData;
+    param.SDataPtr = (void *)&UserData;
     param.SectBitmap = 0xf;
 
     LML_CalculatePhyOpPar(&param, CUR_MAP_ZONE, TableBlk, TablePage);
     ret = LML_VirtualPageRead(&param);
 
 	if(PAGE_CNT_OF_SUPER_BLK >= 512)
-	{
+	{	
 		checksum = _GetTblCheckSum((__u32 *)LML_PROCESS_TBL_BUF,  \
                 	PAGE_CNT_OF_SUPER_BLK*2/sizeof(__u32));
 	}
@@ -397,16 +382,16 @@ static __s32 _read_page_map_tbl(__u32 nLogBlkPst)
 		checksum = _GetTblCheckSum((__u32 *)LML_PROCESS_TBL_BUF,  \
                 	PAGE_CNT_OF_SUPER_BLK*sizeof(struct __PageMapTblItem_t)/sizeof(__u32));
 	}
-
+	
     status = UserData[0].PageStatus;
     logicpagenum = UserData[0].LogicPageNum;
 
     if((ret < 0) || (status != 0xaa) || (logicpagenum != 0xffff) || (checksum != ((__u32 *)LML_PROCESS_TBL_BUF)[511]))
     {
-        if(0 != _rebuild_page_map_tbl(nLogBlkPst))
+        if(NAND_OP_TRUE != _rebuild_page_map_tbl(nLogBlkPst))
         {
             MAPPING_ERR("rebuild page map table err\n");
-            return -1;
+            return NAND_OP_FALSE;
         }
     }
     else
@@ -418,26 +403,25 @@ static __s32 _read_page_map_tbl(__u32 nLogBlkPst)
 			for(page = 0; page < PAGE_CNT_OF_SUPER_BLK; page++)
 				PAGE_MAP_TBL[page].PhyPageNum = *((__u16 *)LML_PROCESS_TBL_BUF + page);
 		}
-		else
+		else	
         	MEMCPY(PAGE_MAP_TBL,LML_PROCESS_TBL_BUF, PAGE_CNT_OF_SUPER_BLK*sizeof(struct __PageMapTblItem_t));
     }
 
-    return 0;
+    return NAND_OP_TRUE;
 }
 
 
 /*post current zone map table in cache*/
 static __s32 _page_map_tbl_cache_post(__u32 nLogBlkPst)
 {
-    __u8 loc;
+    __u8 poisition;
     __u8 i;
+
     struct __BlkMapTblCache_t *TmpBmt = BLK_MAP_CACHE;
 
-    DBG("logic block position %x", nLogBlkPst);
-
     /*find the cache to be post*/
-    loc = _find_page_tbl_post_location();
-    PAGE_MAP_CACHE = &(PAGE_MAP_CACHE_POOL->PageMapTblCachePool[loc]);
+    poisition = _find_page_tbl_post_location();
+    PAGE_MAP_CACHE = &(PAGE_MAP_CACHE_POOL->PageMapTblCachePool[poisition]);
 
     if (PAGE_MAP_CACHE->DirtyFlag && (PAGE_MAP_CACHE->ZoneNum != 0xff)){
     /*write back page  map table*/
@@ -452,16 +436,16 @@ static __s32 _page_map_tbl_cache_post(__u32 nLogBlkPst)
 
             if (i == BLOCK_MAP_TBL_CACHE_CNT){
                 MAPPING_ERR("_page_map_tbl_cache_post : position %d ,page map zone %d,blk map zone %d\n",
-			    loc,PAGE_MAP_CACHE->ZoneNum,BLK_MAP_CACHE->ZoneNum);
-                return -1;
+							poisition,PAGE_MAP_CACHE->ZoneNum,BLK_MAP_CACHE->ZoneNum);
+                return NAND_OP_FALSE;
             }
 
         }
         /* write back new table in flash if dirty*/
 		BMM_SetDirtyFlag();
-        if (0 != _write_back_page_map_tbl(PAGE_MAP_CACHE->LogBlkPst)){
+        if (NAND_OP_TRUE != _write_back_page_map_tbl(PAGE_MAP_CACHE->LogBlkPst)){
             MAPPING_ERR("write back page tbl err\n");
-            return -1;
+            return NAND_OP_FALSE;
         }
 
         BLK_MAP_CACHE = TmpBmt;
@@ -471,15 +455,15 @@ static __s32 _page_map_tbl_cache_post(__u32 nLogBlkPst)
     PAGE_MAP_CACHE->DirtyFlag = 0;
 
     /*fetch current page map table*/
-    if (0 != _read_page_map_tbl(nLogBlkPst)){
+    if (NAND_OP_TRUE != _read_page_map_tbl(nLogBlkPst)){
         MAPPING_ERR("read page map tbl err\n");
-        return -1;
+        return NAND_OP_FALSE;
     }
 
     PAGE_MAP_CACHE->ZoneNum = CUR_MAP_ZONE;
     PAGE_MAP_CACHE->LogBlkPst = nLogBlkPst;
 
-    return 0;
+    return NAND_OP_TRUE;
 }
 
 /*
@@ -497,11 +481,8 @@ static __s32 _page_map_tbl_cache_post(__u32 nLogBlkPst)
 */
 __s32 PMM_SwitchMapTbl(__u32 nLogBlkPst)
 {
-    __s32   result = 0;
-
-    DBG("logic block position %x", nLogBlkPst);
-
-    if (0 !=_page_map_tbl_cache_hit(nLogBlkPst))
+    __s32   result = NAND_OP_TRUE;
+    if (NAND_OP_TRUE !=_page_map_tbl_cache_hit(nLogBlkPst))
     {
         result = (_page_map_tbl_cache_post(nLogBlkPst));
     }
@@ -528,8 +509,6 @@ __s32 PMM_SwitchMapTbl(__u32 nLogBlkPst)
 __s32 BMM_InitMapTblCache(void)
 {
     __u32 i;
-
-    CAPTION;
 
     BLK_MAP_CACHE_POOL = &BlkMapTblCachePool;
 
@@ -571,7 +550,7 @@ __s32 BMM_InitMapTblCache(void)
     /*init log block access time*/
     MEMSET(BLK_MAP_CACHE_POOL->LogBlkAccessAge, 0x0, MAX_LOG_BLK_CNT);
 
-    return 0;
+    return NAND_OP_TRUE;
 }
 
 
@@ -589,8 +568,6 @@ __s32 BMM_InitMapTblCache(void)
 static void _CalBlkTblAccessCount(void)
 {
     __u32   i;
-
-    CAPTION;
 
     for (i=0; i<BLOCK_MAP_TBL_CACHE_CNT; i++)
     {
@@ -618,8 +595,6 @@ __s32 BMM_ExitMapTblCache(void)
 {
     __u32 i;
 
-    CAPTION;
-
     for (i=0; i<BLOCK_MAP_TBL_CACHE_CNT; i++)
     {
 
@@ -627,7 +602,7 @@ __s32 BMM_ExitMapTblCache(void)
         FREE(BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i].LogBlkTbl,sizeof(struct __LogBlkType_t)*LOG_BLK_CNT_OF_ZONE);
     }
 
-    return 0;
+    return NAND_OP_TRUE;
 }
 
 /*the zone table in the cahce pool? cahce hit?*/
@@ -635,58 +610,52 @@ static __s32 _blk_map_tbl_cache_hit(__u32 nZone)
 {
     __u32 i;
 
-    CAPTION;
-
     for (i = 0; i < BLOCK_MAP_TBL_CACHE_CNT; i++){
         if (BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i].ZoneNum == nZone){
             BLK_MAP_CACHE = &(BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i]);
-            return 0;
+            return NAND_OP_TRUE;
         }
     }
 
-    return -1;
+    return NAND_OP_FALSE;
 
 }
 
 /*find post cache, clear cache or LRU cache */
 static __u32 _find_blk_tbl_post_location(void)
 {
-	__u32 i;
-	__u8 location;
-	__u16 access_cnt ;
+    __u32 i;
+    __u8 location;
+    __u16 access_cnt ;
+	
+    /*try to find clear cache*/
+    for (i = 0; i < BLOCK_MAP_TBL_CACHE_CNT; i++)
+    {
+        if (BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i].ZoneNum == 0xff)
+            return i;
+    }
+    /*try to find least used cache recently*/
+    location = 0;
+    access_cnt = BLK_MAP_CACHE_POOL->BlkMapTblCachePool[0].AccessCnt;
 
-	CAPTION;
+    for (i = 1; i < BLOCK_MAP_TBL_CACHE_CNT; i++){
+        if (access_cnt < BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i].AccessCnt){
+            location = i;
+            access_cnt = BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i].AccessCnt;
+        }
+    }
 
-	/*try to find clear cache*/
-	for (i = 0; i < BLOCK_MAP_TBL_CACHE_CNT; i++) {
-		if (BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i].ZoneNum == 0xff) {
-			DBG("block map cache is not initialised");
-			return i;
-		}
-	}
-	/*try to find least used cache recently*/
-	location = 0;
-	access_cnt = BLK_MAP_CACHE_POOL->BlkMapTblCachePool[0].AccessCnt;
+    /*clear access counter*/
+    for (i = 0; i < BLOCK_MAP_TBL_CACHE_CNT; i++)
+        BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i].AccessCnt = 0;
 
-	for (i = 1; i < BLOCK_MAP_TBL_CACHE_CNT; i++) {
-		if (access_cnt < BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i].AccessCnt) {
-			location = i;
-			access_cnt = BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i].AccessCnt;
-			DBG("cache %x location %x access count %x", i, location, access_cnt);
-		}
-	}
-	/*clear access counter*/
-	for (i = 0; i < BLOCK_MAP_TBL_CACHE_CNT; i++)
-		BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i].AccessCnt = 0;
+    return location;
 
-	return location;
 }
 
 static __s32 _write_back_all_page_map_tbl(__u8 nZone)
 {
     __u32 i;
-
-    CAPTION;
 
     for(i=0; i<PAGE_MAP_TBL_CACHE_CNT; i++)
     {
@@ -694,16 +663,16 @@ static __s32 _write_back_all_page_map_tbl(__u8 nZone)
             && (PAGE_MAP_CACHE_POOL->PageMapTblCachePool[i].DirtyFlag == 1))
         {
             PAGE_MAP_CACHE = &(PAGE_MAP_CACHE_POOL->PageMapTblCachePool[i]);
-            if (0 != _write_back_page_map_tbl(PAGE_MAP_CACHE->LogBlkPst))
+            if (NAND_OP_TRUE != _write_back_page_map_tbl(PAGE_MAP_CACHE->LogBlkPst))
             {
                 MAPPING_ERR("write back all page tbl : write page map table err \n");
-                return -1;
+                return NAND_OP_FALSE;
             }
             PAGE_MAP_CACHE->DirtyFlag = 0;
         }
     }
 
-    return 0;
+    return NAND_OP_TRUE;
 }
 
 
@@ -713,31 +682,14 @@ static __s32 _write_back_block_map_tbl(__u8 nZone)
 {
     __s32 TablePage;
     __u32 TableBlk;
-    struct __NandUserData_t UserData[2];
-    struct __PhysicOpPara_t param;
+    struct  __NandUserData_t  UserData[2];
+    struct  __PhysicOpPara_t  param;
     struct __SuperPhyBlkType_t BadBlk,NewBlk;
-
-    DBG("zone %x", nZone);
-
-    if (!BLK_MAP_CACHE ||
-	!DATA_BLK_TBL ||
-	!LML_PROCESS_TBL_BUF ||
-	!LOG_BLK_TBL) {
-	    pr_err("%s ERROR: NULL pointer in %lx %lx %lx %lx\n", __FUNCTION__,
-		   BLK_MAP_CACHE, DATA_BLK_TBL, LML_PROCESS_TBL_BUF, LOG_BLK_TBL);
-	    return -EFAULT;
-    }
-    else if (nZone > MAX_ZONE_CNT - 1) {
-	    pr_err("%s ERROR: invalid zone %d\n", __FUNCTION__, nZone);
-	    return -EINVAL;
-    }
-    else
-	    pr_info("%s precondition OK\n", __FUNCTION__);
-
+	
     /*write back all page map table within this zone*/
-    if (0 != _write_back_all_page_map_tbl(nZone)){
+    if (NAND_OP_TRUE != _write_back_all_page_map_tbl(nZone)){
         MAPPING_ERR("write back all page map tbl err\n");
-        return -1;
+        return NAND_OP_FALSE;
     }
 
     /*set table block number and table page number*/
@@ -745,14 +697,14 @@ static __s32 _write_back_block_map_tbl(__u8 nZone)
     TablePage = NandDriverInfo.ZoneTblPstInfo[nZone].TablePst;
     if(TablePage >= PAGE_CNT_OF_SUPER_BLK - 4)
     {
-        if(0 != LML_VirtualBlkErase(nZone, TableBlk))
+        if(NAND_OP_TRUE != LML_VirtualBlkErase(nZone, TableBlk))
         {
             BadBlk.PhyBlkNum = TableBlk;
 
-            if(0 != LML_BadBlkManage(&BadBlk,CUR_MAP_ZONE,0,&NewBlk))
+            if(NAND_OP_TRUE != LML_BadBlkManage(&BadBlk,CUR_MAP_ZONE,0,&NewBlk))
             {
                 MAPPING_ERR("write back block tbl : bad block manage err erase data block\n");
-                return -1;
+                return NAND_OP_FALSE;
             }
 
             TableBlk = NewBlk.PhyBlkNum;
@@ -781,19 +733,19 @@ rewrite:
     param.MDataPtr = LML_PROCESS_TBL_BUF;
     param.SDataPtr = (void *)&UserData;
     param.SectBitmap = FULL_BITMAP_OF_SUPER_PAGE;
-    LML_CalculatePhyOpPar(&param, nZone, TableBlk, TablePage);
+    LML_CalculatePhyOpPar(&param, nZone, TableBlk, TablePage);    	
     LML_VirtualPageWrite(&param);
-    if (0 !=  PHY_SynchBank(param.BankNum, SYNC_CHIP_MODE)){
+    if (NAND_OP_TRUE !=  PHY_SynchBank(param.BankNum, SYNC_CHIP_MODE)){
         BadBlk.PhyBlkNum = TableBlk;
-        if (0 != LML_BadBlkManage(&BadBlk,nZone,0,&NewBlk)){
+        if (NAND_OP_TRUE != LML_BadBlkManage(&BadBlk,nZone,0,&NewBlk)){
             MAPPING_ERR("write blk map table : bad block mange err after write\n");
-            return -1;
+            return NAND_OP_FALSE;
         }
         TableBlk = NewBlk.PhyBlkNum;
         TablePage = 0;
         goto rewrite;
-    }
-
+    }     
+	
     MEMCPY(LML_PROCESS_TBL_BUF, &DATA_BLK_TBL[512], 2048);
     TablePage ++;
     param.MDataPtr = LML_PROCESS_TBL_BUF;
@@ -801,20 +753,20 @@ rewrite:
     UserData[0].PageStatus = 0x55;
     LML_CalculatePhyOpPar(&param, nZone, TableBlk, TablePage);
     LML_VirtualPageWrite(&param);
-    if(0 != PHY_SynchBank(param.BankNum, SYNC_CHIP_MODE))
+    if(NAND_OP_TRUE != PHY_SynchBank(param.BankNum, SYNC_CHIP_MODE))
     {
         BadBlk.PhyBlkNum = TableBlk;
-        if(0 != LML_BadBlkManage(&BadBlk,nZone,0,&NewBlk))
+        if(NAND_OP_TRUE != LML_BadBlkManage(&BadBlk,nZone,0,&NewBlk))
         {
             MAPPING_ERR("write blk map table : bad block mange err after write\n");
-            return -1;
+            return NAND_OP_FALSE;
         }
         TableBlk = NewBlk.PhyBlkNum;
         TablePage = 0;
         goto rewrite;
     }
-
-
+	
+	
     /*write back log block map table*/
     TablePage++;
     MEMSET(LML_PROCESS_TBL_BUF, 0xff, SECTOR_CNT_OF_SUPER_PAGE * SECTOR_SIZE);
@@ -824,13 +776,13 @@ rewrite:
         _GetTblCheckSum((__u32 *)LML_PROCESS_TBL_BUF, LOG_BLK_CNT_OF_ZONE*sizeof(struct __LogBlkType_t)/sizeof(__u32));
     LML_CalculatePhyOpPar(&param, nZone, TableBlk, TablePage);
     LML_VirtualPageWrite(&param);
-    if(0 !=  PHY_SynchBank(param.BankNum, SYNC_CHIP_MODE))
+    if(NAND_OP_TRUE !=  PHY_SynchBank(param.BankNum, SYNC_CHIP_MODE))
     {
         BadBlk.PhyBlkNum = TableBlk;
-        if(0 != LML_BadBlkManage(&BadBlk,nZone,0,&NewBlk))
+        if(NAND_OP_TRUE != LML_BadBlkManage(&BadBlk,nZone,0,&NewBlk))
         {
             MAPPING_ERR("write blk map table : bad block mange err after write\n");
-            return -1;
+            return NAND_OP_FALSE;
         }
         TableBlk = NewBlk.PhyBlkNum;
         TablePage = 0;
@@ -841,9 +793,7 @@ rewrite:
     NandDriverInfo.ZoneTblPstInfo[nZone].PhyBlkNum = TableBlk;
     NandDriverInfo.ZoneTblPstInfo[nZone].TablePst = TablePage - 2;
 
-    pr_info("%s in zone %d SUCCESS\n", __FUNCTION__, nZone);
-
-    return 0;
+    return NAND_OP_TRUE;
 }
 
 /* fetch block map table from flash */
@@ -853,24 +803,22 @@ static __s32 _read_block_map_tbl(__u8 nZone)
     __u32 TableBlk;
     struct  __PhysicOpPara_t  param;
 
-    DBG("zone %x", nZone);
-
     /*set table block number and table page number*/
     TableBlk = NandDriverInfo.ZoneTblPstInfo[nZone].PhyBlkNum;
     TablePage = NandDriverInfo.ZoneTblPstInfo[nZone].TablePst;
 
     /*read data block and free block map tbl*/
 
-    param.MDataPtr = LML_PROCESS_TBL_BUF;
+	param.MDataPtr = LML_PROCESS_TBL_BUF;
     param.SDataPtr = NULL;
     param.SectBitmap = 0xf;
     LML_CalculatePhyOpPar(&param, nZone, TableBlk, TablePage);
     if(LML_VirtualPageRead(&param) < 0)
     {
         MAPPING_ERR("_read_block_map_tbl :read block map table0 err\n");
-        return -1;
-    }
-
+        return NAND_OP_FALSE;
+    }	
+	
     MEMCPY(DATA_BLK_TBL,LML_PROCESS_TBL_BUF,2048);
 
     TablePage++;
@@ -879,16 +827,16 @@ static __s32 _read_block_map_tbl(__u8 nZone)
     if( LML_VirtualPageRead(&param) < 0)
     {
         MAPPING_ERR("_read_block_map_tbl : read block map table1 err\n");
-        return -1;
+        return NAND_OP_FALSE;
     }
-
+	
     MEMCPY(&DATA_BLK_TBL[512],LML_PROCESS_TBL_BUF,2048);
     if(((__u32 *)DATA_BLK_TBL)[1023] != \
         _GetTblCheckSum((__u32 *)DATA_BLK_TBL,(DATA_BLK_CNT_OF_ZONE+FREE_BLK_CNT_OF_ZONE)))
     {
     	MAPPING_ERR("_read_block_map_tbl : read data block map table checksum err\n");
-	dump((void*)DATA_BLK_TBL,1024*4,4,8);
-	return -1;
+		dump((void*)DATA_BLK_TBL,1024*4,4,8);
+		return NAND_OP_FALSE;
     }
 
     /*read log block table*/
@@ -897,53 +845,46 @@ static __s32 _read_block_map_tbl(__u8 nZone)
     LML_CalculatePhyOpPar(&param, nZone, TableBlk, TablePage);
     if ( LML_VirtualPageRead(&param) < 0){
         MAPPING_ERR("_read_block_map_tbl : read block map table2 err\n");
-        return -1;
+        return NAND_OP_FALSE;
     }
     if (((__u32 *)LML_PROCESS_TBL_BUF)[511] != \
         _GetTblCheckSum((__u32 *)LML_PROCESS_TBL_BUF, LOG_BLK_CNT_OF_ZONE*sizeof(struct __LogBlkType_t)/sizeof(__u32)))
     {
     	MAPPING_ERR("_read_block_map_tbl : read log block table checksum err\n");
 		dump((void*)LML_PROCESS_TBL_BUF,512*8,2,8);
-        return -1;
+        return NAND_OP_FALSE;
     }
     MEMCPY(LOG_BLK_TBL,LML_PROCESS_TBL_BUF,LOG_BLK_CNT_OF_ZONE*sizeof(struct __LogBlkType_t));
 
-    return 0;
+    return NAND_OP_TRUE;
 }
 
 /*post current zone map table in cache*/
 static __s32 _blk_map_tbl_cache_post(__u32 nZone)
 {
-	__u8 loc;
-	int status = 0;
+    __u8 poisition;
 
-	PRECONDITION(BLK_MAP_CACHE_POOL->BlkMapTblCachePool != NULL);
+    /*find the cache to be post*/
+    poisition = _find_blk_tbl_post_location();
+    BLK_MAP_CACHE = &(BLK_MAP_CACHE_POOL->BlkMapTblCachePool[poisition]);
 
-	/*find the cache to be post*/
-	loc = _find_blk_tbl_post_location();
+    /* write back new table in flash if dirty*/
+    if (BLK_MAP_CACHE->DirtyFlag){
+        if (NAND_OP_TRUE != _write_back_block_map_tbl(CUR_MAP_ZONE)){
+            MAPPING_ERR("_blk_map_tbl_cache_post : write back zone tbl err\n");
+            return NAND_OP_FALSE;
+        }
+    }
 
-	DBG("zone %x location %x", nZone, loc);
+    /*fetch current zone map table*/
+    if (NAND_OP_TRUE != _read_block_map_tbl(nZone)){
+        MAPPING_ERR("_blk_map_tbl_cache_post : read zone tbl err\n");
+            return NAND_OP_FALSE;
+    }
+    CUR_MAP_ZONE = nZone;
+    BLK_MAP_CACHE->DirtyFlag = 0;
 
-	BLK_MAP_CACHE = &BLK_MAP_CACHE_POOL->BlkMapTblCachePool[loc];
-
-	/* write back new table in flash if dirty*/
-	if (BLK_MAP_CACHE->DirtyFlag) {
-		DBG("the block map cache is dirty; writing it back...");
-		if ((status = _write_back_block_map_tbl(CUR_MAP_ZONE)) != 0) {
-			DBG("ERROR %d while writing back block map", status);
-			return status;
-		}
-	}
-
-	/*fetch current zone map table*/
-	if ((status = _read_block_map_tbl(nZone)) != 0) {
-		DBG("ERROR %d while reading block map", status);
-	}
-	else {
-		CUR_MAP_ZONE = nZone;
-		BLK_MAP_CACHE->DirtyFlag = 0;
-	}
-	return status;
+    return NAND_OP_TRUE;
 }
 
 /*
@@ -961,17 +902,17 @@ static __s32 _blk_map_tbl_cache_post(__u32 nZone)
 */
 __s32 BMM_SwitchMapTbl(__u32 nZone)
 {
-	__s32   result = 0;
+    __s32   result = NAND_OP_TRUE;
 
-	CAPTION;
+    if(NAND_OP_TRUE != _blk_map_tbl_cache_hit(nZone))
+    {	
+        MAPPING_DBG("BMM_SwitchMapTbl : post zone %d cache\n",nZone);
+		result = (_blk_map_tbl_cache_post(nZone));
+    }
 
-	if (_blk_map_tbl_cache_hit(nZone) != 0) {
-		MAPPING_DBG("BMM_SwitchMapTbl : post zone %d cache\n", nZone);
-		result = _blk_map_tbl_cache_post(nZone);
-	}
-	_CalBlkTblAccessCount();
+    _CalBlkTblAccessCount();
 
-	return result;
+    return result;
 }
 
 
@@ -990,46 +931,27 @@ __s32 BMM_SwitchMapTbl(__u32 nZone)
 */
 __s32 BMM_WriteBackAllMapTbl(void)
 {
-	__u8 i;
-	int ret = 0;
+     __u8 i;
 
-	/*save current scene*/
-	struct __BlkMapTblCache_t *TmpBmt = BLK_MAP_CACHE;
-	struct __PageMapTblCache_t *TmpPmt = PAGE_MAP_CACHE; // What is this for?
+        /*save current scene*/
+        struct __BlkMapTblCache_t *TmpBmt = BLK_MAP_CACHE;
+        struct __PageMapTblCache_t *TmpPmt = PAGE_MAP_CACHE;
 
-	if (!BLK_MAP_CACHE_POOL ||
-	    !BLK_MAP_CACHE_POOL->BlkMapTblCachePool) {
-		pr_err("%s ERROR: NULL pointer in %lx %lx\n", __FUNCTION__,
-		       BLK_MAP_CACHE_POOL,
-		       BLK_MAP_CACHE_POOL->BlkMapTblCachePool);
-		return -EFAULT;
-	}
-	else
-		pr_info("%s precondition OK\n", __FUNCTION__);
+        for (i = 0; i < BLOCK_MAP_TBL_CACHE_CNT; i++)
+        {
+            if (BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i].DirtyFlag){
+                   BLK_MAP_CACHE = &(BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i]);
+                   if (NAND_OP_TRUE != _write_back_block_map_tbl(CUR_MAP_ZONE))
+                        return NAND_OP_FALSE;
+                    BLK_MAP_CACHE->DirtyFlag = 0;
+            }
+       }
 
-	for (i = 0; i < BLOCK_MAP_TBL_CACHE_CNT; i++) {
-		if (BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i].DirtyFlag) {
-			BLK_MAP_CACHE = &(BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i]);
-			if ((ret = _write_back_block_map_tbl(CUR_MAP_ZONE)) != 0)
-				break;
-			BLK_MAP_CACHE->DirtyFlag = 0;
-		}
-	}
+        /*resore current scene*/
+        BLK_MAP_CACHE  = TmpBmt;
+        PAGE_MAP_CACHE = TmpPmt;
 
-	/*resore current scene*/
-	BLK_MAP_CACHE  = TmpBmt;
-	PAGE_MAP_CACHE = TmpPmt;
-
-	if (!ret) {
-		if (i == 0)
-			DBG("map table write omitted");
-		else
-			DBG("map table written OK");
-	}
-	else
-		DBG("map table write ERROR %d", ret);
-
-	return ret;
+        return NAND_OP_TRUE;
 }
 
 static __s32 _write_dirty_flag(__u8 nZone)
@@ -1038,8 +960,6 @@ static __s32 _write_dirty_flag(__u8 nZone)
     __u32 TableBlk;
     struct  __PhysicOpPara_t  param;
     struct  __NandUserData_t  UserData[2];
-
-    CAPTION;
 
     /*set table block number and table page number*/
     TableBlk = NandDriverInfo.ZoneTblPstInfo[nZone].PhyBlkNum;
@@ -1056,7 +976,7 @@ static __s32 _write_dirty_flag(__u8 nZone)
     LML_VirtualPageWrite(&param);
     PHY_SynchBank(param.BankNum, SYNC_CHIP_MODE);
 
-    return 0;
+    return NAND_OP_TRUE;
 
 }
 
@@ -1076,13 +996,14 @@ static __s32 _write_dirty_flag(__u8 nZone)
 */
 __s32 BMM_SetDirtyFlag(void)
 {
-	CAPTION;
+    if (0 == BLK_MAP_CACHE->DirtyFlag){
+       _write_dirty_flag(CUR_MAP_ZONE);
+       BLK_MAP_CACHE->DirtyFlag = 1;
+    }
 
-	if (BLK_MAP_CACHE_POOL &&
-	    BLK_MAP_CACHE &&
-	    !BLK_MAP_CACHE->DirtyFlag) {
-		_write_dirty_flag(CUR_MAP_ZONE);
-		BLK_MAP_CACHE->DirtyFlag = 1;
-	}
-	return 0;
+    return NAND_OP_TRUE;
 }
+
+
+
+

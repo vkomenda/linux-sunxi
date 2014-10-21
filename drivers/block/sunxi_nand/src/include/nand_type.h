@@ -1,25 +1,26 @@
 /*
- * drivers/block/sunxi_nand/src/include/nand_type.h
- *
- * (C) Copyright 2007-2012
- * Allwinner Technology Co., Ltd. <www.allwinnertech.com>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
- */
-
+* (C) Copyright 2007-2012
+* Allwinner Technology Co., Ltd. <www.allwinnertech.com>
+* Neil Peng<penggang@allwinnertech.com>
+*
+* See file CREDITS for list of people who contributed to this
+* project.
+*
+* This program is free software; you can redistribute it and/or
+* modify it under the terms of the GNU General Public License as
+* published by the Free Software Foundation; either version 2 of
+* the License, or (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with this program; if not, write to the Free Software
+* Foundation, Inc., 59 Temple Place, Suite 330, Boston,
+* MA 02111-1307 USA
+*/
 #ifndef __NAND_TYPE_H
 #define __NAND_TYPE_H
 
@@ -45,26 +46,27 @@ struct __OptionalPhyOpPar_t
 
 typedef struct
 {
-    __u8        ChipCnt;                            //the count of the total nand flash chips are currently connecting on the CE pin
-    __u16       ChipConnectInfo;                    //chip connect information, bit == 1 means there is a chip connecting on the CE pin
-	__u8		RbCnt;
-	__u8		RbConnectInfo;						//the connect  information of the all rb  chips are connected
-    __u8        RbConnectMode;						//the rb connect  mode
-	__u8        BankCntPerChip;                     //the count of the banks in one nand chip, multiple banks can support Inter-Leave
-    __u8        DieCntPerChip;                      //the count of the dies in one nand chip, block management is based on Die
-    __u8        PlaneCntPerDie;                     //the count of planes in one die, multiple planes can support multi-plane operation
-    __u8        SectorCntPerPage;                   //the count of sectors in one single physic page, one sector is 0.5k
-    __u16       PageCntPerPhyBlk;                   //the count of physic pages in one physic block
-    __u16       BlkCntPerDie;                       //the count of the physic blocks in one die, include valid block and invalid block
-    __u16       OperationOpt;                       //the mask of the operation types which current nand flash can support support
-    __u8        FrequencePar;                       //the parameter of the hardware access clock, based on 'MHz'
-    __u8        EccMode;                            //the Ecc Mode for the nand flash chip, 0: bch-16, 1:bch-28, 2:bch_32
+//	__u32		ChannelCnt;
+    __u32        ChipCnt;                            //the count of the total nand flash chips are currently connecting on the CE pin
+    __u32       ChipConnectInfo;                    //chip connect information, bit == 1 means there is a chip connecting on the CE pin
+	__u32		RbCnt;
+	__u32		RbConnectInfo;						//the connect  information of the all rb  chips are connected
+    __u32        RbConnectMode;						//the rb connect  mode
+	__u32        BankCntPerChip;                     //the count of the banks in one nand chip, multiple banks can support Inter-Leave
+    __u32        DieCntPerChip;                      //the count of the dies in one nand chip, block management is based on Die
+    __u32        PlaneCntPerDie;                     //the count of planes in one die, multiple planes can support multi-plane operation
+    __u32        SectorCntPerPage;                   //the count of sectors in one single physic page, one sector is 0.5k
+    __u32       PageCntPerPhyBlk;                   //the count of physic pages in one physic block
+    __u32       BlkCntPerDie;                       //the count of the physic blocks in one die, include valid block and invalid block
+    __u32       OperationOpt;                       //the mask of the operation types which current nand flash can support support
+    __u32        FrequencePar;                       //the parameter of the hardware access clock, based on 'MHz'
+    __u32        EccMode;                            //the Ecc Mode for the nand flash chip, 0: bch-16, 1:bch-28, 2:bch_32   
     __u8        NandChipId[8];                      //the nand chip id of current connecting nand chip
-    __u16       ValidBlkRatio;                      //the ratio of the valid physical blocks, based on 1024
+    __u32       ValidBlkRatio;                      //the ratio of the valid physical blocks, based on 1024
 	__u32 		good_block_ratio;					//good block ratio get from hwscan
 	__u32		ReadRetryType;						//the read retry type
 	__u32       DDRType;
-	__u32		Reserved[32];
+	__u32		Reserved[23];
 }boot_nand_para_t;
 
 typedef struct boot_flash_info{
@@ -78,22 +80,23 @@ typedef struct boot_flash_info{
 //define the nand flash storage system information
 struct __NandStorageInfo_t
 {
-    __u8        ChipCnt;                            //the count of the total nand flash chips are currently connecting on the CE pin
-    __u16       ChipConnectInfo;                    //chip connect information, bit == 1 means there is a chip connecting on the CE pin
-	__u8		RbCnt;
-	__u8		RbConnectInfo;						//the connect  information of the all rb  chips are connected
-    __u8        RbConnectMode;						//the rb connect  mode
-	__u8        BankCntPerChip;                     //the count of the banks in one nand chip, multiple banks can support Inter-Leave
-    __u8        DieCntPerChip;                      //the count of the dies in one nand chip, block management is based on Die
-    __u8        PlaneCntPerDie;                     //the count of planes in one die, multiple planes can support multi-plane operation
-    __u8        SectorCntPerPage;                   //the count of sectors in one single physic page, one sector is 0.5k
-    __u16       PageCntPerPhyBlk;                   //the count of physic pages in one physic block
-    __u16       BlkCntPerDie;                       //the count of the physic blocks in one die, include valid block and invalid block
-    __u16       OperationOpt;                       //the mask of the operation types which current nand flash can support support
-    __u8        FrequencePar;                       //the parameter of the hardware access clock, based on 'MHz'
-    __u8        EccMode;                            //the Ecc Mode for the nand flash chip, 0: bch-16, 1:bch-28, 2:bch_32
-    __u8        NandChipId[8];                      //the nand chip id of current connecting nand chip
-    __u16       ValidBlkRatio;                         //the ratio of the valid physical blocks, based on 1024
+//	__u32		ChannelCnt;
+    __u32        ChipCnt;                            //the count of the total nand flash chips are currently connecting on the CE pin
+    __u32       ChipConnectInfo;                    //chip connect information, bit == 1 means there is a chip connecting on the CE pin
+	__u32		RbCnt;
+	__u32		RbConnectInfo;						//the connect  information of the all rb  chips are connected
+    __u32        RbConnectMode;						//the rb connect  mode
+	__u32       BankCntPerChip;                     //the count of the banks in one nand chip, multiple banks can support Inter-Leave
+    __u32        DieCntPerChip;                      //the count of the dies in one nand chip, block management is based on Die
+    __u32        PlaneCntPerDie;                     //the count of planes in one die, multiple planes can support multi-plane operation
+    __u32        SectorCntPerPage;                   //the count of sectors in one single physic page, one sector is 0.5k
+    __u32       PageCntPerPhyBlk;                   //the count of physic pages in one physic block
+    __u32       BlkCntPerDie;                       //the count of the physic blocks in one die, include valid block and invalid block
+    __u32       OperationOpt;                       //the mask of the operation types which current nand flash can support support
+    __u32        FrequencePar;                       //the parameter of the hardware access clock, based on 'MHz'
+    __u32       EccMode;                            //the Ecc Mode for the nand flash chip, 0: bch-16, 1:bch-28, 2:bch_32   
+    __u8       NandChipId[8];                      //the nand chip id of current connecting nand chip
+    __u32       ValidBlkRatio;                         //the ratio of the valid physical blocks, based on 1024
     __u32		ReadRetryType;						//the read retry type
     __u32       DDRType;
     struct __OptionalPhyOpPar_t OptPhyOpPar;        //the parameters for some optional operation
@@ -111,7 +114,7 @@ struct __NandPageCachePool_t
 	__u8		*TmpPageCache;
 };
 
-
+#ifdef __OS_LINUX_SYSTEM__
 //define the User Data structure for nand flash driver
 struct __NandUserData_t
 {
@@ -122,15 +125,27 @@ struct __NandUserData_t
     __u8        PageStatus;                         //the logical information of the physical page
     __u8        Reserved1;                          //reserved for 32bit align
 } __attribute__ ((packed));
+#else
+__packed struct __NandUserData_t
+{
+    __u8        BadBlkFlag;                         //the flag that marks if a physic block is a valid block or a invalid block
+    __u16       LogicInfo;                          //the logical information of the physical block
+    __u8        Reserved0;                          //reserved for 32bit align
+    __u16       LogicPageNum;                       //the value of the logic page number, which the physic page is mapping to
+    __u8        PageStatus;                         //the logical information of the physical page
+    __u8        Reserved1;                          //reserved for 32bit align
+} ;
+
+#endif
 
 
 //define the paramter structure for physic operation function
 struct __PhysicOpPara_t
 {
-    __u8        BankNum;                            //the number of the bank current accessed, bank NO. is different of chip NO.
-    __u8        PageNum;                            //the number of the page current accessed, the page is based on single-plane or multi-plane
-    __u16       BlkNum;                             //the number of the physic block, the block is based on single-plane or multi-plane
-    __u32       SectBitmap;                         //the bitmap of the sector in the page which need access data
+    __u32        BankNum;                            //the number of the bank current accessed, bank NO. is different of chip NO.
+    __u32       PageNum;                            //the number of the page current accessed, the page is based on single-plane or multi-plane
+    __u32       BlkNum;                             //the number of the physic block, the block is based on single-plane or multi-plane
+    __u64       SectBitmap;                         //the bitmap of the sector in the page which need access data
     void        *MDataPtr;                          //the pointer to main data buffer, it is the start address of a page size based buffer
     void        *SDataPtr;                          //the pointer to spare data buffer, it will be set to NULL if needn't access spare data
 };
@@ -228,14 +243,14 @@ struct __PageMapTblCachePool_t
 struct __GlobalLogicPageType_t
 {
     __u32       LogicPageNum;                       //the global page number of the logic page, it is based on super page size
-    __u32       SectorBitmap;                       //the bitmap of the sector in the logic page which data need access
+    __u64       SectorBitmap;                       //the bitmap of the sector in the logic page which data need access
 };
 
 
 //define the global logcial page based on zone and block parameter type
 struct __LogicPageType_t
 {
-    __u32       SectBitmap;                         //the bitmap marks which sectors' data in the logical page need access
+    __u64       SectBitmap;                         //the bitmap marks which sectors' data in the logical page need access
     __u16       BlockNum;                           //the value of the number of the logical block which the page is belonged to
     __u16       PageNum;                            //the value of the number of the page in the logical block
     __u8        ZoneNum;                            //the value of the number of the zone, which the page is belonged to
@@ -265,13 +280,31 @@ struct __NandPhyInfoPar_t
     __u8        SectCntPerPage;                     //the count of the sectors in one single physical page
     __u16       PageCntPerBlk;                      //the count of the pages in one single physical block
     __u16       BlkCntPerDie;                       //the count fo the physical blocks in one nand flash Die
-    __u16       OperationOpt;                       //the bitmap that marks which optional operation that the nand flash can support
+    __u32       OperationOpt;                       //the bitmap that marks which optional operation that the nand flash can support
     __u16       ValidBlkRatio;                      //the valid block ratio, based on 1024 blocks
     __u16       AccessFreq;                         //the highest access frequence of the nand flash chip, based on MHz
-    __u16       EccMode;                            //the Ecc Mode for the nand flash chip, 0: bch-16, 1:bch-28, 2:bch_32
+    __u16       EccMode;                            //the Ecc Mode for the nand flash chip, 0: bch-16, 1:bch-28, 2:bch_32   
     __u32 		ReadRetryType;
     __u32       DDRType;
     struct __OptionalPhyOpPar_t *OptionOp;          //the pointer point to the optional operation parameter
+};
+
+//define the global logical page parameter type
+struct __NandPartInfo_t
+{
+    __u32       PartType;                           //0: normal type, 1: LSB mode type
+    __u32       PartStartLogicBlk;
+	__u32       PartEndLogicBlk;
+	__u32       Reserved;
+};
+
+struct __NandPartTable_t
+{
+	__u32 magic;
+	__u32 part_cnt;
+	__u32 part_type[NAND_MAX_PART_CNT];
+	__u32 start_sec[NAND_MAX_PART_CNT];
+	__u32 sec_cnt[NAND_MAX_PART_CNT];
 };
 
 
@@ -292,21 +325,22 @@ struct __NandDriverGlobal_t
 //==============================================================================
 
 //define the mask for the nand flash optional operation
-#define NAND_CACHE_READ          1          // support cache read operation
-#define NAND_CACHE_PROGRAM      (1<<1)      // support page cache program operation
-#define NAND_MULTI_READ         (1<<2)      // support multi-plane page read operation
-#define NAND_MULTI_PROGRAM      (1<<3)      // support multi-plane page program operation
-#define NAND_PAGE_COPYBACK      (1<<4)      // support page copy-back command mode operation
-#define NAND_INT_INTERLEAVE     (1<<5)      // support internal inter-leave operation, it based multi-bank
-#define NAND_EXT_INTERLEAVE     (1<<6)      // support external inter-leave operation, it based multi-chip
-#define NAND_RANDOM             (1<<7)      // support RANDOMIZER
-#define NAND_READ_RETRY	        (1<<8)      // support READ RETRY
-#define NAND_READ_UNIQUE_ID     (1<<9)      // support READ UNIQUE_ID
-#define NAND_PAGE_ADR_NO_SKIP	(1<<10)     // page adr no skip is required
+#define NAND_CACHE_READ         (1<<0)              //nand flash support cache read operation
+#define NAND_CACHE_PROGRAM      (1<<1)              //nand flash support page cache program operation
+#define NAND_MULTI_READ         (1<<2)              //nand flash support multi-plane page read operation
+#define NAND_MULTI_PROGRAM      (1<<3)              //nand flash support multi-plane page program operation
+#define NAND_PAGE_COPYBACK      (1<<4)              //nand flash support page copy-back command mode operation
+#define NAND_INT_INTERLEAVE     (1<<5)              //nand flash support internal inter-leave operation, it based multi-bank
+#define NAND_EXT_INTERLEAVE     (1<<6)              //nand flash support external inter-leave operation, it based multi-chip
+#define NAND_RANDOM		        (1<<7)			    //nand flash support RANDOMIZER
+#define NAND_READ_RETRY	        (1<<8)			    //nand falsh support READ RETRY
+#define NAND_READ_UNIQUE_ID	    (1<<9)			    //nand falsh support READ UNIQUE_ID
+#define NAND_PAGE_ADR_NO_SKIP	(1<<10)			    //nand falsh page adr no skip is requiered
+#define NAND_DIE_SKIP           (1<<11)             //nand flash die adr skip
 
 
 //define the mask for the nand flash operation status
-#define NAND_OPERATE_FAIL        1                  //nand flash program/erase failed mask
+#define NAND_OPERATE_FAIL       (1<<0)              //nand flash program/erase failed mask
 #define NAND_CACHE_READY        (1<<5)              //nand flash cache program true ready mask
 #define NAND_STATUS_READY       (1<<6)              //nand flash ready/busy status mask
 #define NAND_WRITE_PROTECT      (1<<7)              //nand flash write protected mask
@@ -331,7 +365,11 @@ struct __NandDriverGlobal_t
 //  define the function return value for different modules
 //==============================================================================
 
-// FIXME: Remove these non-standard values and use the ones from the kernel.
+#define NAND_OP_TRUE            (0)                     //define the successful return value
+#define NAND_OP_FALSE           (-1)                    //define the failed return value
+
+
+//define the return value
 #define ECC_LIMIT               10                  //reach the limit of the ability of ECC
 #define ERR_MALLOC              11                  //request buffer failed
 #define ERR_ECC                 12                  //too much ecc error
@@ -345,19 +383,5 @@ struct __NandDriverGlobal_t
 #define ERR_ADDRBEYOND          20                  //the logical sectors need be accessed is beyond the logical disk
 #define ERR_INVALIDPHYADDR		  21
 
-
-/* Verification macros */
-#define PRECONDITION(b) \
-	if (b) \
-		pr_info("%s precondition test PASS\n", __FUNCTION__); \
-	else { \
-		pr_err("%s precondition test FAIL:\n%s\n", __FUNCTION__, #b); \
-		return -EINVAL; \
-	}
-
-#define CAPTION pr_info(">>> %s\n", __FUNCTION__)
-
-#define DBG(fmt, arg...) pr_info("%s " fmt "\n", __FUNCTION__, ##arg)
-//#define DBG(...) {}
-
 #endif //ifndef __NAND_TYPE_H
+

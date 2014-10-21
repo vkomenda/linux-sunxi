@@ -1,25 +1,26 @@
 /*
- * drivers/block/sunxi_nand/src/include/nand_physic.h
- *
- * (C) Copyright 2007-2012
- * Allwinner Technology Co., Ltd. <www.allwinnertech.com>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
- */
-
+* (C) Copyright 2007-2012
+* Allwinner Technology Co., Ltd. <www.allwinnertech.com>
+* Neil Peng<penggang@allwinnertech.com>
+*
+* See file CREDITS for list of people who contributed to this
+* project.
+*
+* This program is free software; you can redistribute it and/or
+* modify it under the terms of the GNU General Public License as
+* published by the Free Software Foundation; either version 2 of
+* the License, or (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with this program; if not, write to the Free Software
+* Foundation, Inc., 59 Temple Place, Suite 330, Boston,
+* MA 02111-1307 USA
+*/
 #ifndef __NAND_PHYSIC_H__
 #define __NAND_PHYSIC_H__
 
@@ -49,10 +50,10 @@ extern struct __NandPageCachePool_t PageCachePool;
 #define SECTOR_CNT_OF_SUPER_PAGE            (NandStorageInfo.SectorCntPerPage * NandStorageInfo.PlaneCntPerDie)
 
 //define the sector bitmap for a single page
-#define FULL_BITMAP_OF_SINGLE_PAGE          ((__u32)((1<<SECTOR_CNT_OF_SINGLE_PAGE) - 1))
+#define FULL_BITMAP_OF_SINGLE_PAGE           ((__u64)(((__u64)1<<(SECTOR_CNT_OF_SINGLE_PAGE - 1)) | (((__u64)1<<(SECTOR_CNT_OF_SINGLE_PAGE - 1)) - 1)))
 
 //define the sector bitmap for a super page, the sector count of a super page may be equal to 32
-#define FULL_BITMAP_OF_SUPER_PAGE           ((__u32)((1<<(SECTOR_CNT_OF_SUPER_PAGE - 1)) | ((1<<(SECTOR_CNT_OF_SUPER_PAGE - 1)) - 1)))
+#define FULL_BITMAP_OF_SUPER_PAGE           ((__u64)(((__u64)1<<(SECTOR_CNT_OF_SUPER_PAGE - 1)) | (((__u64)1<<(SECTOR_CNT_OF_SUPER_PAGE - 1)) - 1)))
 
 //define the block number offset for the multi-plane operation
 #define MULTI_PLANE_BLOCK_OFFSET            (NandStorageInfo.OptPhyOpPar.MultiPlaneBlockOffset)
@@ -93,6 +94,9 @@ extern struct __NandPageCachePool_t PageCachePool;
 //define if the nand flash system can support bank align
 #define SUPPORT_ALIGN_NAND_BNK              (!(NAND_PAGE_ADR_NO_SKIP & NandStorageInfo.OperationOpt))
 
+//define if the nand flash require to skip die addr
+#define SUPPORT_DIE_SKIP                    (NAND_DIE_SKIP & NandStorageInfo.OperationOpt)
+
 //define the count of the nand flash DIE in a nand flash chip
 #define DIE_CNT_OF_CHIP                     (NandStorageInfo.DieCntPerChip)
 
@@ -127,7 +131,7 @@ extern struct __NandPageCachePool_t PageCachePool;
 #define READ_RETRY_CYCLE                   ((READ_RETRY_TYPE>>8)&0xff)
 
 //define the ReadRetryType of the nand chip connect in the nand storage system
-#define READ_RETRY_REG_CNT                  (READ_RETRY_TYPE & 0xff)
+#define READ_RETRY_REG_CNT                   ((READ_RETRY_TYPE>>0)&0xff)
 
 //define the nand flash access frequence parameter
 #define NAND_ACCESS_FREQUENCE               (NandStorageInfo.FrequencePar)
@@ -330,3 +334,7 @@ __s32 PHY_SetDefaultParam(__u32 bank);
 __s32 PHY_ScanDDRParam(void);
 
 #endif  //ifnedf __NAND_PHYSIC_H__
+
+
+
+

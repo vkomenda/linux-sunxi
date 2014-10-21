@@ -1,24 +1,26 @@
 /*
- * drivers/block/sunxi_nand/nfd/nand_blk.c
- *
- * (C) Copyright 2007-2012
- * Allwinner Technology Co., Ltd. <www.allwinnertech.com>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
- */
+* (C) Copyright 2007-2012
+* Allwinner Technology Co., Ltd. <www.allwinnertech.com>
+* Neil Peng<penggang@allwinnertech.com>
+*
+* See file CREDITS for list of people who contributed to this
+* project.
+*
+* This program is free software; you can redistribute it and/or
+* modify it under the terms of the GNU General Public License as
+* published by the Free Software Foundation; either version 2 of
+* the License, or (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with this program; if not, write to the Free Software
+* Foundation, Inc., 59 Temple Place, Suite 330, Boston,
+* MA 02111-1307 USA
+*/
 
 #include <linux/kernel.h>
 #include <linux/slab.h>
@@ -39,26 +41,22 @@
 #include <linux/delay.h>
 #include <linux/clk.h>
 #include <linux/mutex.h>
-
-#include "../src/include/nand_type.h"
-#include "../src/include/nand_drv_cfg.h"
-#include "../nfc/nfc_i.h"
-#include "nand_blk.h"
 #include <mach/clock.h>
-#include <plat/sys_config.h>
-
-#include "nand_private.h"
-#include "../include/type_def.h"
-#include "../nandtest/nand_test.h"
-
-#include "nand_private.h"
+#include <mach/dma.h>
 #include <linux/wait.h>
 #include <linux/sched.h>
+#include <asm/cacheflush.h>
+#include <linux/pm.h>
+#include "nand_blk.h"
+#include "../nandtest/nand_test.h"
+#include <mach/sys_config.h>
 
 
-int nand_magic = 0;
-module_param(nand_magic, int, 0);
+extern __u32 nand_current_dev_num;
+extern int part_secur[MAX_PART_COUNT];
+extern __u32 RetryCount[8];
 
+struct nand_disk disk_array[MAX_PART_COUNT+1];
 
 #define BLK_ERR_MSG_ON
 #ifdef  BLK_ERR_MSG_ON
@@ -76,54 +74,89 @@ module_param(nand_magic, int, 0);
 #endif
 
 
-#define REMAIN_SPACE   0
-#define PART_FREE      0x55
-#define PART_DUMMY     0xff
-#define PART_READONLY  0x85
+#define REMAIN_SPACE 0
+#define PART_FREE 0x55
+#define PART_DUMMY 0xff
+#define PART_READONLY 0x85
 #define PART_WRITEONLY 0x86
 #define PART_NO_ACCESS 0x87
 
-#define TIMEOUT  1  // in seconds
+#define TIMEOUT 				300			// ms
 
-//#define NAND_CACHE_FLUSH_EVERY_SEC
-//#define NAND_BIO_ALIGN     // for 2.6.29 ?
+#define NAND_CACHE_FLUSH_EVERY_SEC
 #define NAND_CACHE_RW
-#define USE_SYS_PIN
-//#define USE_SYS_CLK
+#define NAND_LOG_AUTO_MERGE
+#define NAND_LOG_RELEASE_LEVEL   4
+
+
 
 /**
 *USE_BIO_MERGE level description:
 *1	:	merge bvc in one bio
 *2	:	merge bvc in one bio and merge bios in one request
 */
-#define USE_BIO_MERGE   0
-#define NAND_TEST_TICK  0
+#define USE_BIO_MERGE			2
+#define NAND_TEST_TICK			0
 
 #ifdef NAND_CACHE_FLUSH_EVERY_SEC
-static int after_write = 0;
-struct collect_ops {
-	unsigned long timeout;
-	wait_queue_head_t wait;
-	struct completion thread_exit;
-	unsigned char quit;
+static int after_rw = 0;
+
+struct collect_ops{
+		unsigned long timeout;
+		wait_queue_head_t wait;
+		struct completion thread_exit;
+		unsigned char quit;
 };
 struct collect_ops collect_arg;
+
 #endif
+
+//for CLK
+extern int NAND_ClkEnable(void);
+extern void NAND_ClkDisable(void);
+
+extern int NAND_ClkRequest(__u32 nand_index);
+extern void NAND_ClkRelease(__u32 nand_index);
+extern int NAND_SetClk(__u32 nand_index, __u32 nand_clk);
+extern int NAND_GetClk(__u32 nand_index);
+
+//for DMA
+extern int NAND_RequestDMA(void);
+extern int NAND_ReleaseDMA(void);
+extern void NAND_DMAConfigStart(int rw, unsigned int buff_addr, int len);
+extern int NAND_QueryDmaStat(void);
+extern int NAND_WaitDmaFinish(void);
+//for PIO
+extern void NAND_PIORequest(void);
+extern void NAND_PIORelease(void);
+
+//for Int
+extern void NAND_EnRbInt(void);
+extern void NAND_ClearRbInt(void);
+extern int NAND_WaitRbReady(void);
+extern void NAND_EnDMAInt(void);
+extern void NAND_ClearDMAInt(void);
+extern void NAND_DMAInterrupt(void);
+
+extern void NAND_RbInterrupt(void);
+
+extern __u32 NAND_GetIOBaseAddr(void);
+
+
 
 
 DEFINE_SEMAPHORE(nand_mutex);
 static unsigned char volatile IS_IDLE = 1;
-u32 nand_handle = 0;
-spinlock_t nand_rb_lock;
-
-#ifdef USE_SYS_CLK
-static struct clk *ahb_nand_clk = NULL;
-static struct clk *mod_nand_clk = NULL;
-#endif
-
 static int nand_flush(struct nand_blk_dev *dev);
 
-static irqreturn_t nand_rb_interrupt(int irq, void* dev_id)
+
+static int nand_flush_force(__u32 dev_num);
+static struct nand_state nand_reg_state;
+
+#ifdef __LINUX_NAND_SUPPORT_INT__
+spinlock_t     nand_rb_lock;
+
+static irqreturn_t nand_rb_interrupt(int irq, void *dev_id)
 {
     unsigned long iflags;
 
@@ -133,12 +166,10 @@ static irqreturn_t nand_rb_interrupt(int irq, void* dev_id)
 
 	return IRQ_HANDLED;
 }
-
+#endif
 
 #if USE_BIO_MERGE==0
-static int cache_align_page_request(struct nand_blk_ops* nandr,
-				    struct nand_blk_dev* dev,
-				    struct request* req)
+static int cache_align_page_request(struct nand_blk_ops * nandr, struct nand_blk_dev * dev, struct request * req)
 {
 	unsigned long start,nsector;
 	char *buf;
@@ -146,20 +177,23 @@ static int cache_align_page_request(struct nand_blk_ops* nandr,
 
 	int cmd = rq_data_dir(req);
 
-	if (dev->disable_access ||
-	    ((cmd == WRITE) && (dev->readonly)) ||
-	    ((cmd == READ)  && (dev->writeonly))) {
+	if(dev->disable_access || ( (cmd == WRITE) && (dev->readonly) ) \
+		|| ((cmd == READ) && (dev->writeonly))){
 		dbg_err("can not access this part\n");
+
 		return -EIO;
 	}
+
 
 	//for2.6.36
 	buf = req->buffer;
 	start = blk_rq_pos(req);
 	nsector = blk_rq_cur_bytes(req)>>9;
 
-	if ( (start + nsector) > get_capacity(req->rq_disk)) {
+	if ( (start + nsector) > get_capacity(req->rq_disk))
+	{
 		dbg_err("over the limit of disk\n");
+
 		return -EIO;
 	}
 	start += dev->off_size;
@@ -170,32 +204,36 @@ static int cache_align_page_request(struct nand_blk_ops* nandr,
 
 		dbg_inf("READ:%lu from %lu\n",nsector,start);
 
-#ifndef NAND_CACHE_RW
-		LML_FlushPageCache();
-		ret = LML_Read(start, nsector, buf);
-#else
-		//printk("Rs %lu %lu \n",start, nsector);
-		LML_FlushPageCache();
-		ret = NAND_CacheRead(start, nsector, buf);
-		//printk("Rs %lu %lu \n",start, nsector);
-#endif // NAND_CACHE_RW
-		if (ret) {
+		#ifndef NAND_CACHE_RW
+			LML_FlushPageCache();
+  		ret = LML_Read(start, nsector, buf);
+		#else
+			//printk("Rs %lu %lu \n",start, nsector);
+      LML_FlushPageCache();
+			ret = NAND_CacheRead(start, nsector, buf);
+			//printk("Rs %lu %lu \n",start, nsector);
+		#endif
+		if (ret)
+		{
 			dbg_err("cache_align_page_request:read err\n");
 			return -EIO;
+
 		}
 		return 0;
+
 
 	case WRITE:
 
 		dbg_inf("WRITE:%lu from %lu\n",nsector,start);
-#ifndef NAND_CACHE_RW
-		ret = LML_Write(start, nsector, buf);
-#else
-		//printk("Ws %lu %lu \n",start, nsector);
-		ret = NAND_CacheWrite(start, nsector, buf);
-		//printk("We %lu %lu \n",start, nsector);
-#endif // NAND_CACHE_RW
-		if (ret) {
+		#ifndef NAND_CACHE_RW
+			ret = LML_Write(start, nsector, buf);
+		#else
+			//printk("Ws %lu %lu \n",start, nsector);
+			ret = NAND_CacheWrite(start, nsector, buf);
+			//printk("We %lu %lu \n",start, nsector);
+		#endif
+		if (ret)
+		{
 			dbg_err("cache_align_page_request:write err\n");
 			return -EIO;
 		}
@@ -205,79 +243,15 @@ static int cache_align_page_request(struct nand_blk_ops* nandr,
 		dbg_err("Unknown request \n");
 		return -EIO;
 	}
+
 }
-#endif // USE_BIO_MERGE==0
-
-//for 2.6.29
-#ifdef NAND_BIO_ALIGN
-
-static int nand_blk_phys_contig_segment(struct request_queue* q, struct bio* bio, struct bio* nxt)
-{
-	//if (!(q->queue_flags & (1 << QUEUE_FLAG_CLUSTER)))
-	//	return 0;
-
-	if (!BIOVEC_PHYS_MERGEABLE(__BVEC_END(bio), __BVEC_START(nxt)))
-		return 0;
-	if (bio->bi_size + nxt->bi_size > q->limits.max_segment_size)
-		return 0;
-
-	/*
-	 * bio and nxt are contigous in memory, check if the queue allows
-	 * these two to be merged into one
-	 */
-	if (BIO_SEG_BOUNDARY(q, bio, nxt))
-		return 1;
-
-	return 0;
-}
-
-
-/* Compute maximal contiguous buffer size. */
-static int nand_buffer_chain_size(struct request* req)
-{
-	struct bio *bio,*prevbio = NULL;
-	struct bio_vec *bv;
-	int i;
-	unsigned long size = 0;
-	char *base = bio_data(req->bio);
-	unsigned int phys_size = 0;
-	struct request_queue *q = req->q;
-
-	__rq_for_each_bio(bio, req) {
-		if(prevbio) {
-			int pseg = phys_size + prevbio->bi_size + bio->bi_size;
-			if (!nand_blk_phys_contig_segment(q, prevbio, bio) ||
-			    pseg > q->limits.max_segment_size)
-				break;
-		}
-		bio_for_each_segment(bv, bio, i) {
-			if (page_address(bv->bv_page) + bv->bv_offset != base + size)
-				break;
-			size += bv->bv_len;
-		}
-		prevbio = bio;
-	}
-	//return size>>9;
-	return size;
-}
-
-static void reset(struct request* req)
-{
-	//req->current_nr_sectors = req->hard_cur_sectors = nand_buffer_chain_size(req);
-	nand_buffer_chain_size(req);
-}
-
-#endif // NAND_BIO_ALIGN
-
+#endif
 
 #if USE_BIO_MERGE
 #define nand_bio_kmap(bio,idx,kmtype)	\
 	(page_address(bio_iovec_idx((bio), (idx))->bv_page) +	bio_iovec_idx((bio), (idx))->bv_offset)
 
-
-static int nand_transfer(struct nand_blk_dev* dev,
-			 unsigned long start, unsigned long nsector,
-			 char* buf, int cmd)
+static int nand_transfer(struct nand_blk_dev * dev, unsigned long start,unsigned long nsector, char *buf, int cmd)
 {
 	__s32 ret;
 
@@ -295,32 +269,36 @@ static int nand_transfer(struct nand_blk_dev* dev,
         //printk("R %lu %lu 0x%x \n",start, nsector, (__u32)buf);
 		dbg_inf("READ:%lu from %lu\n",nsector,start);
 
-#ifndef NAND_CACHE_RW
-		LML_FlushPageCache();
-		ret = LML_Read(start, nsector, buf);
-#else
-		//printk("Rs %lu %lu \n",start, nsector);
+		#ifndef NAND_CACHE_RW
+			LML_FlushPageCache();
+  			ret = LML_Read(start, nsector, buf);
+		#else
+			//printk("Rs %lu %lu \n",start, nsector);
       		LML_FlushPageCache();
-		ret = NAND_CacheRead(start, nsector, buf);
-		//printk("Rs %lu %lu \n",start, nsector);
-#endif // NAND_CACHE_RW
-		if (ret) {
+			ret = NAND_CacheRead(start, nsector, buf);
+			//printk("Rs %lu %lu \n",start, nsector);
+		#endif
+		if (ret)
+		{
 			dbg_err("cache_align_page_request:read err\n");
 			return -EIO;
+
 		}
 		return 0;
+
 
 	case WRITE:
         //printk("W %lu %lu 0x%x \n",start, nsector, (__u32)buf);
 		dbg_inf("WRITE:%lu from %lu\n",nsector,start);
-#ifndef NAND_CACHE_RW
-		ret = LML_Write(start, nsector, buf);
-#else
-		//printk("Ws %lu %lu \n",start, nsector);
-		ret = NAND_CacheWrite(start, nsector, buf);
-		//printk("We %lu %lu \n",start, nsector);
-#endif // NAND_CACHE_RW
-		if (ret) {
+		#ifndef NAND_CACHE_RW
+			ret = LML_Write(start, nsector, buf);
+		#else
+			//printk("Ws %lu %lu \n",start, nsector);
+			ret = NAND_CacheWrite(start, nsector, buf);
+			//printk("We %lu %lu \n",start, nsector);
+		#endif
+		if (ret)
+		{
 			dbg_err("cache_align_page_request:write err\n");
 			return -EIO;
 		}
@@ -330,358 +308,284 @@ static int nand_transfer(struct nand_blk_dev* dev,
 		dbg_err("Unknown request \n");
 		return -EIO;
 	}
+
 }
 #endif
-
 #if NAND_TEST_TICK
 static unsigned long nand_rw_time = 0;
 #endif
-
-#if USE_BIO_MERGE==1
-static int nand_xfer_bio(struct request_queue* rq, struct nand_blk_dev* dev,
-			 struct bio* bio, unsigned long start_idx)
-{
-	struct nand_blk_ops *nandr = rq->queuedata;
-	struct bio_vec* bvec;
-	unsigned long long sector = bio->bi_sector;
-	char* buffer;
-	unsigned long rq_len = 0;
-
-	buffer = nand_bio_kmap(bio, bio->bi_idx, KM_USER0);
-
-	bio_for_each_segment(bvec, bio, start_idx) {
-		if(start_idx < bio->bi_vcnt - 1) {
-			if (nand_bio_kmap(bio, start_idx + 1, KM_USER0) ==
-			    nand_bio_kmap(bio, start_idx,     KM_USER0) + bvec->bv_len) {
-				rq_len += bvec->bv_len;
-			}
-			else {
-				rq_len += bvec->bv_len;
-				spin_unlock_irq(rq->queue_lock);
-				down(&nandr->nand_ops_mutex);
-#if NAND_TEST_TICK
-				tick = jiffies;
-				nand_transfer(dev, sector, rq_len>>9, buffer, bio_data_dir(bio));
-				nand_rw_time += jiffies - tick;
-#else
-				nand_transfer(dev, sector, rq_len>>9, buffer, bio_data_dir(bio));
-#endif // NAND_TEST_TICK
-				up(&nandr->nand_ops_mutex);
-				spin_lock_irq(rq->queue_lock);
-				sector += rq_len>>9;
-				rq_len = 0;
-				buffer = nand_bio_kmap(bio, start_idx + 1, KM_USER0);
-			}
-		}
-		else {
-			rq_len += bvec->bv_len;
-			spin_unlock_irq(rq->queue_lock);
-			down(&nandr->nand_ops_mutex);
-#if NAND_TEST_TICK
-			tick = jiffies;
-			nand_transfer(dev, sector,  rq_len>>9, buffer, bio_data_dir(bio));
-			nand_rw_time += jiffies - tick;
-#else
-			nand_transfer(dev, sector,  rq_len>>9, buffer, bio_data_dir(bio));
-#endif // NAND_TEST_TICK
-			up(&nandr->nand_ops_mutex);
-			spin_lock_irq(rq->queue_lock);
-			rq_len=0;
-		}
-	}
-	return 0;
-}
-
-#elif USE_BIO_MERGE==2
-static int nand_xfer_bio(struct request_queue* rq, struct nand_blk_dev* dev,
-			 struct bio* bio, unsigned long start_idx)
-{
-	struct nand_blk_ops *nandr = rq->queuedata;
-	struct bio_vec* bvec;
-	unsigned long long sector = bio->bi_sector;
-	char* buffer = NULL;
-	unsigned long rq_len = 0;
-
-//	buffer = nand_bio_kmap(bio, bio->bi_idx, KM_USER0);
-
-	bio_for_each_segment(bvec, bio, start_idx) {
-		if (nand_bio_kmap(bio, start_idx, KM_USER0) ==
-		    buffer + rq_len) {
-			/*merge vec*/
-			rq_len += bvec->bv_len;
-		}
-		else {
-			/*flush previous data*/
-			if (rq_len) {
-				spin_unlock_irq(rq->queue_lock);
-				down(&nandr->nand_ops_mutex);
-#if NAND_TEST_TICK
-				tick = jiffies;
-				nand_transfer(dev, sector,  rq_len>>9, buffer, rw_flag);
-				nand_rw_time += jiffies - tick;
-#else
-				nand_transfer(dev, sector, rq_len>>9, buffer, rw_flag);
-#endif
-				up(&nandr->nand_ops_mutex);
-				spin_lock_irq(rq->queue_lock);
-			}
-			/*update new*/
-			sector += rq_len>>9;
-			buffer = nand_bio_kmap(bio, start_idx, KM_USER0);
-			rq_len = bvec->bv_len;
-		}
-	}
-	return 0;
-}
-
-#else // USE_BIO_MERGE
-// nand_xfer_bio() is undefined
-
-#endif // USE_BIO_MERGE
-
-
-static int nand_xfer_request(struct request_queue* rq, struct request* req)
-{
-	struct nand_blk_dev* dev = req->rq_disk->private_data;
-	struct nand_blk_ops *nandr = rq->queuedata;
-	int res = 0;
-
-#if NAND_TEST_TICK
-	unsigned long tick=0;
-#endif
-
-#if USE_BIO_MERGE
-	struct req_iterator rq_iter;
-	unsigned long long sector = ULLONG_MAX;
-	unsigned long rq_len = 0;
-	int rw_flag = 0;
-#endif
-
-	pr_info("%s START request in direction %d\n", __FUNCTION__, rq_data_dir(req));
-
-#if USE_BIO_MERGE==1
-	//spin_unlock_irq(rq->queue_lock);
-	IS_IDLE = 0;
-	__rq_for_each_bio(rq_iter.bio, req) {
-		if(!bio_segments(rq_iter.bio))
-			continue;
-		nand_xfer_bio(rq, dev, rq_iter.bio, rq_iter.i);
-	}
-#if NAND_TEST_TICK
-	printk("[N]ticks=%ld\n",nand_rw_time);
-#endif
-
-#ifdef NAND_CACHE_FLUSH_EVERY_SEC
-	if(req->cmd_flags & REQ_WRITE)
-		after_write = 1;
-	if(req->cmd_flags & REQ_SYNC)
-		wake_up_interruptible(&collect_arg.wait);
-#endif
-
-	//spin_lock_irq(rq->queue_lock);
-	__blk_end_request_all(req, 0);
-	req = NULL;
-
-#elif USE_BIO_MERGE==2
-	//IS_IDLE = 0;
-
-	rw_flag = req->cmd_flags & REQ_WRITE;
-
-	__rq_for_each_bio(rq_iter.bio, req) {
-		if (!bio_segments(rq_iter.bio))
-			continue;
-		if (unlikely(sector == ULLONG_MAX))
-			/*new bio, no data exists*/
-			sector = (rq_iter.bio)->bi_sector;
-		else {
-			/*last bio data exists*/
-			if ((rq_iter.bio)->bi_sector == (sector + (rq_len>>9))) {
-				//printk("[N]bio merge\n");
-			}
-			else {
-				/*flush last bio data here*/
-				spin_unlock_irq(rq->queue_lock);
-				down(&nandr->nand_ops_mutex);
-#if NAND_TEST_TICK
-				tick = jiffies;
-				nand_transfer(dev, sector,  rq_len>>9, buffer, rw_flag);
-				nand_rw_time += jiffies - tick;
-#else
-				nand_transfer(dev, sector, rq_len>>9, buffer, rw_flag);
-#endif // NAND_TEST_TICK
-				up(&nandr->nand_ops_mutex);
-				spin_lock_irq(rq->queue_lock);
-				/*update new bio*/
-				sector = (rq_iter.bio)->bi_sector;
-				buffer = 0;
-				rq_len = 0;
-			}
-		}
-		nand_xfer_bio(rq, dev, rq_iter.bio, rq_iter.i);
-	}
-
-	if (rq_len) {
-		spin_unlock_irq(rq->queue_lock);
-		down(&nandr->nand_ops_mutex);
-#if NAND_TEST_TICK
-		tick = jiffies;
-		nand_transfer(dev, sector,  rq_len>>9, buffer, rw_flag);
-		nand_rw_time += jiffies - tick;
-#else
-		nand_transfer(dev, sector, rq_len>>9, buffer, rw_flag);
-#endif // NAND_TEST_TICK
-		up(&nandr->nand_ops_mutex);
-		spin_lock_irq(rq->queue_lock);
-		sector = ULLONG_MAX;
-		rq_len = 0;
-		buffer = NULL;
-	}
-
-#if NAND_TEST_TICK
-	printk("[N]ticks=%ld\n",nand_rw_time);
-#endif
-
-#ifdef NAND_CACHE_FLUSH_EVERY_SEC
-	if(rw_flag == REQ_WRITE)
-		after_write = 1;
-	if(req->cmd_flags&REQ_SYNC)
-		wake_up_interruptible(&collect_arg.wait);
-#endif
-
-	//spin_lock_irq(rq->queue_lock);
-	__blk_end_request_all(req,0);
-	req = NULL;
-
-#elif USE_BIO_MERGE==0
-
-	nandr = dev->nandr;
-	spin_unlock_irq(rq->queue_lock);
-	down(&nandr->nand_ops_mutex);
-	IS_IDLE = 0;
-
-#ifdef NAND_BIO_ALIGN
-	reset(req);
-#endif // NAND_BIO_ALIGN
-
-#if NAND_TEST_TICK
-	tick = jiffies;
-	res = cache_align_page_request(nandr, dev, req);
-	nand_rw_time += jiffies - tick;
-#else
-	res = cache_align_page_request(nandr, dev, req);
-#endif // NAND_TEST_TICK
-
-	up(&nandr->nand_ops_mutex);
-	IS_IDLE = 1;
-	spin_lock_irq(rq->queue_lock);
-
-	if(!__blk_end_request_cur(req, res)) {
-		req = NULL;
-
-#if NAND_TEST_TICK
-		printk("[N]ticks=%ld\n",nand_rw_time);
-#endif // NAND_TEST_TICK
-
-	}
-#endif // USE_BIO_MERGE
-
-	pr_info("%s END", __FUNCTION__);
-
-	return 0;
-}
-
-static void block_thread_signals(sigset_t* old)
-{
-	spin_lock_irq(&current->sighand->siglock);
-	*old = current->blocked;
-
-	sigfillset(&current->blocked);
-
-#ifdef THREAD_CAPTURES_SIGNALS
-	sigdelset(&current->blocked, SIGKILL);
-	sigdelset(&current->blocked, SIGSTOP);
-	sigdelset(&current->blocked, SIGINT);
-#endif // THREAD_CAPTURES_SIGNALS
-
-	recalc_sigpending();
-	spin_unlock_irq(&current->sighand->siglock);
-}
-
-#ifdef UNBLOCK_SIGNALS
-static void unblock_thread_signals(sigset_t* old)
-{
-	spin_lock_irq(&current->sighand->siglock);
-	current->blocked = *old;
-	recalc_sigpending();
-	spin_unlock_irq(&current->sighand->siglock);
-}
-#endif // UNBLOCK_SIGNALS
-
 static int nand_blktrans_thread(void *arg)
 {
 	struct nand_blk_ops *nandr = arg;
 	struct request_queue *rq = nandr->rq;
 	struct request *req = NULL;
-	sigset_t saved_signals;
-
-#ifdef THREAD_CAPTURES_SIGNALS
-	int ret = 0;
-#endif // THREAD_CAPTURES_SIGNALS
+#if NAND_TEST_TICK
+	unsigned long tick=0;
+#endif
+#if USE_BIO_MERGE
+	struct req_iterator rq_iter;
+	struct bio_vec *bvec;
+	unsigned long long sector = ULLONG_MAX;
+	unsigned long rq_len = 0;
+	char *buffer=NULL;
+	int rw_flag = 0;
+#endif
 
 	/* we might get involved when memory gets low, so use PF_MEMALLOC */
 	current->flags |= PF_MEMALLOC | PF_NOFREEZE;
 	daemonize("%sd", nandr->name);
 
-	pr_info("%s BEGIN\n", __FUNCTION__);
+	/* daemonize() doesn't do this for us since some kernel threads
+	   actually want to deal with signals. We can't just call
+	   exit_sighand() since that'll cause an oops when we finally
+	   do exit. */
+	spin_lock_irq(&current->sighand->siglock);
+	sigfillset(&current->blocked);
+	recalc_sigpending();
+	spin_unlock_irq(&current->sighand->siglock);
 
-	// Why does one need to block signals and why unblocked signals may
-	// cause a kernel oops?
-	block_thread_signals(&saved_signals);
-
-	// A pre-condition for the wait queue.
 	spin_lock_irq(rq->queue_lock);
 
 	while (!nandr->quit) {
-//		wait_event_interruptible_locked_irq(nandr->thread_wq,
-//		                                    (req = blk_fetch_request(rq)));
 
-		// Inlined wait_event_interruptible_locked_irq() using the
-		// request queue lock instead of the wait queue lock.
-		DEFINE_WAIT(wait);
-		while (!(req = blk_fetch_request(rq))) {
-			if (likely(list_empty(&wait.task_list)))
-				add_wait_queue(&nandr->thread_wq, &wait);
+		struct nand_blk_dev *dev;
+	#if USE_BIO_MERGE == 0
+		int res = 0;
+	#endif
+		DECLARE_WAITQUEUE(wait, current);
+
+		if (!req && !(req = blk_fetch_request(rq))) {
+			//printk("[N]wait req\n");
+			add_wait_queue(&nandr->thread_wq, &wait);
 			set_current_state(TASK_INTERRUPTIBLE);
-#ifdef THREAD_CAPTURES_SIGNALS
-			if (signal_pending(current)) {
-				ret = -ERESTARTSYS;
-				break;
-			}
-#endif // THREAD_CAPTURES_SIGNALS
 			spin_unlock_irq(rq->queue_lock);
 			schedule();
 			spin_lock_irq(rq->queue_lock);
+			remove_wait_queue(&nandr->thread_wq, &wait);
+			continue;
 		}
-		__remove_wait_queue(&nandr->thread_wq, &wait);
-		__set_current_state(TASK_RUNNING);
-		// End of the modified wait_event_interruptible_locked_irq().
 
-		if (likely(req))
-			nand_xfer_request(rq, req);
+		dev = req->rq_disk->private_data;
+	#if USE_BIO_MERGE==1
+		//spin_unlock_irq(rq->queue_lock);
+		IS_IDLE = 0;
+		//printk("[N]request start\n");
+		__rq_for_each_bio(rq_iter.bio,req){
+			if(!bio_segments(rq_iter.bio)){
+				continue;
+			}
+			//printk("[N]start bio,count=%d\n",(rq_iter.bio)->bi_vcnt);
+			sector = (rq_iter.bio)->bi_sector;
+			buffer = nand_bio_kmap(rq_iter.bio, (rq_iter.bio)->bi_idx, KM_USER0);
+			bio_for_each_segment(bvec, rq_iter.bio, rq_iter.i){
+				if(rq_iter.i<(rq_iter.bio)->bi_vcnt-1){
+					if(nand_bio_kmap(rq_iter.bio, rq_iter.i+1, KM_USER0) == nand_bio_kmap(rq_iter.bio, rq_iter.i, KM_USER0)+ bvec->bv_len){
+						rq_len += bvec->bv_len;
+						//printk("[N]go on\n");
+					}else{
+						rq_len += bvec->bv_len;
+						spin_unlock_irq(rq->queue_lock);
+						down(&nandr->nand_ops_mutex);
+						#if NAND_TEST_TICK
+						tick = jiffies;
+						nand_transfer(dev, sector, rq_len>>9, buffer, bio_data_dir(rq_iter.bio));
+						nand_rw_time += jiffies - tick;
+						#else
+						nand_transfer(dev, sector, rq_len>>9, buffer, bio_data_dir(rq_iter.bio));
+						#endif
+						up(&nandr->nand_ops_mutex);
+						spin_lock_irq(rq->queue_lock);
+						sector += rq_len>>9;
+						rq_len = 0;
+						buffer = nand_bio_kmap(rq_iter.bio, rq_iter.i+1, KM_USER0);
+					}
+				}else{
+					rq_len += bvec->bv_len;
+					spin_unlock_irq(rq->queue_lock);
+					down(&nandr->nand_ops_mutex);
+					#if NAND_TEST_TICK
+					tick = jiffies;
+					nand_transfer(dev, sector,  rq_len>>9, buffer, bio_data_dir(rq_iter.bio));
+					nand_rw_time += jiffies - tick;
+					#else
+					nand_transfer(dev, sector,  rq_len>>9, buffer, bio_data_dir(rq_iter.bio));
+					#endif
+					up(&nandr->nand_ops_mutex);
+					spin_lock_irq(rq->queue_lock);
+					rq_len=0;
+				}
+			}
+			//printk("[N]end bio...\n");
+		}
+		//printk("[N]request finished\n");
+		#if NAND_TEST_TICK
+		printk("[N]ticks=%ld\n",nand_rw_time);
+		#endif
 
-#ifdef THREAD_CAPTURES_SIGNALS
-		if (unlikely(ret))
-			break;
-#endif // THREAD_CAPTURES_SIGNALS
+		//printk("req flags=%x\n",req->cmd_flags);
+		#ifdef NAND_CACHE_FLUSH_EVERY_SEC
+		if(req->cmd_flags&REQ_WRITE)
+			after_rw = 1;
+		if(req->cmd_flags&REQ_SYNC){
+			wake_up_interruptible(&collect_arg.wait);
+		}
+		#endif
+
+		//spin_lock_irq(rq->queue_lock);
+		__blk_end_request_all(req,0);
+		req = NULL;
+	#elif USE_BIO_MERGE==2
+		//IS_IDLE = 0;
+
+		rw_flag = req->cmd_flags&REQ_WRITE;
+
+		__rq_for_each_bio(rq_iter.bio,req){
+			if(!bio_segments(rq_iter.bio)){
+				continue;
+			}
+			if(unlikely(sector == ULLONG_MAX)){
+				/*new bio, no data exists*/
+				sector = (rq_iter.bio)->bi_sector;
+			}else{
+				/*last bio data exists*/
+				if((rq_iter.bio)->bi_sector == (sector + (rq_len>>9))){
+					//printk("[N]bio merge\n");
+				}else{
+					/*flush last bio data here*/
+					spin_unlock_irq(rq->queue_lock);
+					down(&nandr->nand_ops_mutex);
+				#if NAND_TEST_TICK
+					tick = jiffies;
+					nand_current_dev_num = dev->devnum;
+					nand_transfer(dev, sector,  rq_len>>9, buffer, rw_flag);
+					nand_rw_time += jiffies - tick;
+				#else
+					nand_current_dev_num = dev->devnum;
+					nand_transfer(dev, sector, rq_len>>9, buffer, rw_flag);
+				#endif
+					up(&nandr->nand_ops_mutex);
+					spin_lock_irq(rq->queue_lock);
+					/*update new bio*/
+					sector = (rq_iter.bio)->bi_sector;
+					buffer = 0;
+					rq_len = 0;
+				}
+			}
+
+			bio_for_each_segment(bvec, rq_iter.bio, rq_iter.i){
+				if(1){
+					if(nand_bio_kmap(rq_iter.bio, rq_iter.i, KM_USER0) == buffer + rq_len){
+						/*merge vec*/
+						rq_len += bvec->bv_len;
+						//printk("[N]merge bvc\n");
+					}else{
+						/*flush previous data*/
+						if(rq_len){
+							spin_unlock_irq(rq->queue_lock);
+							down(&nandr->nand_ops_mutex);
+						#if NAND_TEST_TICK
+							tick = jiffies;
+							nand_current_dev_num = dev->devnum;
+							nand_transfer(dev, sector,  rq_len>>9, buffer, rw_flag);
+							nand_rw_time += jiffies - tick;
+						#else
+							nand_current_dev_num = dev->devnum;
+							nand_transfer(dev, sector, rq_len>>9, buffer, rw_flag);
+						#endif
+							up(&nandr->nand_ops_mutex);
+							spin_lock_irq(rq->queue_lock);
+						}
+						/*update new*/
+						sector += rq_len>>9;
+						buffer = nand_bio_kmap(rq_iter.bio, rq_iter.i, KM_USER0);
+						rq_len = bvec->bv_len;
+					}
+				}
+			}
+		}
+
+		if(rq_len){
+			spin_unlock_irq(rq->queue_lock);
+			down(&nandr->nand_ops_mutex);
+		#if NAND_TEST_TICK
+			tick = jiffies;
+			nand_current_dev_num = dev->devnum;
+			nand_transfer(dev, sector,  rq_len>>9, buffer, rw_flag);
+			nand_rw_time += jiffies - tick;
+		#else
+			nand_current_dev_num = dev->devnum;
+			nand_transfer(dev, sector, rq_len>>9, buffer, rw_flag);
+		#endif
+			up(&nandr->nand_ops_mutex);
+			spin_lock_irq(rq->queue_lock);
+			sector = ULLONG_MAX;
+			rq_len = 0;
+			buffer = NULL;
+		}
+
+		#if NAND_TEST_TICK
+		printk("[N]ticks=%ld\n",nand_rw_time);
+		#endif
+
+
+		if((req->cmd_flags&REQ_SYNC)&&(req->cmd_flags&REQ_WRITE)&&(part_secur[dev->devnum]== 1)){
+		    //printk("req sync: 0x%x form part: 0x%x \n", req->cmd_flags, dev->devnum);
+		    spin_unlock_irq(rq->queue_lock);
+			down(&nandr->nand_ops_mutex);
+			nand_current_dev_num = dev->devnum;
+		    nand_flush_force(nand_current_dev_num);
+		    up(&nandr->nand_ops_mutex);
+			spin_lock_irq(rq->queue_lock);
+		}
+
+		#ifdef NAND_CACHE_FLUSH_EVERY_SEC
+		if(rw_flag == REQ_WRITE)
+			after_rw = 1;
+		if((req->cmd_flags&REQ_SYNC)&&(req->cmd_flags&REQ_WRITE))
+			wake_up_interruptible(&collect_arg.wait);
+
+		#endif
+
+		//spin_lock_irq(rq->queue_lock);
+		__blk_end_request_all(req,0);
+		req = NULL;
+	#else
+		nandr = dev->nandr;
+		spin_unlock_irq(rq->queue_lock);
+		down(&nandr->nand_ops_mutex);
+		IS_IDLE = 0;
+
+		#ifdef NAND_BIO_ALIGN
+			reset(req);
+		#endif
+		#if NAND_TEST_TICK
+		tick = jiffies;
+		res = cache_align_page_request(nandr, dev, req);
+		nand_rw_time += jiffies - tick;
+		#else
+		res = cache_align_page_request(nandr, dev, req);
+		#endif
+		up(&nandr->nand_ops_mutex);
+		IS_IDLE = 1;
+		spin_lock_irq(rq->queue_lock);
+
+		if(!__blk_end_request_cur(req, res)){
+			req = NULL;
+			#if NAND_TEST_TICK
+			printk("[N]ticks=%ld\n",nand_rw_time);
+			#endif
+		}
+	#endif
+
 	}
-	if (req)
+
+	if(req)
 		__blk_end_request_all(req, -EIO);
 	spin_unlock_irq(rq->queue_lock);
 
-	pr_info("%s END\n", __FUNCTION__);
-
-//	unblock_thread_signals(&saved_signals);    // May be unnecessary.
 	complete_and_exit(&nandr->thread_exit, 0);
+
+	return 0;
 }
 
 
@@ -732,8 +636,8 @@ static int nand_release(struct gendisk *disk, fmode_t mode)
 
 
 /*filp->f_dentry->d_inode->i_bdev->bd_disk->fops->ioctl(filp->f_dentry->d_inode, filp, cmd, arg);*/
-#define DISABLE_WRITE        _IO('V',0)
-#define ENABLE_WRITE         _IO('V',1)
+#define DISABLE_WRITE         _IO('V',0)
+#define ENABLE_WRITE          _IO('V',1)
 #define DISABLE_READ 	     _IO('V',2)
 #define ENABLE_READ 	     _IO('V',3)
 static int nand_ioctl(struct block_device *bdev, fmode_t mode, unsigned int cmd, unsigned long arg)
@@ -808,27 +712,25 @@ void set_part_mod(char *name,int cmd)
 	filp->f_dentry->d_inode->i_bdev->bd_disk->fops->ioctl(filp->f_dentry->d_inode->i_bdev, 0, cmd, 0);
 	filp_close(filp, current->files);
 }
-
-static int nand_add_dev(struct nand_blk_ops *nandr)
+static int nand_add_dev(struct nand_blk_ops *nandr, struct nand_disk *part)
 {
 	struct nand_blk_dev *dev;
+	struct list_head *this;
 	struct gendisk *gd;
 	unsigned long temp;
 
-	if (!down_trylock(&nand_mutex)) {
-		up(&nand_mutex);
-		BUG();
+	int last_devnum = -1;
+
+	dev = kmalloc(sizeof(struct nand_blk_dev), GFP_KERNEL);
+	if (!dev) {
+		dbg_err("dev: out of memory for data structures\n");
+		return -1;
 	}
-
-	dev = &nandr->dev;
-	if (dev->blkcore_priv)
-		return -EBUSY;
-
 	memset(dev, 0, sizeof(*dev));
 	dev->nandr = nandr;
-	dev->size = DiskSize;
-	dev->off_size = 0;
-	dev->devnum = 0;
+	dev->size = part->size;
+	dev->off_size = part->offset;
+	dev->devnum = -1;
 
 	dev->cylinders = 1024;
 	dev->heads = 16;
@@ -847,17 +749,60 @@ static int nand_add_dev(struct nand_blk_ops *nandr)
 		}
 	}
 
+	if (!down_trylock(&nand_mutex)) {
+		up(&nand_mutex);
+		BUG();
+	}
+
+	list_for_each(this, &nandr->devs) {
+		struct nand_blk_dev *tmpdev = list_entry(this, struct nand_blk_dev, list);
+		if (dev->devnum == -1) {
+			/* Use first free number */
+			if (tmpdev->devnum != last_devnum+1) {
+				/* Found a free devnum. Plug it in here */
+				dev->devnum = last_devnum+1;
+				list_add_tail(&dev->list, &tmpdev->list);
+				goto added;
+			}
+		} else if (tmpdev->devnum == dev->devnum) {
+			/* Required number taken */
+			return -EBUSY;
+		} else if (tmpdev->devnum > dev->devnum) {
+			/* Required number was free */
+			list_add_tail(&dev->list, &tmpdev->list);
+			goto added;
+		}
+		last_devnum = tmpdev->devnum;
+	}
+	if (dev->devnum == -1)
+		dev->devnum = last_devnum+1;
+
+	if ((dev->devnum <<nandr->minorbits) > 256) {
+		return -EBUSY;
+	}
+
+	//init_MUTEX(&dev->sem);
+	list_add_tail(&dev->list, &nandr->devs);
+
+ added:
+
 	gd = alloc_disk(1 << nandr->minorbits);
 	if (!gd) {
+		list_del(&dev->list);
 		return -ENOMEM;
 	}
 	gd->major = nandr->major;
 	gd->first_minor = (dev->devnum) << nandr->minorbits;
 	gd->fops = &nand_blktrans_ops;
 
-	/* /dev/nand */
-	snprintf(gd->disk_name, sizeof(gd->disk_name),
-		 "%s", nandr->name);
+	if (dev->devnum)
+		snprintf(gd->disk_name, sizeof(gd->disk_name),
+		 "%s%c", nandr->name, (nandr->minorbits?'a':'0') + dev->devnum - 1);
+	else
+		snprintf(gd->disk_name, sizeof(gd->disk_name), "%s", nandr->name);
+	//snprintf(gd->devfs_name, sizeof(gd->devfs_name),
+	//	 "%s/%c", nandr->name, (nandr->minorbits?'a':'0') + dev->devnum);
+
 
 	/* 2.5 has capacity in units of 512 bytes while still
 	   having BLOCK_SIZE_BITS set to 10. Just to keep us amused. */
@@ -866,6 +811,16 @@ static int nand_add_dev(struct nand_blk_ops *nandr)
 	gd->private_data = dev;
 	dev->blkcore_priv = gd;
 	gd->queue = nandr->rq;
+
+	/*set rw partition*/
+	if(part->type == PART_NO_ACCESS)
+		dev->disable_access = 1;
+
+	if(part->type == PART_READONLY)
+		dev->readonly = 1;
+
+	if(part->type == PART_WRITEONLY)
+		dev->writeonly = 1;
 
 	if (dev->readonly)
 		set_disk_ro(gd, 1);
@@ -876,19 +831,18 @@ static int nand_add_dev(struct nand_blk_ops *nandr)
 static int nand_remove_dev(struct nand_blk_dev *dev)
 {
 	struct gendisk *gd;
+	gd = dev->blkcore_priv;
 
 	if (!down_trylock(&nand_mutex)) {
 		up(&nand_mutex);
 		BUG();
 	}
-	gd = dev->blkcore_priv;
-	dev->blkcore_priv = NULL;
+	list_del(&dev->list);
 	gd->queue = NULL;
 	del_gendisk(gd);
 	put_disk(gd);
 	return 0;
 }
-
 
 #ifdef NAND_CACHE_FLUSH_EVERY_SEC
 static int collect_thread(void *tmparg)
@@ -896,18 +850,15 @@ static int collect_thread(void *tmparg)
 	unsigned long ret;
 	struct collect_ops *arg = tmparg;
 
+
 	current->flags |= PF_MEMALLOC | PF_NOFREEZE;
 	daemonize("%sd", "nfmt");
 
-	pr_info("%s started\n", __FUNCTION__);
-
-	/*
 	spin_lock_irq(&current->sighand->siglock);
 	sigfillset(&current->blocked);
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);
-	*/
-#if 0
+
 	while (!arg->quit)
 	{
 		ret = wait_event_interruptible_timeout(arg->wait, 0, arg->timeout*HZ);
@@ -918,107 +869,96 @@ static int collect_thread(void *tmparg)
 		}
 		arg->timeout = TIMEOUT;
 	}
-#else
-	while (!arg->quit){
-		ret = wait_event_interruptible(arg->wait, after_write);
-		if(ret==0) {
-			do {
-				after_write = 0;
-				ssleep(arg->timeout);
-			} while(after_write);
-			//IS_IDLE = 1;
-			nand_flush(NULL);
-			//IS_IDLE = 1;
-		}
-	}
-#endif // 0
+
 	complete_and_exit(&arg->thread_exit, 0);
 }
-#endif // NAND_CACHE_FLUSH_EVERY_SEC
-
+#endif
 
 int nand_blk_register(struct nand_blk_ops *nandr)
 {
-	int ret;
+	int i,ret;
+	__u32 part_cnt;
 
 	down(&nand_mutex);
 
 	ret = register_blkdev(nandr->major, nandr->name);
-	if (ret < 0) {
-		pr_err("%s: failed to register block device\n", __FUNCTION__);
-		goto out;
+	if(ret){
+		dbg_err("\nfaild to register blk device\n");
+		up(&nand_mutex);
+		return -1;
 	}
+
 
 	spin_lock_init(&nandr->queue_lock);
 	init_completion(&nandr->thread_exit);
 	init_waitqueue_head(&nandr->thread_wq);
 	sema_init(&nandr->nand_ops_mutex, 1);
 
-	nandr->rq = blk_init_queue(nand_blk_request, &nandr->queue_lock);
-	if (IS_ERR(nandr->rq)) {
-		pr_err("%s: init queue error\n", __FUNCTION__);
-		ret = PTR_ERR(nandr->rq);
-		goto undo_blkdev;
+	nandr->rq= blk_init_queue(nand_blk_request, &nandr->queue_lock);
+	if (!nandr->rq) {
+		unregister_blkdev(nandr->major, nandr->name);
+		up(&nand_mutex);
+		return  -1;
 	}
 
-	//for 2.6.29
-	//elevator_exit(nandr->rq->elevator);
-	//for 2.6.36
-	//null
-
 	ret = elevator_change(nandr->rq, "noop");
-	if (ret < 0) {
-		pr_err("%s: elevator_change error %d\n", __FUNCTION__, ret);
-		goto undo_queue;
+	if(ret){
+		blk_cleanup_queue(nandr->rq);
+		return ret;
 	}
 
 	nandr->rq->queuedata = nandr;
-
 	ret = kernel_thread(nand_blktrans_thread, nandr, CLONE_KERNEL);
 	if (ret < 0) {
-		pr_err("%s: worker thread creation ERROR %d\n", __FUNCTION__, ret);
-		goto undo_queue;
+		blk_cleanup_queue(nandr->rq);
+		unregister_blkdev(nandr->major, nandr->name);
+		up(&nand_mutex);
+		return ret;
 	}
-	else
-		pr_info("%s: worker thread created\n", __FUNCTION__);
 
-#ifdef NAND_CACHE_FLUSH_EVERY_SEC
+	#ifdef NAND_CACHE_FLUSH_EVERY_SEC
+	/*init wait queue*/
 	collect_arg.quit = 0;
 	collect_arg.timeout = TIMEOUT;
 	init_completion(&collect_arg.thread_exit);
 	init_waitqueue_head(&collect_arg.wait);
 	ret = kernel_thread(collect_thread, &collect_arg, CLONE_KERNEL);
- 	if (ret < 0) {
-		pr_err("%s: collector thread creation ERROR %d\n", __FUNCTION__, ret);
-		goto undo_queue;
+ 	if (ret < 0)
+	{
+		dbg_err("sorry,thread creat failed\n");
+		return 0;
 	}
-	else
-		pr_info("%s: collector thread created\n", __FUNCTION__);
-#endif
+	#endif
 
 	//devfs_mk_dir(nandr->name);
+	INIT_LIST_HEAD(&nandr->devs);
 
-	memset(&nandr->dev, 0, sizeof(nandr->dev));
-	ret = nandr->add_dev(nandr);
-	pr_info("%s: device added with status %d\n", __FUNCTION__, ret);
-	if (ret < 0)
-		goto undo_queue;
+	disk_array[0].offset = 0;
+	disk_array[0].size = NAND_GetDiskSize();
 
-	goto out;
+	dbg_inf("nand size %lu\n", disk_array[0].size);
 
-  undo_queue:
-	blk_cleanup_queue(nandr->rq);
-  undo_blkdev:
-	unregister_blkdev(nandr->major, nandr->name);
-  out:
+	part_cnt = mbr2disks(disk_array + 1);
+	if (disk_array[0].size != disk_array[part_cnt].size + disk_array[part_cnt].offset)
+		dbg_err("nand size reported %lu by nandlib but last partition is %lu at %lu offset giving %lu disk size\n",
+				disk_array[0].size, disk_array[part_cnt].size, disk_array[part_cnt].offset,
+				disk_array[part_cnt].size + disk_array[part_cnt].offset);
+
+	part_cnt ++;
+
+	for(i = 0 ; i < part_cnt ; i++){
+		nandr->add_dev(nandr,&(disk_array[i]));
+	}
+
 	up(&nand_mutex);
-	return ret;
+
+	return 0;
 }
 
 
 void nand_blk_unregister(struct nand_blk_ops *nandr)
 {
-	pr_info("%s BEGIN", __FUNCTION__);
+	struct list_head *this, *next;
 	down(&nand_mutex);
 	/* Clean up the kernel thread */
 	nandr->quit = 1;
@@ -1031,7 +971,12 @@ void nand_blk_unregister(struct nand_blk_ops *nandr)
 	wait_for_completion(&collect_arg.thread_exit);
 #endif
 	/* Remove it from the list of active majors */
-	nandr->remove_dev(&nandr->dev);
+
+
+	list_for_each_safe(this, next, &nandr->devs) {
+		struct nand_blk_dev *dev = list_entry(this, struct nand_blk_dev, list);
+		nandr->remove_dev(dev);
+	}
 
 	//devfs_remove(nandr->name);
 	blk_cleanup_queue(nandr->rq);
@@ -1039,8 +984,13 @@ void nand_blk_unregister(struct nand_blk_ops *nandr)
 	unregister_blkdev(nandr->major, nandr->name);
 
 	up(&nand_mutex);
-	pr_info("%s END", __FUNCTION__);
+
+	if (!list_empty(&nandr->devs))
+		BUG();
 }
+
+
+
 
 static int nand_getgeo(struct nand_blk_dev *dev,  struct hd_geometry *geo)
 {
@@ -1052,65 +1002,77 @@ static int nand_getgeo(struct nand_blk_dev *dev,  struct hd_geometry *geo)
 }
 
 static struct nand_blk_ops mytr = {
-	.quit        = 0,
-	.name        =  "nand",
-	.major       = 93,
-	.minorbits   = 4, /* ⌈log₂(MAX_PART_COUNT + 1)⌉ */
-	.getgeo      = nand_getgeo,
-	.add_dev     = nand_add_dev,
-	.remove_dev  = nand_remove_dev,
-	.flush       = nand_flush,
-	.owner       = THIS_MODULE,
+	.name 			=  "nand",
+	.major 			= 93,
+	.minorbits 		= 3,
+	.getgeo 			= nand_getgeo,
+	.add_dev			= nand_add_dev,
+	.remove_dev 		= nand_remove_dev,
+	.flush 			= nand_flush,
+	.owner 			= THIS_MODULE,
 };
 
 
 static int nand_flush(struct nand_blk_dev *dev)
 {
-	if (!down_trylock(&mytr.nand_ops_mutex)) {
+	if (0 == down_trylock(&mytr.nand_ops_mutex))
+	{
 		IS_IDLE = 0;
-#ifdef NAND_CACHE_RW
+	#ifdef NAND_CACHE_RW
 		NAND_CacheFlush();
-#else
+	#else
 		LML_FlushPageCache();
-#endif
+	#endif
 		up(&mytr.nand_ops_mutex);
 		IS_IDLE = 1;
 
 		dbg_inf("nand_flush \n");
 	}
-	else
-		pr_info("%s: cannot lock mutex\n", __FUNCTION__);
+
 	return 0;
 }
 
 
+static int nand_flush_force(__u32 dev_num)
+{
+    //printk("nf \n");
+	#ifdef NAND_CACHE_RW
+		NAND_CacheFlushDev(dev_num);
+	#else
+		LML_FlushPageCache();
+	#endif
+	//printk("e\n");
+
+	return 0;
+}
+
+
+
 static void nand_flush_all(void)
 {
-	int     timeout = 0;
+    int     timeout = 0;
 
-#ifdef NAND_CACHE_FLUSH_EVERY_SEC
-	/* wait write finish */
-	for (timeout=0; timeout<10; timeout++) {
-		if (after_write)
-			msleep(500);
-		else
-			break;
-	}
-#endif // NAND_CACHE_FLUSH_EVERY_SEC
+    /* wait write finish */
+    for(timeout=0; timeout<10; timeout++) {
+        if(after_rw) {
+            msleep(500);
+        }
+        else {
+            break;
+        }
+    }
+    printk("nand try to shutdown %d time\n", timeout);
 
-	pr_info("%s: NAND flush all after a delay of %d ms\n",
-		__FUNCTION__, timeout * 500);
+    /* get nand ops mutex */
+    down(&mytr.nand_ops_mutex);
 
-	/* get nand ops mutex */
-	down(&mytr.nand_ops_mutex);
-
-#ifdef NAND_CACHE_RW
-	NAND_CacheFlush();
-#else
-	LML_FlushPageCache();
-#endif
-	BMM_WriteBackAllMapTbl();
-	pr_info("%s: NAND flush all complete\n", __FUNCTION__);
+    #ifdef NAND_CACHE_RW
+    NAND_CacheFlush();
+    #else
+    LML_FlushPageCache();
+    #endif
+    BMM_WriteBackAllMapTbl();
+    printk("Nand flash shutdown ok!\n");
 }
 
 
@@ -1124,267 +1086,17 @@ int cal_partoff_within_disk(char *name,struct inode *i)
 	return ( gd->part_tbl->part[ index - 1]->start_sect);
 }
 
-void set_nand_pio(void)
-{
-#ifndef USE_SYS_PIN
-	__u32	cfg0;
-	__u32	cfg1;
-	__u32	cfg2;
-
-	void* gpio_base;
-
-	/*
-	  gpio_base = ioremap(PIOC_REGS_pBASE, 4096 );
-	  if (gpio_base == NULL) {
-	  printk(KERN_ERR "gpio failed to remap register block\n");
-	  return ;
-	  }
-	*/
-	//modify for f20
-	gpio_base = (void *)SW_VA_PORTC_IO_BASE;
-
-	cfg0 = *(volatile __u32 *)(gpio_base + 0x48);
-	cfg1 = *(volatile __u32 *)(gpio_base + 0x4c);
-	cfg2 = *(volatile __u32 *)(gpio_base + 0x50);
-
-	/*set PIOC for nand*/
-	cfg0 &= 0x0;
-	cfg0 |= 0x22222222;
-	cfg1 &= 0x0;
-	cfg1 |= 0x22222222;
-	cfg2 &= 0x0;
-	cfg2 |= 0x22222222;
-
-	*(volatile __u32 *)(gpio_base + 0x48) = cfg0;
-	*(volatile __u32 *)(gpio_base + 0x4c) = cfg1;
-	*(volatile __u32 *)(gpio_base + 0x50) = cfg2;
-
-	//iounmap(gpio_base);
-#else
-	nand_handle = gpio_request_ex("nand_para",NULL);
-#endif
-}
-
-void release_nand_pio(void)
-{
-
-	#ifndef USE_SYS_PIN
-			void* gpio_base;
-
-			/*
-			gpio_base = ioremap(PIOC_REGS_pBASE, 4096 );
-			if (gpio_base == NULL) {
-				printk(KERN_ERR "gpio failed to remap register block\n");
-				return ;
-			}
-			*/
-			//modify for f20
-			gpio_base = (void *)SW_VA_PORTC_IO_BASE;
-
-
-
-			*(volatile __u32 *)(gpio_base + 0x48) = 0;
-			*(volatile __u32 *)(gpio_base + 0x4c) = 0;
-			*(volatile __u32 *)(gpio_base + 0x50) = 0;
-
-			//iounmap(gpio_base);
-	#else
-			//printk("[NAND] nand gpio_release\n");
-			//gpio_release("nand_para",NULL);
-	#endif
-}
-
-
-#ifndef USE_SYS_CLK
-__u32 get_cmu_clk(void)
-{
-	__u32 reg_val;
-	__u32 div_p, factor_n;
-	__u32 factor_k, factor_m;
-	__u32 clock;
-
-	reg_val  = *(volatile unsigned int *)(0xf1c20000 + 0x20);
-	div_p    = (reg_val >> 16) & 0x3;
-	factor_n = (reg_val >> 8) & 0x1f;
-	factor_k = ((reg_val >> 4) & 0x3) + 1;
-	factor_m = ((reg_val >> 0) & 0x3) + 1;
-
-	clock = 24 * factor_n * factor_k/div_p/factor_m;
-
-	return clock;
-}
-
-void set_nand_clock(__u32 nand_max_clock)
-{
-	__u32 edo_clk, cmu_clk;
-	__u32 cfg;
-	__u32 nand_clk_divid_ratio;
-
-	/*open ahb nand clk */
-	cfg = *(volatile __u32 *)(0xf1c20000 + 0x60);
-	cfg |= (0x1<<13);
-	*(volatile __u32 *)(0xf1c20000 + 0x60) = cfg;
-
-	/*set nand clock*/
-	//edo_clk = (nand_max_clock > 20)?(nand_max_clock-10):nand_max_clock;
-	edo_clk = nand_max_clock * 2;
-
-	cmu_clk = get_cmu_clk( );
-	nand_clk_divid_ratio = cmu_clk / edo_clk;
-	if (cmu_clk % edo_clk)
-			nand_clk_divid_ratio++;
-	if (nand_clk_divid_ratio){
-		if (nand_clk_divid_ratio > 16)
-			nand_clk_divid_ratio = 15;
-		else
-			nand_clk_divid_ratio--;
-	}
-	/*set nand clock gate on*/
-	cfg = *(volatile __u32 *)(0xf1c20000 + 0x80);
-
-	/*gate on nand clock*/
-	cfg |= (1U << 31);
-	/*take cmu pll as nand src block*/
-	cfg &= ~(0x3 << 24);
-	cfg |=  (0x2 << 24);
-	//set divn = 0
-	cfg &= ~(0x03 << 12);
-
-	/*set ratio*/
-	cfg &= ~(0x0f << 0);
-	cfg |= (nand_clk_divid_ratio & 0xf) << 0;
-
-	*(volatile __u32 *)(0xf1c20000 + 0x80) = cfg;
-}
-
-
-void release_nand_clock(void)
-{
-	__u32 cfg;
-	__u32 ccmu_base;
-
-	ccmu_base = 0xf1c20000;
-
-	/*set nand clock gate on*/
-	cfg = *(volatile __u32 *)(ccmu_base + 0x14);
-	cfg &= (~(0x1<<15));
-	*(volatile __u32 *)(ccmu_base + 0x14) = cfg;
-}
-
-void active_nand_clock(void)
-{
-	__u32 cfg;
-	__u32 ccmu_base;
-
-	ccmu_base = 0xf1c20000;
-
-	/*set nand clock gate on*/
-	cfg = *(volatile __u32 *)(ccmu_base + 0x14);
-	cfg |= (0x1<<15);
-	*(volatile __u32 *)(ccmu_base + 0x14) = cfg;
-}
-#else
-
-int nand_request_clk(void)
-{
-	ahb_nand_clk = clk_get(NULL,"ahb_nfc");
-	if(!ahb_nand_clk) {
-		return -1;
-	}
-	mod_nand_clk = clk_get(NULL,"nfc");
-		if(!mod_nand_clk) {
-		return -1;
-	}
-	return 0;
-}
-
-void nand_release_clk(void)
-{
-	clk_put(ahb_nand_clk);
-	clk_put(mod_nand_clk);
-}
-
-
-int nand_ahb_clk_enable(void)
-{
-	return clk_enable(ahb_nand_clk);
-}
-
-int nand_module_clk_enable(void)
-{
-	return clk_enable(mod_nand_clk);
-}
-
-void nand_ahb_clk_disable(void)
-{
-		clk_disable(ahb_nand_clk);
-}
-
-void nand_module_clk_disable(void)
-{
-	clk_disable(mod_nand_clk);
-}
-
-int nand_set_module_clk(__u32 nand_clk)
-{
-	return clk_set_rate(mod_nand_clk, nand_clk*2);
-}
-
-__u32 nand_get_module_clk(void)
-{
-	return clk_get_rate(mod_nand_clk);
-}
-
-
-#endif
+#define SW_INT_IRQNO_NAND AW_IRQ_NAND
 
 #ifndef CONFIG_SUNXI_NAND_TEST
-static int __init init_blklayer(void)
+static int  init_blklayer(void)
 {
 	int ret;
 	unsigned long irqflags;
+	script_item_value_type_e script_ret;
+	script_item_u nand_good_block_ratio;
 
-#ifndef USE_SYS_CLK
-	__u32 nand_clk;
-	set_nand_clock(20);
-#else
-	ret = nand_request_clk();
-	if(ret) {
-		printk("[NAND] nand_request_clk fail \n");
-		return -1;
-	}
-
-	ret = nand_ahb_clk_enable();
-	if(ret) {
-		printk("[NAND] nand_ahb_clk_enable fail \n");
-		return -1;
-	}
-
-	ret = nand_module_clk_enable();
-	if(ret) {
-		printk("[NAND] nand_module_clk_enable fail \n");
-		return -1;
-	}
-
-	ret = nand_set_module_clk(20000000);
-	if(ret) {
-		printk("[NAND] nand_set_module_clk fail \n");
-		return -1;
-	}
-
-#endif
-	set_nand_pio();
-	clear_NAND_ZI();
-
-	printk("[NAND] nand driver version: 0x%x 0x%x \n", NAND_VERSION_0,NAND_VERSION_1);
-	NAND_ClearRbInt();
-	spin_lock_init(&nand_rb_lock);
-	irqflags = IRQF_DISABLED;
-
-	if (request_irq(SW_INT_IRQNO_NAND, nand_rb_interrupt, irqflags, mytr.name, &mytr)) {
-		printk("nand interrupte register error\n");
-		return -EAGAIN;
-	}
+	ClearNandStruct();
 
 	ret = PHY_Init();
 	if (ret) {
@@ -1396,28 +1108,49 @@ static int __init init_blklayer(void)
 	if (ret < 0)
 		return ret;
 
-	//set nand clk
-#ifndef USE_SYS_CLK
-	nand_clk =NandStorageInfo.FrequencePar;
-	if(nand_clk>30)
-		nand_clk = 30;
-	set_nand_clock(nand_clk);
-	dbg_inf("set nand clk to %x \n", nand_clk);
-#else
-	ret = nand_set_module_clk((NandStorageInfo.FrequencePar)*1000000);
-	if(ret) {
-		printk("[NAND] nand_set_module_clk fail \n");
-		return -1;
+	printk("[NAND] nand driver version: 0x%x 0x%x \n", NAND_VERSION_0,NAND_VERSION_1);
+#ifdef __LINUX_NAND_SUPPORT_INT__
+    NAND_ClearRbInt();
+    spin_lock_init(&nand_rb_lock);
+	irqflags = IRQF_DISABLED;
+
+	ret=request_irq(SW_INT_IRQNO_NAND, nand_rb_interrupt, irqflags, mytr.name, &mytr);
+    if(ret)
+	{
+	    printk("nand interrupt register error\n");
+	    return -EAGAIN;
+	}
+	else
+	{
+	    printk("nand interrupt register ok\n");
 	}
 #endif
+	//modify ValidBlkRatio
+	script_ret = script_get_item("nand_para","good_block_ratio", &nand_good_block_ratio);
+  if (script_ret!=SCIRPT_ITEM_VALUE_TYPE_INT)
+  {
+    	printk("nand init fetch nand_good_block_ratio failed\n");
+  }
+  else
+  {
+        if(nand_good_block_ratio.val <= 0)
+        {
+            printk("[NAND] use nand_good_block_ratio from default parameter\n");
+        }
+        else
+        {
+            printk("[NAND] get nand_good_block_ratio from script: %d \n",nand_good_block_ratio.val);
+            NAND_SetValidBlkRatio(nand_good_block_ratio.val);
+        }
+	}
 
 	ret = PHY_ChangeMode(1);
 	if (ret < 0)
 		return ret;
 
-	ret = PHY_ScanDDRParam();
-	if (ret < 0)
-		return ret;
+    ret = PHY_ScanDDRParam();
+    if (ret < 0)
+        return ret;
 
 	ret = FMT_Init();
 	if (ret < 0)
@@ -1433,37 +1166,41 @@ static int __init init_blklayer(void)
 	if (ret < 0)
 		return ret;
 
-#ifdef NAND_CACHE_RW
-	NAND_CacheOpen();
-#endif
+	#ifdef NAND_CACHE_RW
+		NAND_CacheOpen();
+	#endif
+
 
 	return nand_blk_register(&mytr);
 }
 
-static void  __exit exit_blklayer(void)
+static void   exit_blklayer(void)
 {
 	nand_flush(NULL);
 	nand_blk_unregister(&mytr);
+	#ifdef NAND_CACHE_RW
+		NAND_CacheClose();
+	#endif
 	LML_Exit();
 	FMT_Exit();
 	PHY_Exit();
-#ifdef NAND_CACHE_RW
-	NAND_CacheClose();
-#endif
 }
 
 #else
-static int __init init_blklayer(void)
+static int  init_blklayer(void)
 {
 	printk("[NAND] for nand test, init_blklayer \n");
 	return 0;
 }
 
-static void  __exit exit_blklayer(void)
+static void   exit_blklayer(void)
 {
 
 }
 #endif
+
+
+#ifdef CONFIG_PM
 
 #ifdef CONFIG_SUNXI_NAND_TEST
 int nand_suspend(struct platform_device *plat_dev, pm_message_t state)
@@ -1471,10 +1208,13 @@ int nand_suspend(struct platform_device *plat_dev, pm_message_t state)
 static int nand_suspend(struct platform_device *plat_dev, pm_message_t state)
 #endif
 {
+
 	int i=0;
 
-	printk("[NAND] nand_suspend \n");
+	pr_debug("[NAND] nand_suspend \n");
 
+	if(NORMAL_STANDBY== standby_type)
+	{
 	if(!IS_IDLE){
 		for(i=0;i<10;i++){
 			msleep(200);
@@ -1486,16 +1226,38 @@ static int nand_suspend(struct platform_device *plat_dev, pm_message_t state)
 		return -EBUSY;
 	}else{
 		down(&mytr.nand_ops_mutex);
-		#ifndef USE_SYS_CLK
-			release_nand_clock();
-		#else
-			nand_module_clk_disable();
-		#endif
 
-		release_nand_pio();
-		printk("[NAND] nand_suspend ok \n");
-		return 0;
+		NAND_ClkDisable();
+		NAND_PIORelease();
 	}
+	}
+	else if(SUPER_STANDBY == standby_type)
+	{
+	pr_debug("nand super standy mode suspend\n");
+		if(!IS_IDLE){
+			for(i=0;i<10;i++){
+				msleep(200);
+				if(IS_IDLE)
+					break;
+			}
+		}
+		if(i==10){
+			return -EBUSY;
+		}else{
+		down(&mytr.nand_ops_mutex);
+
+		NAND_ClkDisable();
+		NAND_PIORelease();
+	}
+	for(i=0; i<(NAND_REG_LENGTH); i++){
+		nand_reg_state.nand_reg_back[i] = *(volatile u32 *)(NAND_GetIOBaseAddr() + i*0x04);
+		//pr_info("reg addr 0x%x : 0x%x \n", i, nand_reg_state.nand_reg_back[i]);
+	}
+	}
+
+		pr_debug("[NAND] nand_suspend ok \n");
+
+		return 0;
 }
 
 #ifdef CONFIG_SUNXI_NAND_TEST
@@ -1505,24 +1267,89 @@ static int nand_resume(struct platform_device *plat_dev)
 #endif
 {
 
-	printk("[NAND] nand_resume \n");
-	set_nand_pio();
+    __s32 ret;
 
-	#ifndef USE_SYS_CLK
-		active_nand_clock();
-	#else
-		nand_module_clk_enable();
-	#endif
+	printk(KERN_INFO"[NAND] nand_resume \n");
+	if(NORMAL_STANDBY== standby_type){
+	NAND_PIORequest();
+	NAND_ClkEnable();
 
 	up(&mytr.nand_ops_mutex);
+	}else if(SUPER_STANDBY == standby_type){
+		int i;
+		NAND_PIORequest();
+	    NAND_ClkEnable();
+        //process for super standby
+		//restore reg state
+		for(i=0; i<(NAND_REG_LENGTH); i++){
+			if(0x9 == i){
+				continue;
+			}
+			*(volatile u32 *)(NAND_GetIOBaseAddr()+ i*0x04) = nand_reg_state.nand_reg_back[i];
+		}
+        //reset all chip
+
+    	for(i=0; i<8; i++)
+        {
+			__u32 bank=0;
+			if(NAND_GetChipConnect()&(0x1<<i)) //chip valid
+            {
+                pr_info("nand reset chip %d!\n",i);
+                ret = PHY_ResetChip(i);
+				PHY_SetDefaultParam(bank);
+				RetryCount[i] = 0;
+                if(ret)
+                    pr_info("nand reset chip %d failed!\n",i);
+				bank++;
+            }
+        }
+
+		//process for super standby
+		//restore reg state
+		for(i=0; i<(NAND_REG_LENGTH); i++){
+			if(0x9 == i){
+				continue;
+			}
+			*(volatile u32 *)(NAND_GetIOBaseAddr() + i*0x04) = nand_reg_state.nand_reg_back[i];
+		}
+
+		up(&mytr.nand_ops_mutex);
+
+	}
 
 
 	return 0;
 }
 
+#else
+
+#ifdef CONFIG_SUNXI_NAND_TEST
+int nand_suspend(struct platform_device *plat_dev, pm_message_t state)
+#else
+static int nand_suspend(struct platform_device *plat_dev, pm_message_t state)
+#endif
+{
+    return 0;
+}
+
+#ifdef CONFIG_SUNXI_NAND_TEST
+int nand_resume(struct platform_device *plat_dev)
+#else
+static int nand_resume(struct platform_device *plat_dev)
+#endif
+{
+    return 0;
+}
+
+#endif
+
 static int nand_probe(struct platform_device *plat_dev)
 {
+	pr_info("benn: nand probe enter\n");
+	dbg_inf("nand_probe\n");
+
 	return 0;
+
 }
 
 static int nand_remove(struct platform_device *plat_dev)
@@ -1532,7 +1359,7 @@ static int nand_remove(struct platform_device *plat_dev)
 
 void nand_shutdown(struct platform_device *plat_dev)
 {
-	pr_info("%s", __FUNCTION__);
+    printk("[NAND]shutdown\n");
 	nand_flush_all();
 }
 
@@ -1540,8 +1367,10 @@ static struct platform_driver nand_driver = {
 	.probe = nand_probe,
 	.remove = nand_remove,
 	.shutdown =  nand_shutdown,
+#ifdef CONFIG_PM
 	.suspend = nand_suspend,
 	.resume = nand_resume,
+#endif
 	.driver = {
 		.name = "sw_nand",
 		.owner = THIS_MODULE,
@@ -1554,76 +1383,78 @@ static struct platform_driver nand_driver = {
  *
  ****************************************************************************/
 
-#ifndef CONFIG_SUNXI_NAND_TEST
-
-static int __init nand_init(void)
+int nand_init(void)
 {
 	s32 ret;
-	int nand_used = 0;
+//	int nand_used = 0;
 
-	ret = script_parser_fetch("nand_para","nand_used", &nand_used, sizeof(int));
-	if (ret)
-		printk("nand init fetch emac using configuration failed\n");
+	script_item_value_type_e script_ret;
+	script_item_u nand_used;
 
-	if(nand_used == 0) {
-		printk("nand driver is disabled \n");
-		return 0;
-	}
+    printk("%s,line:%d\n", __func__, __LINE__);
+    script_ret = script_get_item("nand_para","nand_used", &nand_used);
+    if (script_ret!=SCIRPT_ITEM_VALUE_TYPE_INT)
+    {
+    	printk("nand init fetch emac using configuration failed\n");
+
+    }
+
+    if(nand_used.val == 0)
+    {
+        printk("nand driver is disabled \n");
+        return 0;
+    }
+
+
+	printk("[NAND]nand driver, init.\n");
 
 	ret = init_blklayer();
-	if(ret) {
+	if(ret)
+	{
 		dbg_err("init_blklayer fail \n");
 		return -1;
 	}
 
 	ret = platform_driver_register(&nand_driver);
-	if(ret) {
+	if(ret)
+	{
 		dbg_err("platform_driver_register fail \n");
 		return -1;
 	}
-	pr_info("%s OK\n", __FUNCTION__);
+	printk("[NAND]nand driver, ok.\n");
 	return 0;
 }
 
-static void __exit nand_exit(void)
+void nand_exit(void)
 {
-	s32 ret;
-	int nand_used = 0;
+ //   s32 ret;
+//	int nand_used = 0;
+	script_item_value_type_e script_ret;
+	script_item_u nand_used;
 
-	ret = script_parser_fetch("nand_para", "nand_used", &nand_used, sizeof(int));
-	if (ret)
-		printk("nand init fetch emac using configuration failed\n");
 
-	if(nand_used == 0) {
-		printk("nand driver is disabled \n");
-		return;
-	}
+    script_ret = script_get_item("nand_para","nand_used", &nand_used);
+    if (script_ret!=SCIRPT_ITEM_VALUE_TYPE_INT)
+    {
+    	printk("nand init fetch emac using configuration failed\n");
 
-//	mytr->quit = 1; // Flag the child threads to exit their busy loops.
+    }
 
-	pr_info("%s: thread busy loop quit flag value is %d\n", __FUNCTION__, mytr.quit);
+    if(nand_used.val == 0)
+    {
+        printk("nand driver is disabled \n");
+        return ;
+    }
+
+	printk("[NAND]nand driver : bye bye\n");
 	platform_driver_unregister(&nand_driver);
 	//platform_device_unregister(&nand_device);
 	exit_blklayer();
+
 }
 
-#else // CONFIG_SUNXI_NAND_TEST
-
-static int __init nand_init(void)
-{
-	return nand_test_init();
-}
-
-static void __exit nand_exit(void)
-{
-	nand_test_exit();
-}
-
-#endif // CONFIG_SUNXI_NAND_TEST
-
-
-module_init(nand_init);
-module_exit(nand_exit);
+//module_init(nand_init);
+//module_exit(nand_exit);
 MODULE_LICENSE ("GPL");
 MODULE_AUTHOR ("nand flash groups");
 MODULE_DESCRIPTION ("Generic NAND flash driver code");
