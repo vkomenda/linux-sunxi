@@ -149,6 +149,11 @@ extern struct __NandPageCachePool_t PageCachePool;
 
 //define the spare data cache for physical module processing spare area data
 #define PHY_TMP_SPARE_CACHE                 (PageCachePool.SpareCache)
+
+// Hynix subrange of read retry modes that are initialised from the OTP area
+#define READ_RETRY_MODE_HYNIX_OTP  (READ_RETRY_MODE >= 2 && READ_RETRY_MODE < 0x10)
+
+#
 //==============================================================================
 //  define the functions __s32erface for the physic operation module
 //==============================================================================
@@ -334,7 +339,3 @@ __s32 PHY_SetDefaultParam(__u32 bank);
 __s32 PHY_ScanDDRParam(void);
 
 #endif  //ifnedf __NAND_PHYSIC_H__
-
-
-
-

@@ -24,7 +24,7 @@
 #ifndef __NAND_DRV_CFG_H
 #define __NAND_DRV_CFG_H
 
-#include "../../osal/nand_osal.h"
+#include "nand_oal.h"
 
 //==============================================================================
 //  define the value of some variable for
@@ -237,4 +237,3 @@
 #define    DBUG_MSG(...)
 
 #endif //ifndef __NAND_DRV_CFG_H
-

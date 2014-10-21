@@ -47,16 +47,16 @@
 #include <linux/sched.h>
 #include <asm/cacheflush.h>
 #include <linux/pm.h>
-#include "nand_blk.h"
-#include "../nandtest/nand_test.h"
-#include <mach/sys_config.h>
+#include <plat/sys_config.h>
 
+#include "nand_blk.h"
+#include "nand_private.h"
 
 extern __u32 nand_current_dev_num;
-extern int part_secur[MAX_PART_COUNT];
+extern int part_secur[ND_MAX_PART_COUNT];
 extern __u32 RetryCount[8];
 
-struct nand_disk disk_array[MAX_PART_COUNT+1];
+struct nand_disk disk_array[ND_MAX_PART_COUNT+1];
 
 #define BLK_ERR_MSG_ON
 #ifdef  BLK_ERR_MSG_ON
@@ -111,6 +111,7 @@ struct collect_ops collect_arg;
 
 #endif
 
+/*
 //for CLK
 extern int NAND_ClkEnable(void);
 extern void NAND_ClkDisable(void);
@@ -141,15 +142,11 @@ extern void NAND_DMAInterrupt(void);
 extern void NAND_RbInterrupt(void);
 
 extern __u32 NAND_GetIOBaseAddr(void);
-
-
-
+*/
 
 DEFINE_SEMAPHORE(nand_mutex);
 static unsigned char volatile IS_IDLE = 1;
 static int nand_flush(struct nand_blk_dev *dev);
-
-
 static int nand_flush_force(__u32 dev_num);
 static struct nand_state nand_reg_state;
 
@@ -1086,15 +1083,12 @@ int cal_partoff_within_disk(char *name,struct inode *i)
 	return ( gd->part_tbl->part[ index - 1]->start_sect);
 }
 
-#define SW_INT_IRQNO_NAND AW_IRQ_NAND
-
 #ifndef CONFIG_SUNXI_NAND_TEST
-static int  init_blklayer(void)
+static int __init init_blklayer(void)
 {
 	int ret;
 	unsigned long irqflags;
-	script_item_value_type_e script_ret;
-	script_item_u nand_good_block_ratio;
+	int nand_good_block_ratio = 0;
 
 	ClearNandStruct();
 
@@ -1110,47 +1104,40 @@ static int  init_blklayer(void)
 
 	printk("[NAND] nand driver version: 0x%x 0x%x \n", NAND_VERSION_0,NAND_VERSION_1);
 #ifdef __LINUX_NAND_SUPPORT_INT__
-    NAND_ClearRbInt();
-    spin_lock_init(&nand_rb_lock);
+	NAND_ClearRbInt();
+	spin_lock_init(&nand_rb_lock);
 	irqflags = IRQF_DISABLED;
 
 	ret=request_irq(SW_INT_IRQNO_NAND, nand_rb_interrupt, irqflags, mytr.name, &mytr);
-    if(ret)
-	{
-	    printk("nand interrupt register error\n");
-	    return -EAGAIN;
+	if(ret) {
+		printk("nand interrupt register error\n");
+		return -EAGAIN;
 	}
 	else
-	{
-	    printk("nand interrupt register ok\n");
-	}
+		printk("nand interrupt register ok\n");
 #endif
 	//modify ValidBlkRatio
-	script_ret = script_get_item("nand_para","good_block_ratio", &nand_good_block_ratio);
-  if (script_ret!=SCIRPT_ITEM_VALUE_TYPE_INT)
-  {
-    	printk("nand init fetch nand_good_block_ratio failed\n");
-  }
-  else
-  {
-        if(nand_good_block_ratio.val <= 0)
-        {
-            printk("[NAND] use nand_good_block_ratio from default parameter\n");
-        }
-        else
-        {
-            printk("[NAND] get nand_good_block_ratio from script: %d \n",nand_good_block_ratio.val);
-            NAND_SetValidBlkRatio(nand_good_block_ratio.val);
-        }
+	ret = script_parser_fetch("nand_para","good_block_ratio",
+				  &nand_good_block_ratio, sizeof(int));
+	if (ret)
+		printk(KERN_INFO "[NAND] nand_good_block_ratio is undefined\n");
+	else {
+		if(nand_good_block_ratio <= 0)
+			printk(KERN_INFO "[NAND] use nand_good_block_ratio from default parameter\n");
+		else {
+			printk(KERN_INFO "[NAND] get nand_good_block_ratio from script: %d\n",
+			       nand_good_block_ratio);
+			NAND_SetValidBlkRatio(nand_good_block_ratio);
+		}
 	}
 
 	ret = PHY_ChangeMode(1);
 	if (ret < 0)
 		return ret;
 
-    ret = PHY_ScanDDRParam();
-    if (ret < 0)
-        return ret;
+	ret = PHY_ScanDDRParam();
+	if (ret < 0)
+		return ret;
 
 	ret = FMT_Init();
 	if (ret < 0)
@@ -1170,11 +1157,10 @@ static int  init_blklayer(void)
 		NAND_CacheOpen();
 	#endif
 
-
 	return nand_blk_register(&mytr);
 }
 
-static void   exit_blklayer(void)
+static void __exit exit_blklayer(void)
 {
 	nand_flush(NULL);
 	nand_blk_unregister(&mytr);
@@ -1187,13 +1173,13 @@ static void   exit_blklayer(void)
 }
 
 #else
-static int  init_blklayer(void)
+static int __init init_blklayer(void)
 {
 	printk("[NAND] for nand test, init_blklayer \n");
 	return 0;
 }
 
-static void   exit_blklayer(void)
+static void __exit exit_blklayer(void)
 {
 
 }
@@ -1228,7 +1214,7 @@ static int nand_suspend(struct platform_device *plat_dev, pm_message_t state)
 		down(&mytr.nand_ops_mutex);
 
 		NAND_ClkDisable();
-		NAND_PIORelease();
+//		NAND_PIORelease();
 	}
 	}
 	else if(SUPER_STANDBY == standby_type)
@@ -1247,7 +1233,7 @@ static int nand_suspend(struct platform_device *plat_dev, pm_message_t state)
 		down(&mytr.nand_ops_mutex);
 
 		NAND_ClkDisable();
-		NAND_PIORelease();
+//		NAND_PIORelease();
 	}
 	for(i=0; i<(NAND_REG_LENGTH); i++){
 		nand_reg_state.nand_reg_back[i] = *(volatile u32 *)(NAND_GetIOBaseAddr() + i*0x04);
@@ -1271,13 +1257,13 @@ static int nand_resume(struct platform_device *plat_dev)
 
 	printk(KERN_INFO"[NAND] nand_resume \n");
 	if(NORMAL_STANDBY== standby_type){
-	NAND_PIORequest();
+//	NAND_PIORequest();
 	NAND_ClkEnable();
 
 	up(&mytr.nand_ops_mutex);
 	}else if(SUPER_STANDBY == standby_type){
 		int i;
-		NAND_PIORequest();
+//		NAND_PIORequest();
 	    NAND_ClkEnable();
         //process for super standby
 		//restore reg state
@@ -1386,25 +1372,16 @@ static struct platform_driver nand_driver = {
 int nand_init(void)
 {
 	s32 ret;
-//	int nand_used = 0;
+	int nand_used = 0;
 
-	script_item_value_type_e script_ret;
-	script_item_u nand_used;
+	ret = script_parser_fetch("nand_para","nand_used", &nand_used, sizeof(int));
+	if (ret)
+		printk("nand init fetch emac using configuration failed\n");
 
-    printk("%s,line:%d\n", __func__, __LINE__);
-    script_ret = script_get_item("nand_para","nand_used", &nand_used);
-    if (script_ret!=SCIRPT_ITEM_VALUE_TYPE_INT)
-    {
-    	printk("nand init fetch emac using configuration failed\n");
-
-    }
-
-    if(nand_used.val == 0)
-    {
-        printk("nand driver is disabled \n");
-        return 0;
-    }
-
+	if (nand_used == 0) {
+		printk("nand driver is disabled \n");
+		return 0;
+	}
 
 	printk("[NAND]nand driver, init.\n");
 
@@ -1427,30 +1404,22 @@ int nand_init(void)
 
 void nand_exit(void)
 {
- //   s32 ret;
-//	int nand_used = 0;
-	script_item_value_type_e script_ret;
-	script_item_u nand_used;
+	s32 ret;
+	int nand_used = 0;
 
+	ret = script_parser_fetch("nand_para", "nand_used", &nand_used, sizeof(int));
+	if (ret)
+		printk("nand init fetch emac using configuration failed\n");
 
-    script_ret = script_get_item("nand_para","nand_used", &nand_used);
-    if (script_ret!=SCIRPT_ITEM_VALUE_TYPE_INT)
-    {
-    	printk("nand init fetch emac using configuration failed\n");
-
-    }
-
-    if(nand_used.val == 0)
-    {
-        printk("nand driver is disabled \n");
-        return ;
-    }
+	if(nand_used == 0) {
+		printk("nand driver is disabled \n");
+		return;
+	}
 
 	printk("[NAND]nand driver : bye bye\n");
 	platform_driver_unregister(&nand_driver);
 	//platform_device_unregister(&nand_device);
 	exit_blklayer();
-
 }
 
 //module_init(nand_init);

@@ -15,8 +15,7 @@
 #include "nand_private.h"
 #include <linux/wait.h>
 #include <linux/sched.h>
-#include "../nfc/nfc.h"
-#include "../nfc/nfc_i.h"
+#include "../src/include/nfc.h"
 
 static int nandrb_ready_flag = 1;
 static DECLARE_WAIT_QUEUE_HEAD(NAND_RB_WAIT);

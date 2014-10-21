@@ -13,7 +13,7 @@
 *
 * This program is distributed in the hope that it will be useful,
 * but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 * GNU General Public License for more details.
 *
 * You should have received a copy of the GNU General Public License
@@ -21,6 +21,10 @@
 * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
 * MA 02111-1307 USA
 */
+
+#include "linux/string.h"
+#include "linux/kernel.h"
+#include "plat/sys_config.h"
 
 #include "../include/mbr.h"
 #include "../include/nand_type.h"
@@ -41,38 +45,36 @@ extern __u32 nand_part_cnt;
 
 typedef struct tag_CRC32_DATA
 {
-	__u32 CRC;				//int的大小是32位
-	__u32 CRC_32_Tbl[256];	//用来保存码表
+	__u32 CRC;
+	__u32 CRC_32_Tbl[256];
 }CRC32_DATA_t;
 
 __u32 nand_calc_crc32(void * buffer, __u32 length)
 {
 	__u32 i, j;
-	CRC32_DATA_t crc32;		//
-	__u32 CRC32 = 0xffffffff; //设置初始值
+	CRC32_DATA_t crc32;
+	__u32 CRC32 = 0xffffffff;
 	crc32.CRC = 0;
 
-	for( i = 0; i < 256; ++i)//用++i以提高效率
+	for( i = 0; i < 256; ++i)
 	{
 		crc32.CRC = i;
 		for( j = 0; j < 8 ; ++j)
 		{
-			//这个循环实际上就是用"计算法"来求取CRC的校验码
 			if(crc32.CRC & 1)
 				crc32.CRC = (crc32.CRC >> 1) ^ 0xEDB88320;
-			else //0xEDB88320就是CRC-32多项表达式的值
+			else //0xEDB88320
 				crc32.CRC >>= 1;
 		}
 		crc32.CRC_32_Tbl[i] = crc32.CRC;
 	}
 
-	CRC32 = 0xffffffff; //设置初始值
+	CRC32 = 0xffffffff;
     for( i = 0; i < length; ++i)
     {
         CRC32 = crc32.CRC_32_Tbl[(CRC32^((unsigned char*)buffer)[i]) & 0xff] ^ (CRC32>>8);
     }
-    //return CRC32;
-	return CRC32^0xffffffff;
+    return CRC32^0xffffffff;
 }
 
 __s32 _get_mbr(void)
@@ -120,18 +122,32 @@ __s32 _free_mbr(void)
 	return 0;
 }
 
+static int NAND_get_storagetype(void)
+{
+	int ret;
+	int storage_type = 0;
+
+	ret = script_parser_fetch("target","storage_type",
+				  &storage_type, sizeof(int));
+	if (ret) {
+		printk("nand init fetch storage_type failed\n");
+		return 0;
+	}
+
+	return storage_type;
+}
+
 int mbr2disks(struct nand_disk* disk_array)
 {
 	int part_cnt = 0;
 
 #if 0
- 	//查找出所有的LINUX盘符
     for(part_cnt = 0; part_cnt < nand_part_cnt && part_cnt < NAND_MAX_PART_CNT; part_cnt++)
     {
             disk_array[part_cnt].offset =nand_disk_array[part_cnt].offset;
     		disk_array[part_cnt].size = nand_disk_array[part_cnt].size;
     		DBUG_MSG("part %d: offset = %x, size = %x\n", part_cnt, disk_array[part_cnt].offset, disk_array[part_cnt].size);
-    }	
+    }
     return nand_part_cnt;
 
 #else
@@ -140,7 +156,6 @@ int mbr2disks(struct nand_disk* disk_array)
     PRINT("storage_type=%d\n",storage_type);
     if((1 != storage_type)&&(2 != storage_type))
     {
-    	//查找出所有的LINUX盘符
     	PRINT("boot from nand\n");
     	for(part_cnt = 0; part_cnt < nand_part_cnt && part_cnt < NAND_MAX_PART_CNT; part_cnt++)
     	{
@@ -149,9 +164,9 @@ int mbr2disks(struct nand_disk* disk_array)
     		DBUG_MSG("part %d: offset = %x, size = %x\n", part_cnt, disk_array[part_cnt].offset, disk_array[part_cnt].size);
     	}
 		return nand_part_cnt;
-    }   
+    }
      else
-    {   
+    {
           PRINT("boot from sd/mmc\n");
           nand_part_cnt = 1;
           disk_array[0].offset = 0;
@@ -176,8 +191,6 @@ int NAND_PartInit(void)
 	for(part_cnt = 0; part_cnt<NAND_MAX_PART_CNT; part_cnt++)
 		part_secur[part_index] = 0;
 
-
-	//查找出所有的LINUX盘符
 	for(part_cnt = 0; part_cnt < mbr->PartCount && part_cnt < NAND_MAX_PART_CNT; part_cnt++)
 	{
 	    //if((mbr->array[part_cnt].user_type == 2) || (mbr->array[part_cnt].user_type == 0))
@@ -213,4 +226,3 @@ int NAND_PartInit(void)
 
 	return part_index;
 }
-

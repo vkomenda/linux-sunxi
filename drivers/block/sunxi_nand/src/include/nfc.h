@@ -22,12 +22,11 @@
 * MA 02111-1307 USA
 */
 #ifndef _NFC_H_
-#define _NFC_H_                   
+#define _NFC_H_
 
-#include "nand_drv_cfg.h" 
-                                       
-extern __u32 nand_io_base;                    
-#define NAND_IO_BASE    (nand_io_base)
+#include "nand_drv_cfg.h"
+
+#define NAND_IO_BASE (0xf1c03000)
 #define __NFC_REG(x)    (*(volatile unsigned int   *)(NAND_IO_BASE + x))
 /*
 *********************************************************************************************************
@@ -55,7 +54,7 @@ extern __u32 nand_io_base;
 #define NFC_REG_o_ECC_CNT1         0x0044
 #define NFC_REG_o_ECC_CNT2         0x0048
 #define NFC_REG_o_ECC_CNT3         0x004c
-#define NFC_REG_o_USER_DATA_BASE   0x0050    
+#define NFC_REG_o_USER_DATA_BASE   0x0050
 #define NFC_REG_o_SPARE_AREA       0x00A0
 #define NFC_o_RAM0_BASE            0x0400
 #define NFC_o_RAM1_BASE            0x0800
@@ -174,18 +173,18 @@ extern __u32 nand_io_base;
 
 typedef struct cmd_list{
 	struct	cmd_list *next;
-	__u8	*addr;	
-	__u8	addr_cycle;	
+	__u8	*addr;
+	__u8	addr_cycle;
 	__u8	data_fetch_flag;
 	__u8	main_data_fetch;
-	__u8	wait_rb_flag;	
+	__u8	wait_rb_flag;
 	__u32 	bytecnt;
-	__u32	value;	
+	__u32	value;
 }NFC_CMD_LIST;
 
-typedef struct NFC_init_info{   
+typedef struct NFC_init_info{
 	__u8	bus_width;// bus width 8 bit
-	__u8	rb_sel; // ready busy 
+	__u8	rb_sel; // ready busy
 	__u8	ce_ctl; // chip select
 	__u8	ce_ctl1;
 	__u8	pagesize; // 1024 ,2048 ,
@@ -260,5 +259,24 @@ void NFC_InitDDRParam(__u32 chip, __u32 param);
 #else
 #define NFC_IS_SDRAM(addr)			( ((addr >= DRAM_BASE))&&(addr < SRAM_BASE)?1:0)
 #endif
+
+int NAND_RequestDMA(void);
+int NAND_ReleaseDMA(void);
+void NAND_Config_Start_DMA(__u8 rw, dma_addr_t buff_addr, __u32 len);
+int NAND_WaitDmaFinish(void);
+void NAND_ClearRbInt(void);
+void NAND_EnRbInt(void);
+
+void NAND_RbInterrupt(void);
+__s32 NAND_WaitRbReady(void);
+
+int NAND_ClkRequest(void);
+void NAND_ClkRelease(void);
+int NAND_AHBEnable(void);
+void NAND_AHBDisable(void);
+int NAND_ClkEnable(void);
+void NAND_ClkDisable(void);
+int NAND_SetClk(unsigned int nand_clk);
+int NAND_GetClk(void);
 
 #endif    // #ifndef _NFC_H_

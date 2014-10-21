@@ -298,7 +298,7 @@ static __s32 _VirtualPageRead(__u32 nDieNum, __u32 nBlkNum, __u32 nPage, __u64 S
     }
 
 	return result;
-	
+
     #if 0
     if(result < 0)
     {
@@ -376,7 +376,7 @@ static __s32 _VirtualPageWrite(__u32 nDieNum, __u32 nBlkNum, __u32 nPage, __u64 
             }
         }
 
-        MEMSET(FORMAT_SPARE_BUF, 0xff, SECTOR_CNT_OF_SUPER_PAGE * 4);
+        memset(FORMAT_SPARE_BUF, 0xff, SECTOR_CNT_OF_SUPER_PAGE * 4);
 
         for(i=0; i<4; i++)
         {
@@ -806,32 +806,32 @@ static __s32 _GetLastUsedPage(__u32 nDieNum, __u32 nBlock)
     {
         __u32   tmpBnkNum;
         __u8    tmpPageStatus;
-    
+
         tmpLowPage = 0;
         tmpHighPage = PAGE_CNT_OF_PHY_BLK - 1;
-    
+
         while(tmpLowPage <= tmpHighPage)
         {
             tmpPageStatus = FREE_PAGE_MARK;
             tmpMidPage = (tmpLowPage + tmpHighPage) / 2;
-    
+
             //if support bank align, there may be some free pages in the used page group
             for(tmpBnkNum=0; tmpBnkNum<INTERLEAVE_BANK_CNT; tmpBnkNum++)
             {
                 //read pages to check if the page is free
                 tmpPage = tmpMidPage * INTERLEAVE_BANK_CNT + tmpBnkNum;
                 _VirtualPageRead(nDieNum, nBlock, tmpPage, 0x3, FORMAT_PAGE_BUF, (void *)&tmpSpare);
-    
+
                 if((tmpSpare.PageStatus == FREE_PAGE_MARK) && (tmpSpare.LogicPageNum == 0xffff))
                 {
                     //current page is a free page
                     continue;
                 }
-    
+
                 tmpPageStatus &= DATA_PAGE_MARK;
                 tmpUsedPage = tmpPage;
             }
-    
+
             if(tmpPageStatus == FREE_PAGE_MARK)
             {
                 //look for the last table group in the front pages
@@ -843,22 +843,22 @@ static __s32 _GetLastUsedPage(__u32 nDieNum, __u32 nBlock)
                 tmpLowPage = tmpMidPage + 1;
             }
         }
-    
+
     }
     else
     {
-    
+
         tmpLowPage = 0;
         tmpHighPage = PAGE_CNT_OF_SUPER_BLK - 1;
-    
+
         while(tmpLowPage <= tmpHighPage)
         {
             tmpMidPage = (tmpLowPage + tmpHighPage) / 2;
-    
+
             //get the spare area data of the page to check if the page is free
             _VirtualPageRead(nDieNum, nBlock, tmpMidPage, 0x3, FORMAT_PAGE_BUF, (void *)&tmpSpare);
             tmpUsedPage = tmpMidPage;
-                
+
             if((tmpSpare.PageStatus == FREE_PAGE_MARK) && (tmpSpare.LogicPageNum == 0xffff))
             {
      		    //look for the last table group in the front pages
@@ -871,7 +871,7 @@ static __s32 _GetLastUsedPage(__u32 nDieNum, __u32 nBlock)
                 tmpLowPage = tmpMidPage + 1;
             }
         }
-    
+
     }
 
     return tmpUsedPage;
@@ -1005,31 +1005,31 @@ static __s32 _GetBlkLogicInfo(struct __ScanDieInfo_t *pDieInfo)
 					if(result==-ERR_ECC)
 					{
 						__u8* temp_mdata_ptr0 = (__u8*)FORMAT_PAGE_BUF;
-						__u8* temp_mdata_ptr1 = (__u8*)((__u32)FORMAT_PAGE_BUF + SECTOR_CNT_OF_SINGLE_PAGE*512); 
-						
+						__u8* temp_mdata_ptr1 = (__u8*)((__u32)FORMAT_PAGE_BUF + SECTOR_CNT_OF_SINGLE_PAGE*512);
+
 						if(((*temp_mdata_ptr0==0x00) && (*(temp_mdata_ptr0+1)==0x00) && (*(temp_mdata_ptr0+2)==0x00) && (*(temp_mdata_ptr0+3)==0x00) && (*(temp_mdata_ptr0+4)==0x00) && (*(temp_mdata_ptr0+5)==0x00))
-							||(SUPPORT_MULTI_PROGRAM && ((*temp_mdata_ptr1==0x00) && (*(temp_mdata_ptr1+1)==0x00) && (*(temp_mdata_ptr1+2)==0x00) && (*(temp_mdata_ptr1+3)==0x00) && (*(temp_mdata_ptr1+4)==0x00) && (*(temp_mdata_ptr1+5)==0x00))))   
+							||(SUPPORT_MULTI_PROGRAM && ((*temp_mdata_ptr1==0x00) && (*(temp_mdata_ptr1+1)==0x00) && (*(temp_mdata_ptr1+2)==0x00) && (*(temp_mdata_ptr1+3)==0x00) && (*(temp_mdata_ptr1+4)==0x00) && (*(temp_mdata_ptr1+5)==0x00))))
 						{
 							tmpBadFlag = 1;
-					
+
 						}
 						else
 						{
 							if((tmpSpare[0].BadBlkFlag != 0xff) || (SUPPORT_MULTI_PROGRAM && (tmpSpare[1].BadBlkFlag != 0xff)))
 							{
 								tmpBadFlag = 1;
-								
+
 							}
 						}
-						
-													
+
+
 					}
 					else
 					{
 						if((tmpSpare[0].BadBlkFlag != 0xff) || (SUPPORT_MULTI_PROGRAM && (tmpSpare[1].BadBlkFlag != 0xff)))
 						{
 							tmpBadFlag = 1;
-						
+
 						}
 					}
 				}
@@ -1039,7 +1039,7 @@ static __s32 _GetBlkLogicInfo(struct __ScanDieInfo_t *pDieInfo)
 	                {
 	                    //set the bad flag of the physical block
 	                    tmpBadFlag = 1;
-						
+
 	                }
 
 				}
@@ -1621,7 +1621,7 @@ static __s32 _KickValidTblBlk(struct __ScanDieInfo_t *pDieInfo)
         tmpTblPage = ZoneTblPstInfo[i + pDieInfo->nDie * ZONE_CNT_OF_DIE].TablePst;
         //read the block mapping table to the block mapping table buffer
         _VirtualPageRead(pDieInfo->nDie, tmpTblBlk, tmpTblPage+DATA_TBL_OFFSET, DATA_TABLE_BITMAP, FORMAT_PAGE_BUF, NULL);
-        MEMCPY(pDieInfo->ZoneInfo[i].ZoneTbl, FORMAT_PAGE_BUF, SECTOR_SIZE * 4);
+        memcpy(pDieInfo->ZoneInfo[i].ZoneTbl, FORMAT_PAGE_BUF, SECTOR_SIZE * 4);
         _VirtualPageRead(pDieInfo->nDie, tmpTblBlk, tmpTblPage+DATA_TBL_OFFSET+1, DATA_TABLE_BITMAP, FORMAT_PAGE_BUF, NULL);
         MEMCPY(&pDieInfo->ZoneInfo[i].ZoneTbl[BLOCK_CNT_OF_ZONE / 2], FORMAT_PAGE_BUF, SECTOR_SIZE * 4);
         //read the log table the block mapping table buffer
@@ -1839,7 +1839,7 @@ static __s32 _FillZoneTblInfo(struct __ScanDieInfo_t *pDieInfo)
     for( ; tmpPhyBlk<SuperBlkCntOfDie; tmpPhyBlk++)
     {
         tmpLogicInfo = pDieInfo->pPhyBlk[tmpPhyBlk];
-        
+
         //added by penggang 20101206
         //the last block is degenrous, if it is free block, kick it as a bad block
         if(tmpPhyBlk == SuperBlkCntOfDie-1)
@@ -1849,13 +1849,13 @@ static __s32 _FillZoneTblInfo(struct __ScanDieInfo_t *pDieInfo)
                 FORMAT_DBG("[FORMAT_DBG] mark the last block as bad block \n");
                 pDieInfo->pPhyBlk[tmpPhyBlk] = BAD_BLOCK_INFO;
                 _WriteBadBlkFlag(pDieInfo->nDie, tmpPhyBlk);
-                
+
             }
         }
-        
+
         tmpLogicInfo = pDieInfo->pPhyBlk[tmpPhyBlk];
-        
-        
+
+
         //check if the block is a bad block
         if(tmpLogicInfo == BAD_BLOCK_INFO)
         {
@@ -2000,24 +2000,24 @@ static __s32 _FillZoneTblInfo(struct __ScanDieInfo_t *pDieInfo)
 	                //erase the virtual block failed, the block is a bad block, need write bad block flag
 	                pDieInfo->pPhyBlk[tmpBlkErase[i]] = BAD_BLOCK_INFO;
 	                _WriteBadBlkFlag(pDieInfo->nDie, tmpBlkErase[i]);
-	
+
 	                //continue;
 	            }
-	
+
 	            //the block will be a new free block, modify the logical information
 	            pDieInfo->pPhyBlk[tmpBlkErase[i]] = FREE_BLOCK_INFO;
 	            pDieInfo->nFreeCnt++;
-	
+
 	            //continue;
 	        }
 	        else
-	        	break; 
-	        
+	        	break;
+
         }
-        
+
         continue;
-        
-        
+
+
     }
 
 #if DBG_DUMP_DIE_INFO
@@ -2557,7 +2557,7 @@ __s32 FMT_Init(void)
     if(SUPPORT_EXT_INTERLEAVE)
     {
        if(NandStorageInfo.ChipCnt >=2)
-          LogicArchiPar.PageCntPerLogicBlk *= 2; 	
+          LogicArchiPar.PageCntPerLogicBlk *= 2;
     }
     LogicArchiPar.ZoneCntPerDie = (NandStorageInfo.BlkCntPerDie / NandStorageInfo.PlaneCntPerDie) / BLOCK_CNT_OF_ZONE;
 
@@ -2684,6 +2684,3 @@ void ClearNandStruct( void )
 {
     MEMSET(&PageCachePool, 0x00, sizeof(struct __NandPageCachePool_t));
 }
-
-
-

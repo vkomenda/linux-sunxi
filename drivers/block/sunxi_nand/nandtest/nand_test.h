@@ -23,7 +23,7 @@
 #ifndef  __NAND_TEST_H__
 #define  __NAND_TEST_H__
 
-#define CONFIG_SUNXI_NAND_TEST  // FIXME: make a proper Kconfig file
+// #define CONFIG_SUNXI_NAND_TEST  // FIXME: make a proper Kconfig file
 
 #ifdef CONFIG_SUNXI_NAND_TEST
 
