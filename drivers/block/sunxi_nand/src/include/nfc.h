@@ -28,6 +28,9 @@
 
 #define NAND_IO_BASE (0xf1c03000)
 #define __NFC_REG(x)    (*(volatile unsigned int   *)(NAND_IO_BASE + x))
+
+// #define USE_SYS_CLK
+
 /*
 *********************************************************************************************************
 *   Nand Flash Controller define          < maintained by Richard >
@@ -270,6 +273,15 @@ void NAND_EnRbInt(void);
 void NAND_RbInterrupt(void);
 __s32 NAND_WaitRbReady(void);
 
+#ifndef USE_SYS_CLK
+__u32 get_cmu_clk(void);
+void set_nand_clock(__u32 nand_max_clock);
+void release_nand_clock(void);
+void active_nand_clock(void);
+__u32 get_nand_clk(void);
+void nand_clk_down(void);
+void nand_clk_recover(__u32 reg_val);
+#else // USE_SYS_CLK
 int NAND_ClkRequest(void);
 void NAND_ClkRelease(void);
 int NAND_AHBEnable(void);
@@ -278,5 +290,6 @@ int NAND_ClkEnable(void);
 void NAND_ClkDisable(void);
 int NAND_SetClk(unsigned int nand_clk);
 int NAND_GetClk(void);
+#endif // USE_SYS_CLK
 
 #endif    // #ifndef _NFC_H_

@@ -28,8 +28,10 @@
 
 extern void dump(void *buf, __u32 len , __u8 nbyte,__u8 linelen);
 
+#ifdef USE_SYS_CLK
 static struct clk *ahb_nand_clk = NULL;
 static struct clk *mod_nand_clk = NULL;
+#endif // USE_SYS_CLK
 
 __u32	nand_board_version=0;
 __u32 	pagesize=0;
@@ -646,10 +648,6 @@ __s32 NFC_SelectChip( __u32 chip)
     cfg = NFC_READ_REG(NFC_REG_CTL);
     cfg &= ( (~NFC_CE_SEL) & 0xffffffff);
     cfg |= ((chip & 0x7) << 24);
-#if 0
-    if(((read_retry_mode == 0)||(read_retry_mode == 1))&&(read_retry_cycle))
-        cfg |= (0x1<<6);
-#endif
     NFC_WRITE_REG(NFC_REG_CTL,cfg);
 
     if((cfg>>18)&0x3) //ddr nand
@@ -827,24 +825,27 @@ __s32 NFC_SetEccMode(__u8 ecc_mode)
 __s32 NFC_Init(NFC_INIT_INFO *nand_info )
 {
 	__s32 ret;
-    __s32 i;
+	__s32 i;
 
-    PRINT("[NAND] nand driver(b) version: 0x%x, 0x%x, data: %x\n", NAND_VERSION_0, NAND_VERSION_1, NAND_DRV_DATE);
+	PRINT("[NAND] nand driver(b) version: 0x%x, 0x%x, data: %x\n", NAND_VERSION_0, NAND_VERSION_1, NAND_DRV_DATE);
 
-    //init ddr_param
-    for(i=0;i<8;i++)
-        ddr_param[i] = 0x21f;
+	//init ddr_param
+	for(i=0;i<8;i++)
+		ddr_param[i] = 0x21f;
 
-    //init clk
-    NAND_ClkRequest();
-    NAND_AHBEnable();
-    NAND_SetClk(10);
-    NAND_ClkEnable();
+#ifndef USE_SYS_CLK
+	set_nand_clock(10);
+#else
+	NAND_ClkRequest();
+	NAND_AHBEnable();
+	NAND_SetClk(10);
+	NAND_ClkEnable();
+#endif // USE_SYS_CLK
 
-    //init pin
-//    NAND_PIORequest();
+	//init pin
+//	NAND_PIORequest();
 
-    //init dma
+	//init dma
 	NFC_SetEccMode(0);
 
 	/*init nand control machine*/
@@ -883,10 +884,11 @@ void NFC_Exit( void )
 	cfg &= ( (~NFC_EN) & 0xffffffff);
 	NFC_WRITE_REG(NFC_REG_CTL,cfg);
 
-	 //init clk
+#ifdef USE_SYS_CLK
 	NAND_ClkDisable();
 	NAND_AHBDisable();
 	NAND_ClkRelease();
+#endif // USE_SYS_CLK
 
 	//init pin
 //	NAND_PIORelease();
@@ -1429,27 +1431,36 @@ __s32 NFC_ReadRetry(__u32 chip, __u32 retry_count, __u32 read_retry_type)
     }
     else if((read_retry_mode>=0x10)&&(read_retry_mode<0x20))  //for toshiba readretry mode
     {
-        nand_clk_bak = NAND_GetClk();
-        NAND_SetClk(10);
+#ifndef USE_SYS_CLK
+	    nand_clk_bak = get_nand_clk();
+	    nand_clk_down();
+#else
+	    nand_clk_bak = NAND_GetClk();
+	    NAND_SetClk(10);
+#endif // USE_SYS_CLK
 
         if(retry_count == 1)
             _vender_pre_condition();
 
         for(i=0; i<read_retry_reg_num; i++)
-            param[i] = (__u8)read_retry_val[retry_count-1][i];
+		param[i] = (__u8)read_retry_val[retry_count-1][i];
 
-		if((NFC_READ_REG(NFC_REG_CTL)<<18)&0x3) //change to legacy mode from toggle mode  after 0x53h cmd
+	if((NFC_READ_REG(NFC_REG_CTL)<<18)&0x3) //change to legacy mode from toggle mode  after 0x53h cmd
 		{
 			NFC_WRITE_REG(NFC_REG_CTL,NFC_READ_REG(NFC_REG_CTL)&(~(0x3<<18)));
 			toggle_mode_flag = 1;
 		}
 
-		ret =_vender_set_param(&param[0], &read_retry_reg_adr[0], read_retry_reg_num);
+	ret =_vender_set_param(&param[0], &read_retry_reg_adr[0], read_retry_reg_num);
 
-		if(toggle_mode_flag == 1) //change to toggle mode from legacy mode  after set param
-			NFC_WRITE_REG(NFC_REG_CTL,NFC_READ_REG(NFC_REG_CTL)|(0x3<<18));
+	if(toggle_mode_flag == 1) //change to toggle mode from legacy mode  after set param
+		NFC_WRITE_REG(NFC_REG_CTL,NFC_READ_REG(NFC_REG_CTL)|(0x3<<18));
 
-        NAND_SetClk(nand_clk_bak);
+#ifndef USE_SYS_CLK
+	nand_clk_recover(nand_clk_bak);
+#else
+	NAND_SetClk(nand_clk_bak);
+#endif // USE_SYS_CLK
     }
     else if((read_retry_mode>=0x20)&&(read_retry_mode<0x30))   //for sansumg readretyr mode
     {
@@ -1458,10 +1469,15 @@ __s32 NFC_ReadRetry(__u32 chip, __u32 retry_count, __u32 read_retry_type)
 
         ret =_vender_set_param(&param[0], &read_retry_reg_adr[0], read_retry_reg_num);
     }
-	else if((read_retry_mode>=0x30)&&(read_retry_mode<0x40))  //for sandisk readretry mode
+    else if((read_retry_mode>=0x30)&&(read_retry_mode<0x40))  //for sandisk readretry mode
     {
-        nand_clk_bak = NAND_GetClk();
-        NAND_SetClk(10);
+#ifndef USE_SYS_CLK
+	    nand_clk_bak = get_nand_clk();
+	    nand_clk_down();
+#else
+	    nand_clk_bak = NAND_GetClk();
+	    NAND_SetClk(10);
+#endif // USE_SYS_CLK
 
         if(retry_count == 1)
             _vender_pre_condition();
@@ -1489,10 +1505,13 @@ __s32 NFC_ReadRetry(__u32 chip, __u32 retry_count, __u32 read_retry_type)
 
         ret =_vender_set_param(&param[0], &read_retry_reg_adr[0], read_retry_reg_num);
 
-		if(toggle_mode_flag == 1) //change to toggle mode from legacy mode  after set param
-			NFC_WRITE_REG(NFC_REG_CTL,NFC_READ_REG(NFC_REG_CTL)|(0x3<<18));
-
-        NAND_SetClk(nand_clk_bak);
+	if(toggle_mode_flag == 1) //change to toggle mode from legacy mode  after set param
+		NFC_WRITE_REG(NFC_REG_CTL,NFC_READ_REG(NFC_REG_CTL)|(0x3<<18));
+#ifndef USE_SYS_CLK
+	nand_clk_recover(nand_clk_bak);
+#else
+	NAND_SetClk(nand_clk_bak);
+#endif // USE_SYS_CLK
     }
 	else if((read_retry_mode>=0x40)&&(read_retry_mode<0x50))  //for micron readretry mode
 	{
@@ -1744,8 +1763,13 @@ __s32 NFC_SetDefaultParam(__u32 chip,__u8* default_value,__u32 read_retry_type)
     }
 	else if((read_retry_mode>=0x30)&&(read_retry_mode<0x40))  //sandisk read retry mode
 	{
+#ifndef USE_SYS_CLK
+		nand_clk_bak = get_nand_clk();
+		nand_clk_down();
+#else
 		nand_clk_bak = NAND_GetClk();
-        NAND_SetClk(10);
+		NAND_SetClk(10);
+#endif // USE_SYS_CLK
 
 		ret = _vender_pre_condition();
 		for(i=0; i<read_retry_reg_num; i++)
@@ -1770,9 +1794,11 @@ __s32 NFC_SetDefaultParam(__u32 chip,__u8* default_value,__u32 read_retry_type)
 
 		ret |= _wait_cmdfifo_free();
 		ret |= _wait_cmd_finish();
-
+#ifndef USE_SYS_CLK
+		nand_clk_recover(nand_clk_bak);
+#else
 		NAND_SetClk(nand_clk_bak);
-
+#endif // USE_SYS_CLK
 		if(ret)
 		{
 			_exit_nand_critical();
@@ -1914,6 +1940,119 @@ __u32 NFC_DmaIntOccur(void)
 }
 
 
+#ifndef USE_SYS_CLK
+__u32 get_cmu_clk(void)
+{
+	__u32 reg_val;
+	__u32 div_p, factor_n;
+	__u32 factor_k, factor_m;
+	__u32 clock;
+
+	reg_val  = *(volatile unsigned int *)(0xf1c20000 + 0x20);
+	div_p    = (reg_val >> 16) & 0x3;
+	factor_n = (reg_val >> 8) & 0x1f;
+	factor_k = ((reg_val >> 4) & 0x3) + 1;
+	factor_m = ((reg_val >> 0) & 0x3) + 1;
+
+	clock = 24 * factor_n * factor_k/div_p/factor_m;
+
+	return clock;
+}
+
+void set_nand_clock(__u32 nand_max_clock)
+{
+	__u32 edo_clk, cmu_clk;
+	__u32 cfg;
+	__u32 nand_clk_divid_ratio;
+
+	/*open ahb nand clk */
+	cfg = *(volatile __u32 *)(0xf1c20000 + 0x60);
+	cfg |= (0x1<<13);
+	*(volatile __u32 *)(0xf1c20000 + 0x60) = cfg;
+
+	/*set nand clock*/
+	//edo_clk = (nand_max_clock > 20)?(nand_max_clock-10):nand_max_clock;
+	edo_clk = nand_max_clock * 2;
+
+	cmu_clk = get_cmu_clk( );
+	nand_clk_divid_ratio = cmu_clk / edo_clk;
+	if (cmu_clk % edo_clk)
+			nand_clk_divid_ratio++;
+	if (nand_clk_divid_ratio){
+		if (nand_clk_divid_ratio > 16)
+			nand_clk_divid_ratio = 15;
+		else
+			nand_clk_divid_ratio--;
+	}
+	/*set nand clock gate on*/
+	cfg = *(volatile __u32 *)(0xf1c20000 + 0x80);
+
+	/*gate on nand clock*/
+	cfg |= (1U << 31);
+	/*take cmu pll as nand src block*/
+	cfg &= ~(0x3 << 24);
+	cfg |=  (0x2 << 24);
+	//set divn = 0
+	cfg &= ~(0x03 << 12);
+
+	/*set ratio*/
+	cfg &= ~(0x0f << 0);
+	cfg |= (nand_clk_divid_ratio & 0xf) << 0;
+
+	*(volatile __u32 *)(0xf1c20000 + 0x80) = cfg;
+}
+
+
+void release_nand_clock(void)
+{
+	__u32 cfg;
+	__u32 ccmu_base;
+
+	ccmu_base = 0xf1c20000;
+
+	/*set nand clock gate on*/
+	cfg = *(volatile __u32 *)(ccmu_base + 0x14);
+	cfg &= (~(0x1<<15));
+	*(volatile __u32 *)(ccmu_base + 0x14) = cfg;
+}
+
+void active_nand_clock(void)
+{
+	__u32 cfg;
+	__u32 ccmu_base;
+
+	ccmu_base = 0xf1c20000;
+
+	/*set nand clock gate on*/
+	cfg = *(volatile __u32 *)(ccmu_base + 0x14);
+	cfg |= (0x1<<15);
+	*(volatile __u32 *)(ccmu_base + 0x14) = cfg;
+}
+
+__u32 get_nand_clk(void)
+{
+    __u32 reg_val = *(volatile __u32 *)(0xf1c20000 + 0x80);
+
+    return reg_val;
+}
+
+void nand_clk_down(void)
+{
+    __u32 reg_val = *(volatile __u32 *)(0xf1c20000 + 0x80);
+
+    reg_val |=(0xf);  //set to mix clock
+
+    *(volatile __u32 *)(0xf1c20000 + 0x80) = reg_val;
+
+}
+
+void nand_clk_recover(__u32 reg_val)
+{
+     *(volatile __u32 *)(0xf1c20000 + 0x80) = reg_val;
+}
+
+#else // USE_SYS_CLK
+
 int NAND_ClkRequest(void)
 {
 	printk("[NAND] nand clk request start\n");
@@ -1965,3 +2104,4 @@ int NAND_GetClk(void)
 {
 	return (clk_get_rate(mod_nand_clk)/2000000);
 }
+#endif // USE_SYS_CLK
