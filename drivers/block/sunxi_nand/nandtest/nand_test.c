@@ -1,25 +1,26 @@
 /*
- * drivers/block/sunxi_nand/nandtest/nand_test.c
- *
- * (C) Copyright 2007-2012
- * Allwinner Technology Co., Ltd. <www.allwinnertech.com>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; either version 2 of
- * the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
- * MA 02111-1307 USA
- */
-
+* (C) Copyright 2007-2012
+* Allwinner Technology Co., Ltd. <www.allwinnertech.com>
+* Neil Peng<penggang@allwinnertech.com>
+*
+* See file CREDITS for list of people who contributed to this
+* project.
+*
+* This program is free software; you can redistribute it and/or
+* modify it under the terms of the GNU General Public License as
+* published by the Free Software Foundation; either version 2 of
+* the License, or (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with this program; if not, write to the Free Software
+* Foundation, Inc., 59 Temple Place, Suite 330, Boston,
+* MA 02111-1307 USA
+*/
 #include <linux/device.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -50,17 +51,11 @@
 #include "../src/include/nand_simple.h"
 
 #include "../nfd/nand_blk.h"
-#include "../nfd/nand_private.h"
 
-#include <plat/mbr411.h>
 
 #include "nand_test.h"
 
-#ifdef CONFIG_SUNXI_NAND_TEST     //  open nand test module
-
-extern void dump(void *buf, __u32 len , __u8 nbyte,__u8 linelen);
-extern __s32 _read_single_page_spare(struct boot_physical_param *readop,
-				     __u8 dma_wait_mode);
+#ifdef CONFIG_SUN7I_NANDFLASH_TEST     //  open nand test module
 
 #define NAND_TEST  "[nand_test]:"
 
@@ -79,14 +74,14 @@ void obj_test_release(struct kobject *kobject);
 
 struct nand_test_card {
     u8    *buffer;
-//    u8    *scratch;
+    u8    *scratch;
     unsigned int sector_cnt;
 };
 
 struct nand_test_case {
     const char *name;
-    int  sector_cnt;
-    int (*prepare)(struct nand_test_card *);
+    int  sectors_cnt;
+    int (*prepare)(struct nand_test_card *, int sectors_cnt);
     int (*run)(struct nand_test_card * );
     int (*cleanup)(struct nand_test_card *);
 };
@@ -108,7 +103,7 @@ struct sysfs_ops obj_test_sysops =
     .store = nand_test_store
 };
 
-struct kobj_type ktype =
+struct kobj_type ktype = 
 {
     .release = obj_test_release,
     .sysfs_ops=&obj_test_sysops,
@@ -123,15 +118,17 @@ void obj_test_release(struct kobject *kobject)
 
 
 /* prepare buffer data for read and write*/
-static int __nand_test_prepare(struct nand_test_card *test, int write)
+static int __nand_test_prepare(struct nand_test_card *test, int sector_cnt,int write)
 {
     int i;
 
-    if (write) {
-        memset(test->buffer, 0xDF, 512 * test->sector_cnt + 4);
+    test->sector_cnt = sector_cnt;    
+
+    if (write){
+        memset(test->buffer, 0xDF, 512 * (sector_cnt) +4);
     }
     else {
-        for (i = 0; i < 512 * test->sector_cnt + 4; i++){
+        for (i = 0; i < 512 * (sector_cnt) + 4; i++){
             test->buffer[i] = i%256;
          }
     }
@@ -140,492 +137,45 @@ static int __nand_test_prepare(struct nand_test_card *test, int write)
 }
 
 
-static int nand_test_prepare_write(struct nand_test_card *test)
+static int nand_test_prepare_write(struct nand_test_card *test, int sector_cnt)
 {
-    return __nand_test_prepare(test, 1);
+    return __nand_test_prepare(test, sector_cnt, 1);
 }
 
-static int nand_test_prepare_read(struct nand_test_card *test)
+static int nand_test_prepare_read(struct nand_test_card *test, int sector_cnt)
 {
-    return __nand_test_prepare(test, 0);
+    return __nand_test_prepare(test, sector_cnt, 0);
 }
 
 
-/*
- *  Create and write the block mapping table onto the flash.
- */
-static int create_BMT_prepare(struct nand_test_card* test)
+static int nand_test_prepare_pwm(struct nand_test_card *test, int sector_cnt)
 {
-	int i;
-	struct __BlkMapTblCache_t* cache;
-
-	// TODO: pointer correction assertions... cache initialisation?
-	PRECONDITION(NandDriverInfo.BlkMapTblCachePool != NULL);
-
-	for (i = 0; i < BLOCK_MAP_TBL_CACHE_CNT; i++) {
-		cache = &NandDriverInfo.BlkMapTblCachePool->BlkMapTblCachePool[i];
-		if (cache->DataBlkTbl == NULL ||
-		    cache->LogBlkTbl  == NULL ||
-		    cache->FreeBlkTbl == NULL) {
-			pr_info("Map cache %d is not initialised. Skipping...\n", i);
-			continue;
-		}
-		cache->DirtyFlag = 1;
-		cache->ZoneNum   = 0;
-		if (NandDriverInfo.BlkMapTblCachePool->ActBlkMapTbl == NULL)
-			NandDriverInfo.BlkMapTblCachePool->ActBlkMapTbl = cache;
-	}
-
-	if (NandDriverInfo.BlkMapTblCachePool->ActBlkMapTbl == NULL) {
-		pr_info("There is no active block map\n");
-		return -ENODATA;
-	}
-
-	return 0;
-}
-
-static int create_BMT_cleanup(struct nand_test_card* test)
-{
-	return 0;
-}
-
-static int create_BMT_run(struct nand_test_card *test)
-{
-	return BMM_WriteBackAllMapTbl();
-}
-
-static int oob_8_to_12_prepare(struct nand_test_card* test)
-{
-	if (PageCachePool.PageCache0 == NULL) {
-		pr_err("Page cache is not initialised.\n");
-		return -ENODATA;
-	}
-	return 0;
-}
-
-static int oob_8_to_12_cleanup(struct nand_test_card* test)
-{
-	return 0;
-}
-
-static int oob_8_to_12_run(struct nand_test_card *test)
-{
-	__u8 oob[64];
-	struct boot_physical_param nand_op;
-	int ret = 0, i;
-
-	oob[0] = 0xFF;
-	oob[1] = 0x4F;
-	oob[2] = 0x4F;
-	oob[3] = 0x42;
-
-	nand_op.chip = 0;
-	nand_op.page = 0;
-	nand_op.oobbuf = oob;
-	nand_op.mainbuf = PageCachePool.PageCache0;
-
-	for (i = 8; i<12; i++) {
-		nand_op.block = i;
-
-		ret = PHY_SimpleErase(&nand_op);
-		if (ret) {
-			pr_err("%s: chip 0 block %d erase ERROR\n",
-			       __FUNCTION__, i);
-			continue;
-		}
-		else
-			pr_info("%s: chip 0 block %d erase SUCCESS\n",
-				__FUNCTION__, i);
-
-		pr_info("The first 1K of the page cache:\n");
-		dump(PageCachePool.PageCache0, 1024, 1, 16);
-
-		ret = PHY_SimpleWrite_1K(&nand_op);
-		if (ret) {
-			pr_err("%s: chip 0 block %d page 0 write ERROR\n",
-			       __FUNCTION__, i);
-			continue;
-		}
-		else
-			pr_info("%s: chip 0 block %d page 0 write SUCCESS\n",
-				__FUNCTION__, i);
-	}
-	return ret;
-}
-
-static int erase_8_to_12_prepare(struct nand_test_card* test)
-{
-	return 0;
-}
-
-static int erase_8_to_12_cleanup(struct nand_test_card* test)
-{
-	return 0;
-}
-
-static int erase_8_to_12_run(struct nand_test_card *test)
-{
-	struct boot_physical_param nand_op;
-	int ret = 0, i;
-
-	memset(&nand_op, 0, sizeof(struct boot_physical_param));
-	nand_op.chip = 0;
-	nand_op.page = 0;
-	nand_op.oobbuf = NULL;
-	nand_op.mainbuf = NULL;
-
-	for (i = 8; i < 12; i++) {
-		nand_op.block = i;
-
-		ret = PHY_SimpleErase(&nand_op);
-		if (ret) {
-			pr_err("%s: chip 0 block %d erase ERROR\n",
-			       __FUNCTION__, i);
-			continue;
-		}
-		else
-			pr_info("%s: chip 0 block %d erase SUCCESS\n",
-				__FUNCTION__, i);
-	}
-	return ret;
-}
-
-#define TEST_PAGE_SIZE  (SECTOR_CNT_OF_SINGLE_PAGE * SECTOR_SIZE)
-#define TEST_SPARE_SIZE (SECTOR_CNT_OF_SINGLE_PAGE * 4)
-
-static int read_13pages_prepare(struct nand_test_card *test)
-{
-	PRECONDITION(FORMAT_SPARE_BUF != NULL &&
-		     FORMAT_PAGE_BUF  != NULL);
-	return 0;
-}
-
-static int read_13pages_cleanup(struct nand_test_card *test)
-{
-	return 0;
-}
-
-static void calcPhyAddr(struct __PhysicOpPara_t* op,
-			int zone, int lblock, int lpage)
-{
-	int die;
-
-	die = zone / ZONE_CNT_OF_DIE;
-	op->BankNum = die / DIE_CNT_OF_CHIP;
-	op->PageNum = lpage;
-	op->BlkNum  = lblock +
-		(die % DIE_CNT_OF_CHIP) *
-		(BLOCK_CNT_OF_DIE / PLANE_CNT_OF_DIE);
-}
-
-static int read_13pages_run(struct nand_test_card *test)
-{
-	struct __PhysicOpPara_t op;
-	int i, result = 0;
-
-	pr_info("Page size 0x%x, spare size 0x%x\n",
-		TEST_PAGE_SIZE, TEST_SPARE_SIZE);
-
-	for (i = 0; i < 13; i++) {
-		memset(FORMAT_PAGE_BUF,  0, TEST_PAGE_SIZE);
-		memset(FORMAT_SPARE_BUF, 0, TEST_SPARE_SIZE);
-		calcPhyAddr(&op, 0, 0, i);
-		op.SectBitmap = FULL_BITMAP_OF_SINGLE_PAGE;
-		op.MDataPtr = FORMAT_PAGE_BUF;
-		op.SDataPtr = FORMAT_SPARE_BUF;
-		result = PHY_PageReadSpare(&op);
-
-		if (!result) {
-			pr_info("=== Block 0, Page 0x%x [Data] ===\n", i);
-			dump(FORMAT_PAGE_BUF, TEST_PAGE_SIZE, 1, 32);
-			pr_info("=== Block 0, Page 0x%x [Spare] ===\n", i);
-			dump(FORMAT_SPARE_BUF, TEST_SPARE_SIZE, 1, 32);
-		}
-		else {
-			pr_err("Block %x Page %x read error %d\n",
-			       op.BlkNum, op.PageNum, result);
-		}
-	}
-	return result;
-}
-
-static int read_page7_prepare(struct nand_test_card *test)
-{
-	PRECONDITION(FORMAT_SPARE_BUF != NULL &&
-		     FORMAT_PAGE_BUF  != NULL);
-
-        memset(FORMAT_PAGE_BUF,  0, TEST_PAGE_SIZE);
-	memset(FORMAT_SPARE_BUF, 0, TEST_SPARE_SIZE);
-	return 0;
-}
-
-static int read_page7_cleanup(struct nand_test_card *test)
-{
-	return 0;
-}
-
-static int read_page7_run(struct nand_test_card *test)
-{
-	struct __PhysicOpPara_t op;
-	int i, result = 0;
-
-	pr_info("Page size 0x%x, spare size 0x%x\n",
-		TEST_PAGE_SIZE, TEST_SPARE_SIZE);
-
-	for (i = 0; i < 5; i++) {
-		memset(FORMAT_PAGE_BUF,  0, TEST_PAGE_SIZE);
-		memset(FORMAT_SPARE_BUF, 0, TEST_SPARE_SIZE);
-		calcPhyAddr(&op, 0, i, 7);
-		op.SectBitmap = 0xFFFFFFFF;
-		op.MDataPtr = FORMAT_PAGE_BUF;
-		op.SDataPtr = FORMAT_SPARE_BUF;
-		result = PHY_PageReadSpare(&op);
-
-		if (!result) {
-			pr_info("=== Block %x, Page %x [Data] (raw) ===\n",
-				op.BlkNum, op.PageNum);
-			dump(FORMAT_PAGE_BUF, TEST_PAGE_SIZE, 1, 32);
-			pr_info("=== Block %x, Page %x [Spare] (raw) ===\n",
-				op.BlkNum, op.PageNum);
-			dump(FORMAT_SPARE_BUF, TEST_SPARE_SIZE, 1, 32);
-		}
-		else {
-			pr_err("Block %x Page %x read error %d\n",
-			       op.BlkNum, op.PageNum, result);
-		}
-	}
-
-	return result;
-}
-
-static int print_map_caches_prepare(struct nand_test_card* test)
-{
-	PRECONDITION(BLK_MAP_CACHE_POOL != NULL &&
-		     BLK_MAP_CACHE_POOL->BlkMapTblCachePool != NULL &&
-		     PAGE_MAP_CACHE_POOL != NULL &&
-		     PAGE_MAP_CACHE_POOL->PageMapTblCachePool != NULL);
-	return 0;
-}
-
-static int print_map_caches_cleanup(struct nand_test_card* test)
-{
-	return 0;
-}
-
-static void show_block_map_cache(struct __BlkMapTblCache_t* m)
-{
-	pr_info("--- Block Map Cache at %x ---\n"
-		" zone %x\n dirty? %x\n accesses %x\n"
-		" data block table at %x\n"
-		" logic block table at %x\n"
-		" free block table at %x\n"
-		" last free block position %x\n"
-		"------\n",
-		(u32) m, m->ZoneNum, m->DirtyFlag, m->AccessCnt,
-		(u32) m->DataBlkTbl, (u32) m->LogBlkTbl,
-		(u32) m->FreeBlkTbl, m->LastFreeBlkPst);
-}
-
-static void show_page_map_cache(struct __PageMapTblCache_t* m)
-{
-	pr_info("--- Page Map Cache at %x ---\n"
-	        " zone %x\n logic block position %x\n accesses %x\n"
-		" page map table at %x\n"
-		" dirty? %x\n"
-		"------\n",
-		(u32) m, m->ZoneNum, m->LogBlkPst, m->AccessCnt,
-		(u32) m->PageMapTbl, m->DirtyFlag);
-}
-
-static int print_map_caches_run(struct nand_test_card* test)
-{
-	int i;
-	struct __BlkMapTblCache_t*  bmc;
-	struct __PageMapTblCache_t* pmc;
-
-	pr_info("%d block map caches, %d page map caches",
-		BLOCK_MAP_TBL_CACHE_CNT, PAGE_MAP_TBL_CACHE_CNT);
-
-	for (i = 0; i < BLOCK_MAP_TBL_CACHE_CNT; i++) {
-		bmc = &BLK_MAP_CACHE_POOL->BlkMapTblCachePool[i];
-		pr_info("=== Block Map Cache #%d (raw) ===\n", i);
-		dump(bmc, sizeof(struct __BlkMapTblCache_t), 1, 32);
-		show_block_map_cache(bmc);
-	}
-	for (i = 0; i < PAGE_MAP_TBL_CACHE_CNT; i++) {
-		pmc = &PAGE_MAP_CACHE_POOL->PageMapTblCachePool[i];
-		pr_info("=== Page Map Cache #%d (raw) ===\n", i);
-		dump(pmc, sizeof(struct __PageMapTblCache_t), 1, 32);
-		show_page_map_cache(pmc);
-        }
-	return 0;
-}
-
-static int erase_block_prepare(struct nand_test_card* test)
-{
-	return 0;
-}
-
-static int erase_block_cleanup(struct nand_test_card* test)
-{
-	return 0;
-}
-
-static int erase_block_run(struct nand_test_card* test)
-{
-	struct boot_physical_param op;
-	int ret = 0;
-
-	op.chip    = 0;
-	op.block   = 0x100;
-	op.page    = 0;     // not used
-	op.oobbuf  = NULL;  // not used
-	op.mainbuf = NULL;  // not used
-
-	ret = PHY_SimpleErase(&op);
-	if (ret) {
-		pr_err("Block %x erase ERROR %d\n", op.block, ret);
-	}
-	else
-		pr_info("Block %x erase SUCCESS\n", op.block);
-	return ret;
-}
-
-static int write_page_prepare(struct nand_test_card* test)
-{
-	PRECONDITION(PageCachePool.PageCache0 != NULL &&
-		     PageCachePool.SpareCache != NULL);
-
-        memset(PageCachePool.PageCache0, 0, TEST_PAGE_SIZE);
-	memset(PageCachePool.SpareCache, 0, TEST_SPARE_SIZE);
-	return 0;
-}
-
-static int write_page_cleanup(struct nand_test_card* test)
-{
-	memset(PageCachePool.PageCache0, 0, TEST_PAGE_SIZE);
-	memset(PageCachePool.SpareCache, 0, TEST_SPARE_SIZE);
-	return 0;
-}
-
-static void show_page_spare(void)
-{
-	pr_info("=== Page cache ===\n");
-	dump(PageCachePool.PageCache0, TEST_PAGE_SIZE, 1, 32);
-	pr_info("=== Spare cache ===\n");
-	dump(PageCachePool.SpareCache, TEST_SPARE_SIZE, 1, 32);
-}
-
-static int write_page_run(struct nand_test_card* test)
-{
-	u8 content[TEST_PAGE_SIZE];
-	u8 oob[TEST_SPARE_SIZE];
-	struct boot_physical_param op;
-	int ret = 0;
-
-	op.chip    = 0;
-	op.block   = 0x100;
-	op.page    = 1;
-	op.oobbuf  = PageCachePool.PageCache0;
-	op.mainbuf = PageCachePool.SpareCache;
-
-//	ret = PHY_SimpleRead_1K(&op);
-	ret = _read_single_page_spare(&op, SUPPORT_DMA_IRQ);
-	if (!ret)
-		show_page_spare();
-	else
-		pr_err("Block %x Page %x read ERROR %d\n",
-		       op.block, op.page, ret);
-
-	memset(content, 0x37, TEST_PAGE_SIZE);
-	memset(oob,     0,    TEST_SPARE_SIZE);
-	oob[1] = 0x75;
-	oob[2] = 0x13;
-	oob[3] = 0x07;
-	oob[4] = 0x96;
-	oob[5] = 0x39;
-
-	op.mainbuf = content;
-	op.oobbuf = oob;
-
-	ret = PHY_SimpleWrite(&op);
-	if (!ret)
-		pr_info("Block %x Page %x write SUCCESS\n",
-			op.block, op.page);
-	else
-		pr_err("Block %x Page %x write ERROR %d\n",
-		       op.block, op.page, ret);
-
-//	ret = PHY_SimpleRead_1K(&op);
-	ret = _read_single_page_spare(&op, SUPPORT_DMA_IRQ);
-	if (!ret)
-		show_page_spare();
-	else
-		pr_err("Block %x Page %x read ERROR %d\n",
-		       op.block, op.page, ret);
-	return ret;
-}
-
-static int read_page_prepare(struct nand_test_card* test)
-{
-	PRECONDITION(PageCachePool.PageCache0 != NULL &&
-		     PageCachePool.SpareCache != NULL);
-
-        memset(PageCachePool.PageCache0, 0, TEST_PAGE_SIZE);
-	memset(PageCachePool.SpareCache, 0, TEST_SPARE_SIZE);
-	return 0;
-}
-
-static int read_page_cleanup(struct nand_test_card* test)
-{
-	memset(PageCachePool.PageCache0, 0, TEST_PAGE_SIZE);
-	memset(PageCachePool.SpareCache, 0, TEST_SPARE_SIZE);
-	return 0;
-}
-
-static int read_page_run(struct nand_test_card* test)
-{
-	struct boot_physical_param op;
-	int ret = 0;
-
-	op.chip    = 0;
-	op.block   = 0x100;
-	op.page    = 1;
-	op.mainbuf = PageCachePool.PageCache0;
-	op.oobbuf  = PageCachePool.SpareCache;
-
-//	ret = PHY_SimpleRead_1K(&op);
-	ret = _read_single_page_spare(&op, SUPPORT_DMA_IRQ);
-	if (!ret)
-		show_page_spare();
-	else
-		pr_err("Block %x Page %x read ERROR %d\n",
-		       op.block, op.page, ret);
-	return ret;
+    test->sector_cnt = sector_cnt; 
+    return 0;
 }
 
 
 /* read /write one sector with out verification*/
 static int nand_test_simple_transfer(struct nand_test_card *test,
-                                    unsigned dev_addr,unsigned start,
+                                    unsigned dev_addr,unsigned start, 
                                     unsigned nsector, int write)
 {
     int ret;
     if (write){
-
+      
 #ifndef NAND_CACHE_RW
-        ret = LML_Write(start, nsector, test->buffer + dev_addr);
+        ret = LML_Write(start, nsector, test->buffer + dev_addr); 
 #else
         //printk("Ws %lu %lu \n",start, nsector);
         ret = NAND_CacheWrite(start, nsector, test->buffer + dev_addr);
-#endif // NAND_CACHE_RW
+#endif     
         if(ret){
             return -EIO;
         }
         return 0;
         }
-    else {
-
+    else { 
+      
 #ifndef NAND_CACHE_RW
         LML_FlushPageCache();
         ret = LML_Read(start, nsector, test->buffer + dev_addr);
@@ -633,11 +183,11 @@ static int nand_test_simple_transfer(struct nand_test_card *test,
         //printk("Rs %lu %lu \n",start, nsector);
         LML_FlushPageCache();
         ret = NAND_CacheRead(start, nsector, test->buffer + dev_addr);
-#endif // NAND_CACHE_RW
-
+#endif                                                  // read
+        
         if (ret){
-            return -EIO;
-        }
+            return -EIO;  
+        } 
         return 0;
     }
 }
@@ -645,12 +195,12 @@ static int nand_test_simple_transfer(struct nand_test_card *test,
 
 /* read /write one or more sectors with verification*/
 static int nand_test_transfer(struct nand_test_card *test,
-                              unsigned dev_addr,unsigned start,
+                              unsigned dev_addr,unsigned start, 
                               unsigned nsector, int write)
 {
     int ret;
     int i;
-
+    
     if (!write){
         ret = nand_test_simple_transfer(test, 0, start, nsector, 1);  // write to sectors for read
         if (ret){
@@ -658,13 +208,13 @@ static int nand_test_transfer(struct nand_test_card *test,
         }
         memset(test->buffer, 0, nsector * 512 +4);    // clean mem for read
     }
-
+  
     if ( ( ret = nand_test_simple_transfer(test, dev_addr, start, nsector, write ) ) ) {   // read or write
         return ret;
     }
-    if(write){
+    if(write){     
         memset(test->buffer, 0, nsector * 512 + 4);    // clean mem for read
-        ret = nand_test_simple_transfer(test, 0 , start, nsector, 0);   // read
+        ret = nand_test_simple_transfer(test, 0 , start, nsector, 0);   // read 
         if (ret){
             return ret;
         }
@@ -673,11 +223,11 @@ static int nand_test_transfer(struct nand_test_card *test,
                 printk(KERN_INFO "[nand_test] Ttest->buffer[i] = %d, i = %d, dev_addr = %d, nsector = %d\n", test->buffer[i],  i, dev_addr,nsector);
                 return RESULT_FAIL;
             }
-        }
+        } 
     }
-    else {   //read
+    else {   //read 
         for(i  = 0 + dev_addr; i < nsector * 512 + dev_addr ; i++){   // verify data
-
+    
             if (test->buffer[i] != (i-dev_addr)%256){
                 printk(KERN_INFO "[nand_test] Ttest->buffer[i] = %d, i = %d, dev_addr = %d, nsector = %d\n", test->buffer[i],  i, dev_addr,nsector);
                 return RESULT_FAIL;
@@ -688,7 +238,7 @@ static int nand_test_transfer(struct nand_test_card *test,
 }
 
 
-
+  
 /* write one sector without verification*/
 static int nand_test_single_write(struct nand_test_card *test)
 {
@@ -696,12 +246,12 @@ static int nand_test_single_write(struct nand_test_card *test)
 
 
     ret = nand_test_simple_transfer(test, 0, 0, test->sector_cnt,1);
-
+    
     if(ret){
         return ret;
     }
     return nand_test_simple_transfer(test, 0, DiskSize/2, test->sector_cnt, 1 );
-
+   
 }
 
 /* read one sector without verification*/
@@ -747,7 +297,7 @@ static int nand_test_align_write(struct nand_test_card *test)
 {
     int ret;
     int i;
-
+  
     for (i = 1;i < 4;i++) {
         ret = nand_test_transfer(test,  i, 1, test->sector_cnt, 1);
     }
@@ -761,14 +311,14 @@ static int nand_test_align_read(struct nand_test_card *test)
 {
     int ret;
     int i;
-
+  
     for (i = 1;i < 4;i++) {
         ret = nand_test_transfer(test,  i, 1, test->sector_cnt, 0);
     }
     if (ret){
         return ret;
     }
-
+  
     return 0;
 }
 
@@ -776,10 +326,10 @@ static int nand_test_align_read(struct nand_test_card *test)
 static int nand_test_negstart_write(struct nand_test_card *test)
 {
     int ret;
-
+    
     /* start + sectnum > 0, start < 0*/
     ret = nand_test_simple_transfer(test,  0, -5 , 11, 1);
-
+    
     if (!ret){
         return RESULT_FAIL;
     }
@@ -787,7 +337,7 @@ static int nand_test_negstart_write(struct nand_test_card *test)
 
     /* start + sectnum < 0 , start < 0 */
     ret = nand_test_simple_transfer(test,  0, -62, 5, 1);
-
+    
     if (!ret){
         return RESULT_FAIL;
     }
@@ -803,7 +353,7 @@ static int nand_test_negstart_read(struct nand_test_card *test)
 
     /* start + sectnum > 0, start < 0*/
     ret = nand_test_simple_transfer(test,  0, -1, 3, 0);
-
+    
     if (!ret){
         return RESULT_FAIL;
     }
@@ -811,12 +361,12 @@ static int nand_test_negstart_read(struct nand_test_card *test)
 
     /* start + sectnum < 0 , start < 0 */
     ret = nand_test_simple_transfer(test,  0, -90, 15, 0);
-
+    
     if (!ret){
         return RESULT_FAIL;
     }
     return RESULT_OK;
-
+  
 }
 
 static int nand_test_beyond(struct nand_test_card *test, int write)
@@ -825,52 +375,52 @@ static int nand_test_beyond(struct nand_test_card *test, int write)
 
 
     ret = nand_test_simple_transfer(test,  0, DiskSize -3 , 5, write);
-
-    if (!ret){
-
+    
+    if (!ret){ 
+        
         return 1;
     }
     printk(NAND_TEST "DiskSize -3 , 5 pass\n");
     ret = nand_test_simple_transfer(test,  0, DiskSize -1 , 2, write);
-
-    if (!ret){
-
+    
+    if (!ret){ 
+        
         return 1;
     }
     printk(NAND_TEST "DiskSize -1 , 2 pass\n");
     ret = nand_test_simple_transfer(test,  0, DiskSize , 3, write);
-
-    if (!ret){
-
+    
+    if (!ret){ 
+        
         return 1;
     }
 
     printk(NAND_TEST "DiskSize , 3 pass\n");
-
+    
     ret = nand_test_simple_transfer(test,  0, DiskSize + 3 , 0, write);
-
-    if (!ret){
-
+    
+    if (!ret){ 
+        
         return 1;
     }
 
     printk(NAND_TEST "DiskSize + 3 , 0 pass\n");
 
     ret = nand_test_simple_transfer(test,  0, DiskSize - 3 , -2, write);
-
-    if (!ret){
-
+    
+    if (!ret){ 
+        
         return 1;
     }
 
     printk(NAND_TEST "DiskSize - 3 , -2 pass\n");
-
+    
     return RESULT_OK;
 }
 
 
 static int nand_test_beyond_write(struct nand_test_card *test)
-{
+{   
     return (nand_test_beyond(test, 1));
 }
 
@@ -878,9 +428,9 @@ static int nand_test_beyond_write(struct nand_test_card *test)
 /* read from incorrect sector num such as -1, DiskSize(max sector num + 1),  DiskSize +1 */
 static int nand_test_beyond_read(struct nand_test_card *test)
 {
-
+    
     return (nand_test_beyond(test, 0));
-
+  
 }
 
 
@@ -888,39 +438,39 @@ static int nand_test_beyond_read(struct nand_test_card *test)
 /* write all sectors from sector num 0 to DiskSize - 1(max sector num )*/
 static int nand_test_write_all_ascending(struct nand_test_card *test)
 {
-    int ret;
+    int ret; 
     int i = 0;
     int j = 0;
 
     printk(KERN_INFO "DiskSize = %x\n", DiskSize);
-
-
-    for (i = 0; i < DiskSize; i++) {   // write all sectors
+   
+  
+    for (i = 0; i < DiskSize; i++) {   // write all sectors  
         ret = nand_test_simple_transfer(test, 0, i, test->sector_cnt,1);
-        if(ret){
+        if(ret){ 
             printk(KERN_INFO "nand_test_write_all_ascending fail, sector num %d\n", i);
             return ret;
         }
     }
-
+   
     /* start check */
     printk(KERN_INFO "[nand test]:start check\n");
-
+   
     for (i = 0; i < DiskSize; i++){
         memset(test->buffer, 0, test->sector_cnt * 512);  // clear buffer
-
-        ret = nand_test_simple_transfer(test, 0 , i, test->sector_cnt, 0);   // read
+        
+        ret = nand_test_simple_transfer(test, 0 , i, test->sector_cnt, 0);   // read 
         if(ret){
             return ret;
         }
-
+        
         for(j  = 0; j < test->sector_cnt * 512; j++)  {  // verify
             if (test->buffer[j] != 0xDF){
                 printk(KERN_INFO "nand_test_write_all_ascending, Ttest->buffer[j] = %d, i = %d\n", test->buffer[j],  i);
                 return RESULT_FAIL;
             }
         }
-
+   
     }
     return RESULT_OK;
 }
@@ -929,30 +479,30 @@ static int nand_test_write_all_ascending(struct nand_test_card *test)
 /* read all sectors from sector num 0 to DiskSize - 1(max sector num )*/
 static int nand_test_read_all_ascending(struct nand_test_card *test)
 {
-    int ret;
+    int ret; 
     int i = 0;
     int j = 0;
 
     /*  before reading, write */
     for (i = 0; i < DiskSize; i++) {
-
+      
         ret = nand_test_simple_transfer(test, 0, i, test->sector_cnt,1);  // write all sectors
         if(ret){
             printk(KERN_INFO "nand_test_read_all_ascending fail, sector num %d\n", i);
             return ret;
         }
     }
-
+   
    /* finish write,  start to read and check */
     for (i = 0; i < DiskSize; i++)
     {
         if (i%100000 == 0){
             printk(KERN_INFO "[nand test]: sector num:%d\n", i);
         }
-
+        
         memset(test->buffer, 0, test->sector_cnt * 512);  // clear buffer
-
-        ret = nand_test_simple_transfer(test, 0 , i, test->sector_cnt, 0);   // read
+        
+        ret = nand_test_simple_transfer(test, 0 , i, test->sector_cnt, 0);   // read 
         if(ret){
             return ret;
         }
@@ -961,9 +511,9 @@ static int nand_test_read_all_ascending(struct nand_test_card *test)
                 printk(KERN_INFO "nand_test_read_all_ascending fial! Ttest->buffer[j] = %d, i = %d\n", test->buffer[i],  j);
                 return RESULT_FAIL;
             }
-
+      
        }
-    }
+    } 
     return RESULT_OK;
 }
 
@@ -971,38 +521,38 @@ static int nand_test_read_all_ascending(struct nand_test_card *test)
 /* write all sectors from sector num  DiskSize - 1(max sector num ) to  0  */
 static int nand_test_write_all_descending(struct nand_test_card *test)
 {
-    int ret;
+    int ret; 
     int i = 0;
     int j = 0;
 
     printk(KERN_INFO "nand_test: DiskSize = %x\n", DiskSize);
-
+   
     for (i = DiskSize - 1; i >= 0; i--){
-
+      
         memset(test->buffer, i%256, 512);
-
+        
         if (i%100000 == 0){
             printk(KERN_INFO "[nand test]: sector num:%d\n", i);
         }
-
+        
         ret = nand_test_simple_transfer(test, 0, i, test->sector_cnt,1);  // write all sectors
         if(ret){
             printk(KERN_INFO "[nand_test]: nand_test_write_all_ascending fail, sector num %d\n", i);
             return ret;
         }
    }
-
+   
    printk(KERN_INFO "[nand test]: check start\n");
-
+   
    for (i = DiskSize - 1; i >= 0; i--){
 
        if (i%100000 == 0){
            printk(KERN_INFO "[nand test]: sector num:%d\n", i);
        }
-
+       
        memset(test->buffer, 0, test->sector_cnt * 512);  // clear buffer
-
-       ret = nand_test_simple_transfer(test, 0 , i, test->sector_cnt, 0);   // read
+       
+       ret = nand_test_simple_transfer(test, 0 , i, test->sector_cnt, 0);   // read 
        if(ret){
            return ret;
        }
@@ -1011,7 +561,7 @@ static int nand_test_write_all_descending(struct nand_test_card *test)
                 printk(KERN_INFO "[nand_test]: nand_test_write_all_ascending, Ttest->buffer[j] = %d, i = %d\n", test->buffer[j],  i);
                 return RESULT_FAIL;
             }
-        }
+        }   
     }
     return RESULT_OK;
 }
@@ -1019,27 +569,27 @@ static int nand_test_write_all_descending(struct nand_test_card *test)
 /* read all sectors from sector num  DiskSize - 1(max sector num ) to  0  */
 static int nand_test_read_all_descending(struct nand_test_card *test)
 {
-    int ret;
+    int ret; 
     int i = 0;
     int j = 0;
-
+   
     for (i = DiskSize - 1; i >= 0; i--){
         memset(test->buffer, i%256, 512);
-
+        
         ret = nand_test_simple_transfer(test, 0, i, test->sector_cnt,1);  // write all sectors
         if(ret){
             printk(KERN_INFO "[nand_test]: nand_test_read_all_ascending fail, sector num %d\n", i);
             return ret;
         }
     }
-
+   
     printk(KERN_INFO "[nand test]: check start\n");
     for (i = DiskSize - 1; i >= 0; i--){
         if (i%100000 == 0){
             printk(KERN_INFO "[nand test]: sector num:%d\n", i);
         }
         memset(test->buffer, 0, test->sector_cnt * 512);  // clear buffer
-        ret = nand_test_simple_transfer(test, 0 , i, test->sector_cnt, 0);   // read
+        ret = nand_test_simple_transfer(test, 0 , i, test->sector_cnt, 0);   // read 
         if(ret){
             return ret;
         }
@@ -1049,18 +599,18 @@ static int nand_test_read_all_descending(struct nand_test_card *test)
                 return RESULT_FAIL;
             }
         }
-    }
+    } 
     return RESULT_OK;
 }
 
 /* write a sector for  n times  without verification to test stability */
 static int nand_test_repeat_single_write(struct nand_test_card *test)
 {
-    int ret;
+    int ret; 
     int i = 0;
-
+   
     printk(NAND_TEST "DiskSize = %d\n", DiskSize);
-
+    
     for(i = 0; i < REPEAT_TIMES*1000; i++){
        ret = nand_test_simple_transfer(test, 0 , DiskSize/7, test->sector_cnt, 1);
        if(ret){
@@ -1074,7 +624,7 @@ static int nand_test_repeat_single_write(struct nand_test_card *test)
 /* read a sector for  n times with verification to test stability*/
 static int nand_test_repeat_single_read(struct nand_test_card *test)
 {
-    int ret;
+    int ret; 
     int i = 0;
     for(i = 0; i < REPEAT_TIMES*30; i++){
         ret = nand_test_simple_transfer(test, 0 , DiskSize/4 + 7, test->sector_cnt, 0);
@@ -1088,16 +638,16 @@ static int nand_test_repeat_single_read(struct nand_test_card *test)
 /* write multi sectors for  n times without verification to test stability*/
 static int nand_test_repeat_multi_write(struct nand_test_card *test)
 {
-    int ret;
+    int ret; 
     int i = 0;
-
+    
     for(i = 0; i < 1100000; i++){
         ret = nand_test_simple_transfer(test, 0 , DiskSize/2, test->sector_cnt, 1);
         if(ret) {
             return ret;
         }
     }
-
+    
     return 0;
 }
 
@@ -1105,7 +655,7 @@ static int nand_test_repeat_multi_write(struct nand_test_card *test)
 /* read multi sectors for  n times without verification to test stability*/
 static int nand_test_repeat_multi_read(struct nand_test_card *test)
 {
-    int ret;
+    int ret; 
     int i = 0;
     for(i = 0; i < 9200000; i++){
         ret = nand_test_simple_transfer(test, 0 , DiskSize/3, test->sector_cnt, 0);
@@ -1119,18 +669,18 @@ static int nand_test_repeat_multi_read(struct nand_test_card *test)
 /* random write one or more sectors*/
 static int nand_test_random_write(struct nand_test_card *test)
 {
-    int ret;
-
+    int ret; 
+  
     ret = nand_test_simple_transfer(test, 0 , 0, test->sector_cnt, 1);
     if(ret){
         return ret;
     }
-
+    
     ret = nand_test_simple_transfer(test, 0 , DiskSize -1, test->sector_cnt, 1);
     if(ret) {
         return ret;
     }
-
+   
     ret = nand_test_simple_transfer(test, 0 , DiskSize/2, test->sector_cnt, 1);
     if(ret){
         return ret;
@@ -1141,23 +691,23 @@ static int nand_test_random_write(struct nand_test_card *test)
 /* random read one or more sectors*/
 static int nand_test_random_read(struct nand_test_card *test)
 {
-    int ret;
-
+    int ret; 
+  
     ret = nand_test_simple_transfer(test, 0 , 0, test->sector_cnt, 0);
     if(ret) {
         return ret;
     }
-
+   
     ret = nand_test_simple_transfer(test, 0 , DiskSize -1, test->sector_cnt, 0);
     if(ret){
         return ret;
     }
-
+   
     ret = nand_test_simple_transfer(test, 0 , DiskSize/2, test->sector_cnt, 0);
     if(ret){
         return ret;
     }
-
+   
     return 0;
 }
 
@@ -1175,40 +725,40 @@ static int nand_test_cleanup(struct nand_test_card *test)
 static const struct nand_test_case nand_test_cases[] = {
     {
 	    .name = "single sector write (no data verification)",
-	    .sector_cnt = 1,
+	    .sectors_cnt = 1,
 	    .prepare = nand_test_prepare_write,
 	    .run = nand_test_single_write,
 	    .cleanup = nand_test_cleanup
     },
-
+  
     {
 	    .name = "single sector read (no data verification)",
-	    .sector_cnt = 1,
+	    .sectors_cnt = 1,
 	    .prepare = nand_test_prepare_read,
 	    .run = nand_test_single_read,
 	    .cleanup = nand_test_cleanup
     },
-
+  
     {
 	    .name = "single sector write(verify data)",
-	    .sector_cnt = 1,
+	    .sectors_cnt = 1,
 	    .prepare = nand_test_prepare_write,
 	    .run = nand_test_verify_write,
 	    .cleanup = nand_test_cleanup
     },
-
+  
     {
 	    .name = "single sector read(verify data)",
-	    .sector_cnt = 1,
+	    .sectors_cnt = 1,
 	    .prepare = nand_test_prepare_read,
 	    .run = nand_test_verify_read,
 	    .cleanup = nand_test_cleanup
     },
-
+  
     /* multi read/write*/
     {
 	    .name = "multi sector read(2 sectors, verify)",
-	    .sector_cnt = 2,
+	    .sectors_cnt = 2,
 	    .prepare = nand_test_prepare_read,
 	    .run = nand_test_multi_read,
 	    .cleanup = nand_test_cleanup
@@ -1216,7 +766,7 @@ static const struct nand_test_case nand_test_cases[] = {
 
     {
 	    .name = "multi sector read(3 sectors, verify)",
-	    .sector_cnt = 3,
+	    .sectors_cnt = 3,
 	    .prepare = nand_test_prepare_read,
 	    .run = nand_test_multi_read,
 	    .cleanup = nand_test_cleanup
@@ -1224,55 +774,55 @@ static const struct nand_test_case nand_test_cases[] = {
 
     {
 	    .name = "multi sector read(8 sectors, verify)",
-	    .sector_cnt = 8,
+	    .sectors_cnt = 8,
 	    .prepare = nand_test_prepare_read,
 	    .run = nand_test_multi_read,
 	    .cleanup = nand_test_cleanup
     },
-
+  
     {
 	    .name = "multi sector read(18 sectors, verify)",
-	    .sector_cnt = 18,
+	    .sectors_cnt = 18,
 	    .prepare = nand_test_prepare_read,
 	    .run = nand_test_multi_read,
 	    .cleanup = nand_test_cleanup
     },
-
+  
     {
 	    .name = "multi sector read(53 sectors, verify)",
-	    .sector_cnt = 53,
+	    .sectors_cnt = 53,
 	    .prepare = nand_test_prepare_read,
 	    .run = nand_test_multi_read,
 	    .cleanup = nand_test_cleanup
     },
-
+  
     {
 	    .name = "multi sector write(2 sectors ,verify)",
-	    .sector_cnt = 2,
+	    .sectors_cnt = 2,
 	    .prepare = nand_test_prepare_write,
 	    .run = nand_test_multi_write,
 	    .cleanup = nand_test_cleanup
     },
-
+  
     {
 	    .name = "multi sector write(5 sectors ,verify)",
-	    .sector_cnt = 5,
+	    .sectors_cnt = 5,
 	    .prepare = nand_test_prepare_write,
 	    .run = nand_test_multi_write,
 	    .cleanup = nand_test_cleanup,
     },
-
+  
     {
 	    .name = "multi sector write(12 sectors ,verify)",
-	    .sector_cnt = 12,
+	    .sectors_cnt = 12,
 	    .prepare = nand_test_prepare_write,
 	    .run = nand_test_multi_write,
 	    .cleanup = nand_test_cleanup,
     },
-
+  
     {
 	    .name = "multi sector write(15 sectors ,verify)",
-	    .sector_cnt = 15,
+	    .sectors_cnt = 15,
 	    .prepare = nand_test_prepare_write,
 	    .run = nand_test_multi_write,
 	    .cleanup = nand_test_cleanup,
@@ -1280,7 +830,7 @@ static const struct nand_test_case nand_test_cases[] = {
 
     {
 	    .name = "multi sector write(26 sectors ,verify)",
-	    .sector_cnt = 26,
+	    .sectors_cnt = 26,
 	    .prepare = nand_test_prepare_write,
 	    .run = nand_test_multi_write,
 	    .cleanup = nand_test_cleanup,
@@ -1288,41 +838,41 @@ static const struct nand_test_case nand_test_cases[] = {
 
     {
 	    .name = "multi sector write(93 sectors ,verify)",
-	    .sector_cnt = 93,
+	    .sectors_cnt = 93,
 	    .prepare = nand_test_prepare_write,
 	    .run = nand_test_multi_write,
 	    .cleanup = nand_test_cleanup,
     },
-
+    
     /*align test*/
     {
 	    .name = "align write(1 sector ,verify)",
-	    .sector_cnt = 1,
+	    .sectors_cnt = 1,
 	    .prepare = nand_test_prepare_write,
 	    .run = nand_test_align_write,
 	    .cleanup = nand_test_cleanup,
     },
-
+    
     {
 	    .name = "align read(1 sector ,verify)",
-	    .sector_cnt = 1,
+	    .sectors_cnt = 1,
 	    .prepare = nand_test_prepare_read,
 	    .run = nand_test_align_read,
 	    .cleanup = nand_test_cleanup,
     },
-
+    
     /* stability test */
     {
 	    .name = "weird write(negative start)",   // 18
-	    .sector_cnt = 10,
+	    .sectors_cnt = 10,
 	    .prepare = nand_test_prepare_write,
 	    .run = nand_test_negstart_write,
 	    .cleanup = nand_test_cleanup,
     },
-
+  
     {
 	    .name = "weid read(nagative satrt)",
-	    .sector_cnt = 10,
+	    .sectors_cnt = 10,
 	    .prepare = nand_test_prepare_read,
 	    .run = nand_test_negstart_read,
 	    .cleanup = nand_test_cleanup,
@@ -1330,15 +880,15 @@ static const struct nand_test_case nand_test_cases[] = {
 
     {
 	    .name = "weird write(beyond start)",   // 20
-	    .sector_cnt = 10,
+	    .sectors_cnt = 10,
 	    .prepare = nand_test_prepare_write,
 	    .run = nand_test_beyond_write,
 	    .cleanup = nand_test_cleanup,
     },
-
+  
     {
 	    .name = "weid read(bayond start)",
-	    .sector_cnt = 10,
+	    .sectors_cnt = 10,
 	    .prepare = nand_test_prepare_read,
 	    .run = nand_test_beyond_read,
 	    .cleanup = nand_test_cleanup,
@@ -1346,7 +896,7 @@ static const struct nand_test_case nand_test_cases[] = {
 
     {                                            // 22
 	    .name = "write all ascending",
-	    .sector_cnt = 1,
+	    .sectors_cnt = 1,
 	    .prepare = nand_test_prepare_write,
 	    .run = nand_test_write_all_ascending,
 	    .cleanup = nand_test_cleanup,
@@ -1354,138 +904,83 @@ static const struct nand_test_case nand_test_cases[] = {
 
     {
 	    .name = "read all ascending",
-	    .sector_cnt = 1,
+	    .sectors_cnt = 1,
 	    .prepare = nand_test_prepare_read,
 	    .run = nand_test_read_all_ascending,
 	    .cleanup = nand_test_cleanup,
     },
-
+  
     {
 	    .name = "write all descending",
-	    .sector_cnt = 1,
+	    .sectors_cnt = 1,
 	    .prepare = nand_test_prepare_write,
 	    .run = nand_test_write_all_descending,
 	     .cleanup = nand_test_cleanup,
     },
-
+       
 
     {
 	    .name = "read all descending",
-	    .sector_cnt = 1,
+	    .sectors_cnt = 1,
 	    .prepare = nand_test_prepare_read,
 	    .run = nand_test_read_all_descending,
 	    .cleanup = nand_test_cleanup,
     },
-
-    {                                                     // 26
+   
+    {                                                     // 26    
 	    .name = " repeat  write (no data verification) ",
-	    .sector_cnt = 1,
+	    .sectors_cnt = 1,
 	    .prepare = nand_test_prepare_write,
 	    .run = nand_test_repeat_single_write,
 	    .cleanup = nand_test_cleanup,
     },
-
-    {                                                    // 27
+  
+    {                                                    // 27   
 	    .name = " repeat  read (no data verification) ",
-	    .sector_cnt = 1,
+	    .sectors_cnt = 1,
 	    .prepare = nand_test_prepare_read,
 	    .run = nand_test_repeat_single_read,
 	    .cleanup = nand_test_cleanup,
    },
 
-   {                                                     // 28
+   {                                                     // 28  
 	    .name = " repeat multi write (no data verification)",
-	    .sector_cnt = 43,
+	    .sectors_cnt = 43,
 	    .prepare = nand_test_prepare_write,
 	    .run = nand_test_repeat_multi_write,
 	    .cleanup = nand_test_cleanup,
    },
-
-   {                                                    // 29
+   
+   {                                                    // 29    
 	    .name = " repeat multi read (no data verification)",
-	    .sector_cnt = 81,
+	    .sectors_cnt = 81,
 	    .prepare = nand_test_prepare_read,
 	    .run = nand_test_repeat_multi_read,
 	    .cleanup = nand_test_cleanup,
     },
 
-    {                                                    // 30
+    {                                                    // 30   
 	    .name = " random  write (no data verification)",
-	    .sector_cnt = 1,
+	    .sectors_cnt = 1,
 	    .prepare = nand_test_prepare_write,
 	    .run = nand_test_random_write,
 	    .cleanup = nand_test_cleanup,
     },
-
-    {                                                    // 31
+    
+    {                                                    // 31   
 	    .name = " random  read (no data verification)",
-	    .sector_cnt = 1,
+	    .sectors_cnt = 1,
 	    .prepare = nand_test_prepare_read,
 	    .run = nand_test_random_read,
 	    .cleanup = nand_test_cleanup,
     },
-    {       // 32
-	    .name = "create block map table",
-	    .sector_cnt = 0,
-	    .prepare = create_BMT_prepare,
-	    .run     = create_BMT_run,
-	    .cleanup = create_BMT_cleanup,
-    },
-    {       // 33
-	    .name = "erase pages from 8 to 12 and write an OOB marker there",
-	    .sector_cnt = 0,
-	    .prepare = oob_8_to_12_prepare,
-	    .run     = oob_8_to_12_run,
-	    .cleanup = oob_8_to_12_cleanup,
-    },
-    {       // 34
-	    .name = "erase pages from 8 to 12",
-	    .sector_cnt = 0,
-	    .prepare = erase_8_to_12_prepare,
-	    .run     = erase_8_to_12_run,
-	    .cleanup = erase_8_to_12_cleanup,
-    },
-    {       // 35
-	    .name = "Dump the first 13 pages of Block 0",
-	    .sector_cnt = 0,
-	    .prepare = read_13pages_prepare,
-	    .run     = read_13pages_run,
-	    .cleanup = read_13pages_cleanup,
-    },
-    {       // 36
-	    .name = "Dump Page 7 of the first 5 blocks",
-	    .sector_cnt = 0,
-	    .prepare = read_page7_prepare,
-	    .run     = read_page7_run,
-	    .cleanup = read_page7_cleanup,
-    },
-    {       // 37
-	    .name = "Dump block and page map caches",
-	    .sector_cnt = 0,
-	    .prepare = print_map_caches_prepare,
-	    .run     = print_map_caches_run,
-	    .cleanup = print_map_caches_cleanup,
-    },
-    {       // 38
-	    .name = "Erase block 0x100",
-	    .sector_cnt = 0,
-	    .prepare = erase_block_prepare,
-	    .run     = erase_block_run,
-	    .cleanup = erase_block_cleanup,
-    },
-    {       // 39
-	    .name = "Write page 1 in block 0x100",
-	    .sector_cnt = 0,
-	    .prepare = write_page_prepare,
-	    .run     = write_page_run,
-	    .cleanup = write_page_cleanup,
-    },
-    {       // 40
-	    .name = "Read page 1 in block 0x100",
-	    .sector_cnt = 0,
-	    .prepare = read_page_prepare,
-	    .run     = read_page_run,
-	    .cleanup = read_page_cleanup,
+    
+    {                                                    // 32 
+	    .name = " pwm  test (no data verification)",
+	    .sectors_cnt = 1,
+	    .prepare = nand_test_prepare_pwm,
+	    //.run = nand_test_pwm,
+	    .cleanup = nand_test_cleanup,
     },
 };
 
@@ -1496,27 +991,26 @@ static DEFINE_MUTEX(nand_test_lock);
 static void nand_test_run(struct nand_test_card *test, int testcase)
 {
     int i, ret;
-
+  
     printk(KERN_INFO "[nand_test]: Starting tests of nand\n");
-
+  
     for (i = 0;i < ARRAY_SIZE(nand_test_cases);i++) {
         if (testcase && ((i + 1) != testcase)){
             continue;
         }
-
+  
         printk(KERN_INFO "[nand_test]: Test case %d. %s...\n", i + 1, nand_test_cases[i].name);
-
+    
         if (nand_test_cases[i].prepare) {
-		test->sector_cnt = nand_test_cases[i].sector_cnt;
-		ret = nand_test_cases[i].prepare(test);
-		if (ret) {
-			printk(KERN_INFO "[nand_test]: Result: Prepare stage failed! (%d)\n", ret);
-			continue;
-		}
+              ret = nand_test_cases[i].prepare(test, nand_test_cases[i].sectors_cnt);
+          if (ret) {
+              printk(KERN_INFO "[nand_test]: Result: Prepare stage failed! (%d)\n", ret);
+              continue;
+          }
         }
-
+  
         ret = nand_test_cases[i].run(test);
-
+        
         switch (ret) {
             case RESULT_OK:
                 printk(KERN_INFO "[nand_test]: Result: OK\n");
@@ -1537,7 +1031,7 @@ static void nand_test_run(struct nand_test_card *test, int testcase)
             default:
                 printk(KERN_INFO "[nand_test]:Result: ERROR (%d)\n", ret);
         }
-
+    
         if (nand_test_cases[i].cleanup) {
             ret = nand_test_cases[i].cleanup(test);
             if (ret) {
@@ -1546,9 +1040,9 @@ static void nand_test_run(struct nand_test_card *test, int testcase)
             }
         }
     }
-
+  
     //mmc_release_host(test->card->host);
-
+    
     printk(KERN_INFO "[nand_test]: Nand tests completed.\n");
 }
 
@@ -1563,31 +1057,31 @@ static ssize_t nand_test_show(struct kobject *kobject,struct attribute *attr, ch
 /* receive testcase num from echo command */
 static ssize_t nand_test_store(struct kobject *kobject,struct attribute *attr, const char *buf, size_t count)
 {
-
+  
     struct nand_test_card *test;
     int testcase;
-
+  
     testcase = simple_strtol(buf, NULL, 10);  // get test case number     >> grace
-
+  
     test = kzalloc(sizeof(struct nand_test_card), GFP_KERNEL);
     if (!test){
         return -ENOMEM;
     }
-
+  
     test->buffer = kzalloc(BUFFER_SIZE, GFP_KERNEL);  // alloc buffer for r/w
-//    test->scratch = kzalloc(BUFFER_SIZE, GFP_KERNEL); // not used now
-
-//    if (test->buffer && test->scratch) {
-    if (test->buffer) {
+    test->scratch = kzalloc(BUFFER_SIZE, GFP_KERNEL); // not used now
+    
+    if (test->buffer && test->scratch) {
         mutex_lock(&nand_test_lock);
         nand_test_run(test, testcase);             // run test cases
         mutex_unlock(&nand_test_lock);
     }
-
+  
+  
     kfree(test->buffer);
-//    kfree(test->scratch);
+    kfree(test->scratch);
     kfree(test);
-
+  
     return count;
 }
 
@@ -1595,7 +1089,7 @@ struct kobject kobj;
 
 
 /* if nand driver is not inited ,  functions below will be used  */
-#ifdef INIT_NAND_IN_TESTDRIVER
+#ifdef INIT_NAND_IN_TESTDRIVER   
 
 static void set_nand_pio(void)
 {
@@ -1603,14 +1097,14 @@ static void set_nand_pio(void)
     __u32 cfg1;
     __u32 cfg2;
     void* gpio_base;
-
+  
     //modify for f20
     gpio_base = (void *)SW_VA_PORTC_IO_BASE;
-
+  
     cfg0 = *(volatile __u32 *)(gpio_base + 0x48);
     cfg1 = *(volatile __u32 *)(gpio_base + 0x4c);
     cfg2 = *(volatile __u32 *)(gpio_base + 0x50);
-
+  
     /*set PIOC for nand*/
     cfg0 &= 0x0;
     cfg0 |= 0x22222222;
@@ -1618,7 +1112,7 @@ static void set_nand_pio(void)
     cfg1 |= 0x22222222;
     cfg2 &= 0x0;
     cfg2 |= 0x22222222;
-
+  
     *(volatile __u32 *)(gpio_base + 0x48) = cfg0;
     *(volatile __u32 *)(gpio_base + 0x4c) = cfg1;
     *(volatile __u32 *)(gpio_base + 0x50) = cfg2;
@@ -1650,7 +1144,7 @@ static void set_nand_clock(__u32 nand_max_clock)
 	__u32 edo_clk, cmu_clk;
 	__u32 cfg;
 	__u32 nand_clk_divid_ratio;
-
+	
 	/*open ahb nand clk */
 	cfg = *(volatile __u32 *)(0xf1c20000 + 0x60);
 	cfg |= (0x1<<13);
@@ -1660,7 +1154,7 @@ static void set_nand_clock(__u32 nand_max_clock)
 	//edo_clk = (nand_max_clock > 20)?(nand_max_clock-10):nand_max_clock;
 	edo_clk = nand_max_clock * 2;
 
-	cmu_clk = get_cmu_clk( );
+    cmu_clk = get_cmu_clk( );
 	nand_clk_divid_ratio = cmu_clk / edo_clk;
 	if (cmu_clk % edo_clk)
 			nand_clk_divid_ratio++;
@@ -1686,55 +1180,59 @@ static void set_nand_clock(__u32 nand_max_clock)
 	cfg |= (nand_clk_divid_ratio & 0xf) << 0;
 
 	*(volatile __u32 *)(0xf1c20000 + 0x80) = cfg;
-
+	
 	printk("nand clk init end \n");
 	printk("offset 0xc:  0x%x \n", *(volatile __u32 *)(0xf1c20000 + 0x60));
 	printk("offset 0x14:  0x%x \n", *(volatile __u32 *)(0xf1c20000 + 0x80));
 }
 
-#endif // INIT_NAND_IN_TESTDRIVER
+#endif
 
-int __init nand_test_init(void)
+static int __init nand_test_init(void)
 {
-
-    int ret;
+  
+   int ret;
+#ifdef INIT_NAND_IN_TESTDRIVER
+    __u32 cmu_clk;
+#endif
 
     printk("[nand_test]:nand_test_init test init.\n");
     if((ret = kobject_init_and_add(&kobj,&ktype,NULL,"nand")) != 0 ) {
-        return ret;
+        return ret; 
     }
 
 
 #ifdef INIT_NAND_IN_TESTDRIVER
+
     /* init nand resource */
     printk("[nand_test]:init nand resource \n");
     //set nand clk
     set_nand_clock(20);
-
+   
    //set nand pio
     set_nand_pio();
-
+   
     clear_NAND_ZI();
-
+   
     printk("/*********************************************************/ \n");
     printk("[nand_test]: init nand block layer start \n");
     printk("/*********************************************************/ \n");
-
+   
     ret = PHY_Init();
     if (ret) {
-     PHY_Exit();
+     PHY_Exit();     
      return -1;
     }
-
+   
     ret = SCN_AnalyzeNandSystem();
     if (ret < 0){
         return ret;
     }
-
+   
     ret = PHY_ChangeMode(1);
     if (ret < 0){
-        return ret;
-    }
+        return ret; 
+    }   
     ret = FMT_Init();
     if (ret < 0){
         return ret;
@@ -1744,7 +1242,7 @@ int __init nand_test_init(void)
         return ret;
     }
     FMT_Exit();
-
+   
     /*init logic layer*/
     ret = LML_Init();
     if (ret < 0){
@@ -1752,39 +1250,42 @@ int __init nand_test_init(void)
     }
 #ifdef NAND_CACHE_RW
     NAND_CacheOpen();
-#endif // NAND_CACHE_RW
-#endif // INIT_NAND_IN_TESTDRIVER
+#endif
 
+#endif
+  
    return 0;  // init success
-
+  
 }
 
-void __exit nand_test_exit(void)
+
+
+static void __exit nand_test_exit(void)
 {
     printk("[nand_test]:nand test exit.\n");
     kobject_del(&kobj);
-
+    
 #ifdef INIT_NAND_IN_TESTDRIVER
     LML_FlushPageCache();
     BMM_WriteBackAllMapTbl();
     LML_Exit();
     FMT_Exit();
-    PHY_Exit();
+    PHY_Exit(); 
 #ifdef NAND_CACHE_RW
-    NAND_CacheClose();
-#endif // NAND_CACHE_RW
-#endif // INIT_NAND_IN_TESTDRIVER
+    NAND_CacheOpen();
+#endif
+
+#endif
 
     return;
 }
+  
+  
+module_init(nand_test_init);
+module_exit(nand_test_exit);
 
 
-//module_init(nand_test_init);
-//module_exit(nand_test_exit);
-
-
-//MODULE_LICENSE("GPL");
-//MODULE_DESCRIPTION("Nand test driver");
-//MODULE_AUTHOR("Grace Miao");
-
-#endif // CONFIG_SUNXI_NAND_TEST
+MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("Nand test driver");
+MODULE_AUTHOR("Grace Miao");
+#endif

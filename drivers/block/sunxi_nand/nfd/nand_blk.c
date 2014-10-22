@@ -1194,34 +1194,13 @@ int nand_suspend(struct platform_device *plat_dev, pm_message_t state)
 static int nand_suspend(struct platform_device *plat_dev, pm_message_t state)
 #endif
 {
-
 	int i=0;
 
 	pr_debug("[NAND] nand_suspend \n");
 
-	if(NORMAL_STANDBY== standby_type)
-	{
-	if(!IS_IDLE){
-		for(i=0;i<10;i++){
-			msleep(200);
-			if(IS_IDLE)
-				break;
-		}
-	}
-	if(i==10){
-		return -EBUSY;
-	}else{
-		down(&mytr.nand_ops_mutex);
-
-		NAND_ClkDisable();
-//		NAND_PIORelease();
-	}
-	}
-	else if(SUPER_STANDBY == standby_type)
-	{
-	pr_debug("nand super standy mode suspend\n");
-		if(!IS_IDLE){
-			for(i=0;i<10;i++){
+	if(NORMAL_STANDBY== standby_type) {
+		if(!IS_IDLE) {
+			for(i=0;i<10;i++) {
 				msleep(200);
 				if(IS_IDLE)
 					break;
@@ -1229,21 +1208,46 @@ static int nand_suspend(struct platform_device *plat_dev, pm_message_t state)
 		}
 		if(i==10){
 			return -EBUSY;
-		}else{
-		down(&mytr.nand_ops_mutex);
-
-		NAND_ClkDisable();
+		}
+		else {
+			down(&mytr.nand_ops_mutex);
+#ifndef USE_SYS_CLK
+			release_nand_clock();
+#else
+			NAND_ClkDisable();
+#endif
 //		NAND_PIORelease();
+		}
 	}
-	for(i=0; i<(NAND_REG_LENGTH); i++){
-		nand_reg_state.nand_reg_back[i] = *(volatile u32 *)(NAND_GetIOBaseAddr() + i*0x04);
-		//pr_info("reg addr 0x%x : 0x%x \n", i, nand_reg_state.nand_reg_back[i]);
+	else if(SUPER_STANDBY == standby_type) {
+		pr_debug("nand super standy mode suspend\n");
+		if(!IS_IDLE) {
+			for(i=0;i<10;i++) {
+				msleep(200);
+				if(IS_IDLE)
+					break;
+			}
+		}
+		if(i==10){
+			return -EBUSY;
+		}
+		else {
+#ifndef USE_SYS_CLK
+			release_nand_clock();
+#else
+			NAND_ClkDisable();
+			for(i=0; i<(NAND_REG_LENGTH); i++){
+				nand_reg_state.nand_reg_back[i] =
+					*(volatile u32 *)(NAND_GetIOBaseAddr() + i*0x04);
+//				pr_info("reg addr 0x%x : 0x%x \n",
+//					i, nand_reg_state.nand_reg_back[i]);
+			}
+#endif
+//		NAND_PIORelease();
+		}
 	}
-	}
-
-		pr_debug("[NAND] nand_suspend ok \n");
-
-		return 0;
+	pr_debug("[NAND] nand_suspend ok \n");
+	return 0;
 }
 
 #ifdef CONFIG_SUNXI_NAND_TEST
@@ -1422,8 +1426,8 @@ void nand_exit(void)
 	exit_blklayer();
 }
 
-//module_init(nand_init);
-//module_exit(nand_exit);
+module_init(nand_init);
+module_exit(nand_exit);
 MODULE_LICENSE ("GPL");
 MODULE_AUTHOR ("nand flash groups");
 MODULE_DESCRIPTION ("Generic NAND flash driver code");

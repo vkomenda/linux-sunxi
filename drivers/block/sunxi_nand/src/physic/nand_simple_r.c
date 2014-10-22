@@ -766,7 +766,12 @@ __s32 PHY_ChangeMode(__u8 serial_mode)
 
 	NFC_INIT_INFO nand_info;
 
+#ifndef USE_SYS_CLK
+	set_nand_clock(NandStorageInfo.FrequencePar);
+	PHY_DBG("NAND clock set to %x \n", nand_clk);
+#else
 	NAND_SetClk(NandStorageInfo.FrequencePar);
+#endif // USE_SYS_CLK
 
 	/*memory allocate*/
 	if (!PageCachePool.PageCache0){
