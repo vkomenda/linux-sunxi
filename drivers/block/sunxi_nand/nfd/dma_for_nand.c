@@ -51,17 +51,20 @@ void nanddma_buffdone(struct sunxi_dma_params *dma, void *dev_id)
 
 int NAND_RequestDMA(void)
 {
-	int r;
+	int ret = 0;
 
-	r = sunxi_dma_request(&nand_dma, 1);
-	if (r < 0)
-		return r;
+	ret = sunxi_dma_request(&nand_dma, 1);
+	if (ret < 0)
+		DBG("DMA request rejected");
 
-	r = sunxi_dma_set_callback(&nand_dma, nanddma_buffdone, NULL);
-	if (r < 0)
-		return r;
+	ret = sunxi_dma_set_callback(&nand_dma, nanddma_buffdone, NULL);
+	if (ret < 0)
+		DBG("DMA callback could not be set");
 
-	return 1;
+	if (!ret)
+		DBG("DMA granted");
+
+	return ret;
 }
 
 int NAND_ReleaseDMA(void)

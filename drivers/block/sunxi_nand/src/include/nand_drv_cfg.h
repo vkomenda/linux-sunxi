@@ -31,11 +31,9 @@
 //==============================================================================
 
 #define  NAND_VERSION_0                 0x02
-#define  NAND_VERSION_1                 0x12
-#define  NAND_DRV_DATE                  0x20130526
+#define  NAND_VERSION_1                 0xff
+#define  NAND_DRV_DATE                  0x20141022
 #define  NAND_PART_TABLE_MAGIC          0x0055ff00
-
-
 
 //define the max value of the count of chip select
 #define MAX_CHIP_SELECT_CNT                 (8)
@@ -115,54 +113,43 @@
 //define if need support ReadRetry
 #define CFG_SUPPORT_READ_RETRY                  (1)
 
-
-#define SUPPORT_DMA_IRQ							(0)
-#define SUPPORT_RB_IRQ							(0)
+#define SUPPORT_DMA_IRQ (0)
+#define SUPPORT_RB_IRQ  (0)
 
 //==============================================================================
 //  define some pr__s32 switch
 //==============================================================================
 //define if need pr__s32 the physic operation module debug message
-#ifndef __OS_NAND_DBG__
-    #define PHY_DBG_MESSAGE_ON                  (0)
-#else
-    #define PHY_DBG_MESSAGE_ON                  (1)
-#endif
+#define PHY_DBG_MESSAGE_ON                  (1)
 
 //define if need pr__s32 the physic operation module error message
 #define PHY_ERR_MESSAGE_ON                  (1)
 
 //define if need pr__s32 the nand hardware scan module debug message
-#ifndef __OS_NAND_DBG__
-    #define SCAN_DBG_MESSAGE_ON                 (0)
-#else
-    #define SCAN_DBG_MESSAGE_ON                 (1)
-#endif
+#define SCAN_DBG_MESSAGE_ON                 (1)
 
 //define if need pr__s32 the nand hardware scan module error message
 #define SCAN_ERR_MESSAGE_ON                 (1)
 
 //define if need pr__s32 the nand disk format module debug message
-#define FORMAT_DBG_MESSAGE_ON               (0)
+#define FORMAT_DBG_MESSAGE_ON               (1)
 
 //define if need pr__s32 the nand disk format module error message
 #define FORMAT_ERR_MESSAGE_ON               (1)
 
 //define if need pr__s32 the mapping manage module debug message
-#define MAPPING_DBG_MESSAGE_ON              (0)
+#define MAPPING_DBG_MESSAGE_ON              (1)
 
 //define if need pr__s32 the mapping manage module error message
 #define MAPPING_ERR_MESSAGE_ON              (1)
 
 //define if need pr__s32 the logic control layer debug message
-#define LOGICCTL_DBG_MESSAGE_ON             (0)
+#define LOGICCTL_DBG_MESSAGE_ON             (1)
 
 //define if need pr__s32 the logic control layer error message
 #define LOGICCTL_ERR_MESSAGE_ON             (1)
 
-#define MBR_DBG_MESSAGE_ON             (0)
-
-
+#define MBR_DBG_MESSAGE_ON                  (1)
 
 #if PHY_DBG_MESSAGE_ON
 #define	   PHY_DBG(...)        			PRINT(__VA_ARGS__)
@@ -176,7 +163,6 @@
 #define     PHY_ERR(...)
 #endif
 
-
 #if SCAN_DBG_MESSAGE_ON
 #define     SCAN_DBG(...)          		PRINT(__VA_ARGS__)
 #else
@@ -188,7 +174,6 @@
 #else
 #define     SCAN_ERR(...)
 #endif
-
 
 #if FORMAT_DBG_MESSAGE_ON
 #define     FORMAT_DBG(...)         	PRINT(__VA_ARGS__)
@@ -202,7 +187,6 @@
 #define     FORMAT_ERR(...)
 #endif
 
-
 #if MAPPING_DBG_MESSAGE_ON
 #define     MAPPING_DBG(...)        	PRINT(__VA_ARGS__)
 #else
@@ -214,7 +198,6 @@
 #else
 #define     MAPPING_ERR(...)
 #endif
-
 
 #if LOGICCTL_DBG_MESSAGE_ON
 #define     LOGICCTL_DBG(...)       	PRINT(__VA_ARGS__)

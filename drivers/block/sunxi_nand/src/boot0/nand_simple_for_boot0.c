@@ -430,7 +430,7 @@ __s32 PHY_ChangeMode(__u8 serial_mode)
 			return -1;
 	}
 
-    NFC_SetEccMode(ECC_MODE);
+	NFC_SetEccMode(ECC_MODE);
 
 	nand_info.bus_width = 0x0;
 	nand_info.ce_ctl = 0x0;

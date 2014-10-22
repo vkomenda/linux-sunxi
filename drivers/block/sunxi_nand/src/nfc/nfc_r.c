@@ -23,6 +23,7 @@
 */
 #include "../include/nfc.h"
 #include "../include/nand_oal.h"
+#include "../include/nand_type.h"
 #include <linux/dma-mapping.h>
 #include <linux/clk.h>
 
@@ -35,14 +36,13 @@ static struct clk *mod_nand_clk = NULL;
 
 __u32	nand_board_version=0;
 __u32 	pagesize=0;
-
 volatile __u32 irq_value=0;
 
 
 __u8 read_retry_reg_adr[READ_RETRY_MAX_REG_NUM]={0};
-__u8 read_retry_default_val[MAX_CHIP_SELECT_CNT][READ_RETRY_MAX_REG_NUM]={0};
-__s16 read_retry_val[READ_RETRY_MAX_CYCLE][READ_RETRY_MAX_REG_NUM]={0};
-__u8 hynix_read_retry_otp_value[MAX_CHIP_SELECT_CNT][8][8]={0};
+__u8 read_retry_default_val[MAX_CHIP_SELECT_CNT][READ_RETRY_MAX_REG_NUM]={{0}};
+__s16 read_retry_val[READ_RETRY_MAX_CYCLE][READ_RETRY_MAX_REG_NUM]={{0}};
+__u8 hynix_read_retry_otp_value[MAX_CHIP_SELECT_CNT][8][8]={{{0}}};
 __u8 read_retry_mode=0;
 __u8 read_retry_cycle=0;
 __u8 read_retry_reg_num=0;
@@ -744,17 +744,19 @@ __s32 NFC_CheckRbReady( __u32 rb)
 * Description 	: change serial access mode when clock change.
 * Arguments	: nand_info -- structure with flash bus width,pagesize ,serial access mode and other configure parametre
 
-* Returns		: 0 = sucess -1 = fail
+* Returns	: n/a
 * Notes		: NFC must be reset before seial access mode changes.
 ********************************************************************************/
 __s32 NFC_ChangMode(NFC_INIT_INFO *nand_info )
 {
-	__u32 cfg;
+	__u32 cfg, ret = 0;
 
 	pagesize = nand_info->pagesize * 512;
 
 	/*reset nfc*/
-	_reset();
+	ret = _reset();
+	if (ret)
+		return ret;
 
 	/*set NFC_REG_CTL*/
 	cfg = 0;
@@ -768,7 +770,7 @@ __s32 NFC_ChangMode(NFC_INIT_INFO *nand_info )
 	   cfg |= ( 0x1 << 8 );
 	else if(nand_info->pagesize == 8 )       /*  4K  */
 	   cfg |= ( 0x2 << 8 );
-    else if(nand_info->pagesize == 16 )       /*  8K  */
+	else if(nand_info->pagesize == 16 )       /*  8K  */
 	   cfg |= ( 0x3 << 8 );
 	else if(nand_info->pagesize == 32 )       /*  16K  */
 	   cfg |= ( 0x4 << 8 );
@@ -786,8 +788,8 @@ __s32 NFC_ChangMode(NFC_INIT_INFO *nand_info )
 	{
 	    cfg |= 0x3f;
 	    cfg |= 0x3<<8;
-    }
-    else if((nand_info->ddr_type & 0x3) == 3)
+	}
+	else if((nand_info->ddr_type & 0x3) == 3)
 	{
 	    cfg |= 0x1f;
 	    cfg |= 0x2<<8;
@@ -800,17 +802,14 @@ __s32 NFC_ChangMode(NFC_INIT_INFO *nand_info )
 	return 0;
 }
 
-__s32 NFC_SetEccMode(__u8 ecc_mode)
+void NFC_SetEccMode(__u8 ecc_mode)
 {
-    __u32 cfg = NFC_READ_REG(NFC_REG_ECC_CTL);
+	__u32 cfg = NFC_READ_REG(NFC_REG_ECC_CTL);
 
-
-    cfg &=	((~NFC_ECC_MODE)&0xffffffff);
-    cfg |= (NFC_ECC_MODE & (ecc_mode<<12));
+	cfg &= ((~NFC_ECC_MODE)&0xffffffff);
+	cfg |= (NFC_ECC_MODE & (ecc_mode<<12));
 
 	NFC_WRITE_REG(NFC_REG_ECC_CTL, cfg);
-
-	return 0;
 }
 
 /*******************************************************************************
@@ -824,17 +823,18 @@ __s32 NFC_SetEccMode(__u8 ecc_mode)
 ********************************************************************************/
 __s32 NFC_Init(NFC_INIT_INFO *nand_info )
 {
-	__s32 ret;
+	__s32 ret = 0;
 	__s32 i;
 
 	PRINT("[NAND] nand driver(b) version: 0x%x, 0x%x, data: %x\n", NAND_VERSION_0, NAND_VERSION_1, NAND_DRV_DATE);
 
 	//init ddr_param
 	for(i=0;i<8;i++)
-		ddr_param[i] = 0x21f;
+		ddr_param[i] = 0;    // 0x21f;
 
 #ifndef USE_SYS_CLK
 	set_nand_clock(10);
+	DBG("NAND clock is initialised");
 #else
 	NAND_ClkRequest();
 	NAND_AHBEnable();
@@ -842,26 +842,16 @@ __s32 NFC_Init(NFC_INIT_INFO *nand_info )
 	NAND_ClkEnable();
 #endif // USE_SYS_CLK
 
-	//init pin
-//	NAND_PIORequest();
-
-	//init dma
+	set_nand_pio();
 	NFC_SetEccMode(0);
 
 	/*init nand control machine*/
-	ret = NFC_ChangMode( nand_info);
+	ret = NFC_ChangMode(nand_info);
+	if (ret)
+		return ret;
 
 	/*request special dma*/
-	if (!NAND_RequestDMA())
-	{
-	    PRINT("NAND_RequestDMA  fail\n");
-	    return -1;
-	}
-	else
-	{
-	    //PRINT("NAND_RequestDMA  ok\n");
-	}
-
+	ret = NAND_RequestDMA();
 
 	return ret;
 
@@ -889,11 +879,7 @@ void NFC_Exit( void )
 	NAND_AHBDisable();
 	NAND_ClkRelease();
 #endif // USE_SYS_CLK
-
-	//init pin
-//	NAND_PIORelease();
-
-	//init dma
+	release_nand_pio();
 	NAND_ReleaseDMA();
 }
 
@@ -2105,3 +2091,46 @@ int NAND_GetClk(void)
 	return (clk_get_rate(mod_nand_clk)/2000000);
 }
 #endif // USE_SYS_CLK
+
+void set_nand_pio(void)
+{
+#ifndef USE_SYS_PIN
+	__u32	cfg0;
+	__u32	cfg1;
+	__u32	cfg2;
+	void* gpio_base = (void*) SW_VA_PORTC_IO_BASE;
+
+	cfg0 = *(volatile __u32 *)(gpio_base + 0x48);
+	cfg1 = *(volatile __u32 *)(gpio_base + 0x4c);
+	cfg2 = *(volatile __u32 *)(gpio_base + 0x50);
+
+	/*set PIOC for nand*/
+	cfg0 &= 0x0;
+	cfg0 |= 0x22222222;
+	cfg1 &= 0x0;
+	cfg1 |= 0x22222222;
+	cfg2 &= 0x0;
+	cfg2 |= 0x22222222;
+
+	*(volatile __u32 *)(gpio_base + 0x48) = cfg0;
+	*(volatile __u32 *)(gpio_base + 0x4c) = cfg1;
+	*(volatile __u32 *)(gpio_base + 0x50) = cfg2;
+#else
+	nand_handle = gpio_request_ex("nand_para",NULL);
+#endif
+}
+
+void release_nand_pio(void)
+{
+
+#ifndef USE_SYS_PIN
+	void* gpio_base = (void*) SW_VA_PORTC_IO_BASE;
+
+	*(volatile __u32 *)(gpio_base + 0x48) = 0;
+	*(volatile __u32 *)(gpio_base + 0x4c) = 0;
+	*(volatile __u32 *)(gpio_base + 0x50) = 0;
+#else
+	//printk("[NAND] nand gpio_release\n");
+	//gpio_release("nand_para",NULL);
+#endif // USE_SYS_PIN
+}

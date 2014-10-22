@@ -707,13 +707,12 @@ __s32 NFC_ChangMode(NFC_INIT_INFO *nand_info )
 	return 0;
 }
 
-__s32 NFC_SetEccMode(__u8 ecc_mode)
+void NFC_SetEccMode(__u8 ecc_mode)
 {
-    __u32 cfg = NFC_READ_REG(NFC_REG_ECC_CTL);
+	__u32 cfg = NFC_READ_REG(NFC_REG_ECC_CTL);
 
-
-    cfg &=	((~NFC_ECC_MODE)&0xffffffff);
-    cfg |= (NFC_ECC_MODE & (ecc_mode<<12));
+	cfg &= ((~NFC_ECC_MODE)&0xffffffff);
+	cfg |= (NFC_ECC_MODE & (ecc_mode<<12));
 
 	NFC_WRITE_REG(NFC_REG_ECC_CTL, cfg);
 

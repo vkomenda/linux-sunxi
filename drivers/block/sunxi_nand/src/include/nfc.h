@@ -24,9 +24,10 @@
 #ifndef _NFC_H_
 #define _NFC_H_
 
+#include <mach/platform.h>
 #include "nand_drv_cfg.h"
 
-#define NAND_IO_BASE (0xf1c03000)
+#define NAND_IO_BASE SW_VA_NANDFLASHC_IO_BASE
 #define __NFC_REG(x)    (*(volatile unsigned int   *)(NAND_IO_BASE + x))
 
 // #define USE_SYS_CLK
@@ -230,7 +231,7 @@ __s32 NFC_DeSelectRb(__u32 rb);
 __s32 NFC_GetStatus(NFC_CMD_LIST * scmd);
 __s32 NFC_CheckRbReady(__u32 rb);
 __s32 NFC_ChangMode(NFC_INIT_INFO * nand_info);
-__s32 NFC_SetEccMode(__u8 ecc_mode);
+void NFC_SetEccMode(__u8 ecc_mode);
 __s32 NFC_ResetChip(NFC_CMD_LIST * reset_cmd);
 __s32 NFC_ReadRetry_off(__u32 chip); //sandisk readretry exit
 __u32 NFC_QueryINT(void);
@@ -291,5 +292,8 @@ void NAND_ClkDisable(void);
 int NAND_SetClk(unsigned int nand_clk);
 int NAND_GetClk(void);
 #endif // USE_SYS_CLK
+
+void set_nand_pio(void);
+void release_nand_pio(void);
 
 #endif    // #ifndef _NFC_H_
