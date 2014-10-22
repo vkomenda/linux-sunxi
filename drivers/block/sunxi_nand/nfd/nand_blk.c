@@ -73,7 +73,6 @@ struct nand_disk disk_array[ND_MAX_PART_COUNT+1];
 #define dbg_inf(fmt, ...)  ({})
 #endif
 
-
 #define REMAIN_SPACE 0
 #define PART_FREE 0x55
 #define PART_DUMMY 0xff
@@ -110,39 +109,6 @@ struct collect_ops{
 struct collect_ops collect_arg;
 
 #endif
-
-/*
-//for CLK
-extern int NAND_ClkEnable(void);
-extern void NAND_ClkDisable(void);
-
-extern int NAND_ClkRequest(__u32 nand_index);
-extern void NAND_ClkRelease(__u32 nand_index);
-extern int NAND_SetClk(__u32 nand_index, __u32 nand_clk);
-extern int NAND_GetClk(__u32 nand_index);
-
-//for DMA
-extern int NAND_RequestDMA(void);
-extern int NAND_ReleaseDMA(void);
-extern void NAND_DMAConfigStart(int rw, unsigned int buff_addr, int len);
-extern int NAND_QueryDmaStat(void);
-extern int NAND_WaitDmaFinish(void);
-//for PIO
-extern void NAND_PIORequest(void);
-extern void NAND_PIORelease(void);
-
-//for Int
-extern void NAND_EnRbInt(void);
-extern void NAND_ClearRbInt(void);
-extern int NAND_WaitRbReady(void);
-extern void NAND_EnDMAInt(void);
-extern void NAND_ClearDMAInt(void);
-extern void NAND_DMAInterrupt(void);
-
-extern void NAND_RbInterrupt(void);
-
-extern __u32 NAND_GetIOBaseAddr(void);
-*/
 
 DEFINE_SEMAPHORE(nand_mutex);
 static unsigned char volatile IS_IDLE = 1;
@@ -1091,7 +1057,7 @@ static int __init init_blklayer(void)
 	int nand_good_block_ratio = 0;
 
 	ClearNandStruct();
-
+	set_nand_pio();
 	ret = PHY_Init();
 	if (ret) {
 		PHY_Exit();
@@ -1179,14 +1145,8 @@ static int __init init_blklayer(void)
 	return 0;
 }
 
-static void __exit exit_blklayer(void)
-{
-
-}
+static void __exit exit_blklayer(void) {}
 #endif
-
-
-#ifdef CONFIG_PM
 
 #ifdef CONFIG_SUNXI_NAND_TEST
 int nand_suspend(struct platform_device *plat_dev, pm_message_t state)
@@ -1196,57 +1156,27 @@ static int nand_suspend(struct platform_device *plat_dev, pm_message_t state)
 {
 	int i=0;
 
-	pr_debug("[NAND] nand_suspend \n");
+	printk("[NAND] nand_suspend \n");
 
-	if(NORMAL_STANDBY== standby_type) {
-		if(!IS_IDLE) {
-			for(i=0;i<10;i++) {
-				msleep(200);
-				if(IS_IDLE)
-					break;
-			}
-		}
-		if(i==10){
-			return -EBUSY;
-		}
-		else {
-			down(&mytr.nand_ops_mutex);
-#ifndef USE_SYS_CLK
-			release_nand_clock();
-#else
-			NAND_ClkDisable();
-#endif
-//		NAND_PIORelease();
+	if(!IS_IDLE){
+		for(i=0;i<10;i++){
+			msleep(200);
+			if(IS_IDLE)
+				break;
 		}
 	}
-	else if(SUPER_STANDBY == standby_type) {
-		pr_debug("nand super standy mode suspend\n");
-		if(!IS_IDLE) {
-			for(i=0;i<10;i++) {
-				msleep(200);
-				if(IS_IDLE)
-					break;
-			}
-		}
-		if(i==10){
-			return -EBUSY;
-		}
-		else {
+	if(i==10){
+		return -EBUSY;
+	}else{
+		down(&mytr.nand_ops_mutex);
 #ifndef USE_SYS_CLK
-			release_nand_clock();
+		release_nand_clock();
 #else
-			NAND_ClkDisable();
-			for(i=0; i<(NAND_REG_LENGTH); i++){
-				nand_reg_state.nand_reg_back[i] =
-					*(volatile u32 *)(NAND_GetIOBaseAddr() + i*0x04);
-//				pr_info("reg addr 0x%x : 0x%x \n",
-//					i, nand_reg_state.nand_reg_back[i]);
-			}
+		NAND_ClkDisable();
 #endif
-//		NAND_PIORelease();
-		}
+		release_nand_pio();
+		printk("[NAND] nand_suspend ok \n");
 	}
-	pr_debug("[NAND] nand_suspend ok \n");
 	return 0;
 }
 
@@ -1256,100 +1186,34 @@ int nand_resume(struct platform_device *plat_dev)
 static int nand_resume(struct platform_device *plat_dev)
 #endif
 {
+	printk("[NAND] nand_resume \n");
+	set_nand_pio();
 
-    __s32 ret;
-
-	printk(KERN_INFO"[NAND] nand_resume \n");
-	if(NORMAL_STANDBY== standby_type){
-//	NAND_PIORequest();
+#ifndef USE_SYS_CLK
+	active_nand_clock();
+#else
 	NAND_ClkEnable();
-
+#endif
 	up(&mytr.nand_ops_mutex);
-	}else if(SUPER_STANDBY == standby_type){
-		int i;
-//		NAND_PIORequest();
-	    NAND_ClkEnable();
-        //process for super standby
-		//restore reg state
-		for(i=0; i<(NAND_REG_LENGTH); i++){
-			if(0x9 == i){
-				continue;
-			}
-			*(volatile u32 *)(NAND_GetIOBaseAddr()+ i*0x04) = nand_reg_state.nand_reg_back[i];
-		}
-        //reset all chip
-
-    	for(i=0; i<8; i++)
-        {
-			__u32 bank=0;
-			if(NAND_GetChipConnect()&(0x1<<i)) //chip valid
-            {
-                pr_info("nand reset chip %d!\n",i);
-                ret = PHY_ResetChip(i);
-				PHY_SetDefaultParam(bank);
-				RetryCount[i] = 0;
-                if(ret)
-                    pr_info("nand reset chip %d failed!\n",i);
-				bank++;
-            }
-        }
-
-		//process for super standby
-		//restore reg state
-		for(i=0; i<(NAND_REG_LENGTH); i++){
-			if(0x9 == i){
-				continue;
-			}
-			*(volatile u32 *)(NAND_GetIOBaseAddr() + i*0x04) = nand_reg_state.nand_reg_back[i];
-		}
-
-		up(&mytr.nand_ops_mutex);
-
-	}
-
 
 	return 0;
 }
-
-#else
-
-#ifdef CONFIG_SUNXI_NAND_TEST
-int nand_suspend(struct platform_device *plat_dev, pm_message_t state)
-#else
-static int nand_suspend(struct platform_device *plat_dev, pm_message_t state)
-#endif
-{
-    return 0;
-}
-
-#ifdef CONFIG_SUNXI_NAND_TEST
-int nand_resume(struct platform_device *plat_dev)
-#else
-static int nand_resume(struct platform_device *plat_dev)
-#endif
-{
-    return 0;
-}
-
-#endif
 
 static int nand_probe(struct platform_device *plat_dev)
 {
-	pr_info("benn: nand probe enter\n");
-	dbg_inf("nand_probe\n");
-
+	DBG("");
 	return 0;
-
 }
 
 static int nand_remove(struct platform_device *plat_dev)
 {
+	DBG("");
 	return 0;
 }
 
 void nand_shutdown(struct platform_device *plat_dev)
 {
-    printk("[NAND]shutdown\n");
+	pr_info("[NAND] shutdown\n");
 	nand_flush_all();
 }
 
@@ -1357,10 +1221,8 @@ static struct platform_driver nand_driver = {
 	.probe = nand_probe,
 	.remove = nand_remove,
 	.shutdown =  nand_shutdown,
-#ifdef CONFIG_PM
 	.suspend = nand_suspend,
 	.resume = nand_resume,
-#endif
 	.driver = {
 		.name = "sw_nand",
 		.owner = THIS_MODULE,
@@ -1373,7 +1235,7 @@ static struct platform_driver nand_driver = {
  *
  ****************************************************************************/
 
-int nand_init(void)
+static int __init nand_init(void)
 {
 	s32 ret;
 	int nand_used = 0;
@@ -1386,19 +1248,15 @@ int nand_init(void)
 		printk("nand driver is disabled \n");
 		return 0;
 	}
-
-	printk("[NAND]nand driver, init.\n");
-
+	pr_info("NAND block driver init\n");
 	ret = init_blklayer();
-	if(ret)
-	{
+	if(ret) {
 		dbg_err("init_blklayer fail \n");
 		return -1;
 	}
 
 	ret = platform_driver_register(&nand_driver);
-	if(ret)
-	{
+	if(ret) {
 		dbg_err("platform_driver_register fail \n");
 		return -1;
 	}
@@ -1406,7 +1264,7 @@ int nand_init(void)
 	return 0;
 }
 
-void nand_exit(void)
+static void __exit nand_exit(void)
 {
 	s32 ret;
 	int nand_used = 0;

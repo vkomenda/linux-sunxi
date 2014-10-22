@@ -571,12 +571,13 @@ __s32 _read_single_page(struct boot_physical_param *readop,__u8 dma_wait_mode)
 */
 __s32 PHY_Init(void)
 {
-    __s32 ret;
-    __u32 i;
+	__s32 ret;
+	__u32 i;
 	NFC_INIT_INFO nand_info;
-    //init RetryCount
-    for(i=0; i<8; i++)
-        RetryCount[i] = 0;
+	//init RetryCount
+	for(i=0; i<8; i++)
+		RetryCount[i] = 0;
+
 	nand_info.bus_width = 0x0;
 	nand_info.ce_ctl = 0x0;
 	nand_info.ce_ctl1 = 0x0;
@@ -587,7 +588,7 @@ __s32 PHY_Init(void)
 	nand_info.ddr_type = 0;
 	ret = NFC_Init(&nand_info);
 
-    PHY_DBG("NFC Randomizer start. \n");
+	PHY_DBG("NFC Randomizer start.\n");
 	_random_seed_init();
 	NFC_RandomDisable();
 
@@ -768,7 +769,7 @@ __s32 PHY_ChangeMode(__u8 serial_mode)
 
 #ifndef USE_SYS_CLK
 	set_nand_clock(NandStorageInfo.FrequencePar);
-	PHY_DBG("NAND clock set to %x \n", nand_clk);
+	PHY_DBG("NAND clock set to %x \n", NandStorageInfo.FrequencePar);
 #else
 	NAND_SetClk(NandStorageInfo.FrequencePar);
 #endif // USE_SYS_CLK

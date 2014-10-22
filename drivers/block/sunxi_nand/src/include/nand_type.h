@@ -60,7 +60,7 @@ typedef struct
     __u32       BlkCntPerDie;                       //the count of the physic blocks in one die, include valid block and invalid block
     __u32       OperationOpt;                       //the mask of the operation types which current nand flash can support support
     __u32        FrequencePar;                       //the parameter of the hardware access clock, based on 'MHz'
-    __u32        EccMode;                            //the Ecc Mode for the nand flash chip, 0: bch-16, 1:bch-28, 2:bch_32   
+    __u32        EccMode;                            //the Ecc Mode for the nand flash chip, 0: bch-16, 1:bch-28, 2:bch_32
     __u8        NandChipId[8];                      //the nand chip id of current connecting nand chip
     __u32       ValidBlkRatio;                      //the ratio of the valid physical blocks, based on 1024
 	__u32 		good_block_ratio;					//good block ratio get from hwscan
@@ -94,7 +94,7 @@ struct __NandStorageInfo_t
     __u32       BlkCntPerDie;                       //the count of the physic blocks in one die, include valid block and invalid block
     __u32       OperationOpt;                       //the mask of the operation types which current nand flash can support support
     __u32        FrequencePar;                       //the parameter of the hardware access clock, based on 'MHz'
-    __u32       EccMode;                            //the Ecc Mode for the nand flash chip, 0: bch-16, 1:bch-28, 2:bch_32   
+    __u32       EccMode;                            //the Ecc Mode for the nand flash chip, 0: bch-16, 1:bch-28, 2:bch_32
     __u8       NandChipId[8];                      //the nand chip id of current connecting nand chip
     __u32       ValidBlkRatio;                         //the ratio of the valid physical blocks, based on 1024
     __u32		ReadRetryType;						//the read retry type
@@ -283,7 +283,7 @@ struct __NandPhyInfoPar_t
     __u32       OperationOpt;                       //the bitmap that marks which optional operation that the nand flash can support
     __u16       ValidBlkRatio;                      //the valid block ratio, based on 1024 blocks
     __u16       AccessFreq;                         //the highest access frequence of the nand flash chip, based on MHz
-    __u16       EccMode;                            //the Ecc Mode for the nand flash chip, 0: bch-16, 1:bch-28, 2:bch_32   
+    __u16       EccMode;                            //the Ecc Mode for the nand flash chip, 0: bch-16, 1:bch-28, 2:bch_32
     __u32 		ReadRetryType;
     __u32       DDRType;
     struct __OptionalPhyOpPar_t *OptionOp;          //the pointer point to the optional operation parameter
@@ -383,5 +383,18 @@ struct __NandDriverGlobal_t
 #define ERR_ADDRBEYOND          20                  //the logical sectors need be accessed is beyond the logical disk
 #define ERR_INVALIDPHYADDR		  21
 
-#endif //ifndef __NAND_TYPE_H
+/* Verification macros */
+#define PRECONDITION(b) \
+	if (b) \
+		pr_info("%s precondition test PASS\n", __FUNCTION__); \
+	else { \
+		pr_err("%s precondition test FAIL:\n%s\n", __FUNCTION__, #b); \
+		return -EINVAL; \
+	}
 
+#define CAPTION pr_info(">>> %s\n", __FUNCTION__)
+
+#define DBG(fmt, arg...) pr_info("%s " fmt "\n", __FUNCTION__, ##arg)
+//#define DBG(...) {}
+
+#endif //ifndef __NAND_TYPE_H
