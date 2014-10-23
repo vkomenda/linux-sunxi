@@ -78,39 +78,40 @@ __s32 _flush_w_cache(void)
 {
 	__u32	i;
 
+	PRECONDITION(nand_w_cache != NULL);
+
 	for(i = 0; i < N_NAND_W_CACHE; i++)
 	{
-		if(nand_w_cache[i].hit_page != 0xffffffff)
-		{
+		if(nand_w_cache[i].hit_page != 0xffffffff) {
+			DBG("hit page %x", nand_w_cache[i].hit_page);
 			if(nand_w_cache[i].secbitmap != FULL_BITMAP_OF_LOGIC_PAGE)
-				LML_PageRead(nand_w_cache[i].hit_page,(nand_w_cache[i].secbitmap ^ FULL_BITMAP_OF_LOGIC_PAGE)&FULL_BITMAP_OF_LOGIC_PAGE,nand_w_cache[i].data);
-
+				LML_PageRead(nand_w_cache[i].hit_page,
+					     (nand_w_cache[i].secbitmap ^
+					      FULL_BITMAP_OF_LOGIC_PAGE) &
+					     FULL_BITMAP_OF_LOGIC_PAGE,
+					     nand_w_cache[i].data);
 			LML_PageWrite(nand_w_cache[i].hit_page,FULL_BITMAP_OF_LOGIC_PAGE,nand_w_cache[i].data);
-
-
 			/*disable read cache with current page*/
 			if (nand_r_cache.hit_page == nand_w_cache[i].hit_page){
 					nand_r_cache.hit_page = 0xffffffff;
 					nand_r_cache.secbitmap = 0;
 			}
-
-
 			nand_w_cache[i].hit_page = 0xffffffff;
 			nand_w_cache[i].secbitmap = 0;
 			nand_w_cache[i].access_count = 0;
-
 		}
 	}
-
-
 	return 0;
 
 }
 
 __s32 _flush_w_cache_simple(__u32 i)
 {
+	PRECONDITION(nand_w_cache != NULL);
+
 	if(nand_w_cache[i].hit_page != 0xffffffff)
 	{
+		DBG("hit page %x", nand_w_cache[i].hit_page);
 		if(nand_w_cache[i].secbitmap != FULL_BITMAP_OF_LOGIC_PAGE)
 			LML_PageRead(nand_w_cache[i].hit_page,(nand_w_cache[i].secbitmap ^ FULL_BITMAP_OF_LOGIC_PAGE)&FULL_BITMAP_OF_LOGIC_PAGE,nand_w_cache[i].data);
 
@@ -481,6 +482,8 @@ __s32 NAND_CacheOpen(void)
 __s32 NAND_CacheClose(void)
 {
 	__u32 i;
+
+	CAPTION;
 
 	NAND_CacheFlush();
 

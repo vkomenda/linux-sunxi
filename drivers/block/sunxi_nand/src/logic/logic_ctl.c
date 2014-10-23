@@ -865,7 +865,7 @@ __s32 LML_PageWrite(__u32 nPage, __u64 nBitmap, void* pBuf)
     struct __NandUserData_t tmpSpare[2];
     struct __LogBlkType_t tmpLogBlk;
 
-		
+
     //check if the bitmap of valid sectors is full, if not, report error
     if(nBitmap != FULL_BITMAP_OF_LOGIC_PAGE)
     {
@@ -984,7 +984,7 @@ __TRY_WRITE_PHYSIC_PAGE:
     tmpPhyPage.SDataPtr = (void *)tmpSpare;
 
     #if !CFG_SUPPORT_CHECK_WRITE_SYNCH
-	
+
 	if (LogicalCtl.OpMode == 'w')
     {
     	//synch currently write bank
@@ -993,8 +993,8 @@ __TRY_WRITE_PHYSIC_PAGE:
     	{
         	//the last write operation on current bank is failed, the block is bad, need proccess it
         	LOGICCTL_DBG("[LOGICCTL_DBG] Find a bad block when write logical page! bank:0x%x, block:0x%x, page:0x%x\n",
-                tmpPhyPage.BankNum, tmpPhyPage.BlkNum, tmpPhyPage.PageNum);			
-			
+                tmpPhyPage.BankNum, tmpPhyPage.BlkNum, tmpPhyPage.PageNum);
+
         	//process the bad block
         	result = LML_BadBlkManage(&LogicalCtl.LogBlkNum, LogicalCtl.ZoneNum, LogicalCtl.LogPageNum, &LogicalCtl.LogBlkNum);
         	if(result < 0)
@@ -1071,6 +1071,8 @@ __s32 LML_FlushPageCache(void)
 {
     __s32   result;
 
+    CAPTION;
+
     result = _WritePageCacheToNand();
     if(result < 0)
     {
@@ -1119,11 +1121,11 @@ __s32 LML_Read(__u32 nSectNum, __u32 nSectorCnt, void* pBuf)
 	      LOGICCTL_ERR("[LOGICCTL_ERR] LML_Write, invalid bufaddr: 0x%x \n", (__u32)(pBuf));
 				return -ERR_ADDRBEYOND;
 	  }
-	  
+
     //check if the parameter is valid
     if(((nSectNum + nSectorCnt) > LogicalCtl.DiskCap)||(nSectNum>LogicalCtl.DiskCap-1)||(nSectorCnt>LogicalCtl.DiskCap-1))
     {
-        LOGICCTL_ERR("[LOGICCTL_ERR] LML_Read, the addr of read(start:%x, cnt:%x) is beyond the disk volume %x!!!\n", 
+        LOGICCTL_ERR("[LOGICCTL_ERR] LML_Read, the addr of read(start:%x, cnt:%x) is beyond the disk volume %x!!!\n",
 						nSectNum, nSectorCnt,LogicalCtl.DiskCap);
         return -ERR_ADDRBEYOND;
     }
@@ -1216,7 +1218,7 @@ void echo_write_data (__u32 nSectNum, __u32 nSectorCnt, void* pBuf)
 	}
 
 	return;
-	
+
 }*/
 
 /*
@@ -1241,16 +1243,16 @@ __s32 LML_Write(__u32 nSectNum, __u32 nSectorCnt, void* pBuf)
 	__u64	tmpBitmap;
     __u8    *tmpBuf;
     struct __GlobalLogicPageType_t tmpHeadPage, tmpTailPage;
-    
+
 	 	if(((__u32)pBuf)&0x3)
 	  {
 	      LOGICCTL_ERR("[LOGICCTL_ERR] LML_Write, invalid bufaddr: 0x%x \n", (__u32)(pBuf));
 				return -ERR_ADDRBEYOND;
 	  }
-	
+
     if(((nSectNum + nSectorCnt) > LogicalCtl.DiskCap)||(nSectNum>LogicalCtl.DiskCap-1)||(nSectorCnt>LogicalCtl.DiskCap-1))
     {
-        LOGICCTL_ERR("[LOGICCTL_ERR] LML_Write, the addr of write(start:%x, cnt:%x) is beyond the disk volume %x!!!\n", 
+        LOGICCTL_ERR("[LOGICCTL_ERR] LML_Write, the addr of write(start:%x, cnt:%x) is beyond the disk volume %x!!!\n",
 						nSectNum, nSectorCnt,LogicalCtl.DiskCap);
 				return -ERR_ADDRBEYOND;
     }
@@ -1434,6 +1436,8 @@ __s32 LML_Init(void)
 */
 __s32 LML_Exit(void)
 {
+	CAPTION;
+
      //flush page cache to nand flash
     LML_FlushPageCache();
 
@@ -1503,7 +1507,3 @@ __s32 NAND_SetPartInfo(void *part_table)
 
 	return 0;
 }
-
-
-
-
