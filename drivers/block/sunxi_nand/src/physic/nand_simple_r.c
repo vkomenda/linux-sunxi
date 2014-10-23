@@ -793,7 +793,7 @@ __s32 PHY_ChangeMode(__u8 serial_mode)
 			return -1;
 	}
 
-    NFC_SetEccMode(ECC_MODE);
+	NFC_SetEccMode(ECC_MODE);
 
 	nand_info.bus_width = 0x0;
 	nand_info.ce_ctl = 0x0;
@@ -821,7 +821,9 @@ __s32 PHY_ChangeMode(__u8 serial_mode)
 */
 __s32 PHY_Exit(void)
 {
-    __u32 i = 0;
+	__u32 i = 0;
+
+	CAPTION;
 
 	if (PageCachePool.PageCache0){
 		FREE(PageCachePool.PageCache0,SECTOR_CNT_OF_SUPER_PAGE * 512);

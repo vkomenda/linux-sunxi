@@ -114,7 +114,7 @@ DEFINE_SEMAPHORE(nand_mutex);
 static unsigned char volatile IS_IDLE = 1;
 static int nand_flush(struct nand_blk_dev *dev);
 static int nand_flush_force(__u32 dev_num);
-static struct nand_state nand_reg_state;
+//static struct nand_state nand_reg_state;
 
 #ifdef __LINUX_NAND_SUPPORT_INT__
 spinlock_t     nand_rb_lock;
@@ -797,6 +797,7 @@ static int nand_remove_dev(struct nand_blk_dev *dev)
 	gd = dev->blkcore_priv;
 
 	if (!down_trylock(&nand_mutex)) {
+		DBG("cannot obtain mutex");
 		up(&nand_mutex);
 		BUG();
 	}
@@ -804,6 +805,10 @@ static int nand_remove_dev(struct nand_blk_dev *dev)
 	gd->queue = NULL;
 	del_gendisk(gd);
 	put_disk(gd);
+	up(&nand_mutex);
+
+	DBG("block device removed");
+
 	return 0;
 }
 
@@ -846,7 +851,7 @@ int nand_blk_register(struct nand_blk_ops *nandr)
 
 	ret = register_blkdev(nandr->major, nandr->name);
 	if(ret){
-		dbg_err("\nfaild to register blk device\n");
+		dbg_err("failed to register block device\n");
 		up(&nand_mutex);
 		return -1;
 	}
@@ -915,6 +920,8 @@ int nand_blk_register(struct nand_blk_ops *nandr)
 
 	up(&nand_mutex);
 
+	DBG("block device registered");
+
 	return 0;
 }
 
@@ -922,6 +929,9 @@ int nand_blk_register(struct nand_blk_ops *nandr)
 void nand_blk_unregister(struct nand_blk_ops *nandr)
 {
 	struct list_head *this, *next;
+
+	CAPTION;
+
 	down(&nand_mutex);
 	/* Clean up the kernel thread */
 	nandr->quit = 1;
@@ -948,8 +958,12 @@ void nand_blk_unregister(struct nand_blk_ops *nandr)
 
 	up(&nand_mutex);
 
-	if (!list_empty(&nandr->devs))
+	if (!list_empty(&nandr->devs)) {
+		DBG("device list is not empty");
 		BUG();
+	}
+
+	DBG("block device unregistered");
 }
 
 
@@ -978,6 +992,8 @@ static struct nand_blk_ops mytr = {
 
 static int nand_flush(struct nand_blk_dev *dev)
 {
+	CAPTION;
+
 	if (0 == down_trylock(&mytr.nand_ops_mutex))
 	{
 		IS_IDLE = 0;
@@ -1128,11 +1144,13 @@ static int __init init_blklayer(void)
 
 static void __exit exit_blklayer(void)
 {
+	CAPTION;
+
 	nand_flush(NULL);
 	nand_blk_unregister(&mytr);
-	#ifdef NAND_CACHE_RW
-		NAND_CacheClose();
-	#endif
+#ifdef NAND_CACHE_RW
+	NAND_CacheClose();
+#endif
 	LML_Exit();
 	FMT_Exit();
 	PHY_Exit();
@@ -1199,15 +1217,15 @@ static int nand_resume(struct platform_device *plat_dev)
 	return 0;
 }
 
-static int nand_probe(struct platform_device *plat_dev)
+static int __init nand_probe(struct platform_device *plat_dev)
 {
-	DBG("");
+	CAPTION;
 	return 0;
 }
 
-static int nand_remove(struct platform_device *plat_dev)
+static int __exit nand_remove(struct platform_device *plat_dev)
 {
-	DBG("");
+	CAPTION;
 	return 0;
 }
 
@@ -1240,6 +1258,7 @@ static int __init nand_init(void)
 	s32 ret;
 	int nand_used = 0;
 
+	pr_info("Sunxi NAND flash block driver\n");
 	ret = script_parser_fetch("nand_para","nand_used", &nand_used, sizeof(int));
 	if (ret)
 		printk("nand init fetch emac using configuration failed\n");
@@ -1248,7 +1267,6 @@ static int __init nand_init(void)
 		printk("nand driver is disabled \n");
 		return 0;
 	}
-	pr_info("NAND block driver init\n");
 	ret = init_blklayer();
 	if(ret) {
 		dbg_err("init_blklayer fail \n");
@@ -1269,6 +1287,8 @@ static void __exit nand_exit(void)
 	s32 ret;
 	int nand_used = 0;
 
+	CAPTION;
+
 	ret = script_parser_fetch("nand_para", "nand_used", &nand_used, sizeof(int));
 	if (ret)
 		printk("nand init fetch emac using configuration failed\n");
@@ -1278,10 +1298,10 @@ static void __exit nand_exit(void)
 		return;
 	}
 
-	printk("[NAND]nand driver : bye bye\n");
 	platform_driver_unregister(&nand_driver);
 	//platform_device_unregister(&nand_device);
 	exit_blklayer();
+	pr_info("Sunxi NAND flash block driver unloaded\n");
 }
 
 module_init(nand_init);
