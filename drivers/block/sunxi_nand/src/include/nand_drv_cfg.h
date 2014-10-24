@@ -144,7 +144,7 @@
 #define MAPPING_ERR_MESSAGE_ON              (1)
 
 //define if need pr__s32 the logic control layer debug message
-#define LOGICCTL_DBG_MESSAGE_ON             (1)
+#define LOGICCTL_DBG_MESSAGE_ON             (0)
 
 //define if need pr__s32 the logic control layer error message
 #define LOGICCTL_ERR_MESSAGE_ON             (1)

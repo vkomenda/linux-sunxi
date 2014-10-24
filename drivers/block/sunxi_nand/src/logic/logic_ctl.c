@@ -256,6 +256,7 @@ static __s32 _WritePageCacheToNand(void)
 
     if(tmpPage != 0xffffffff)
     {
+	    DBG("page %x", tmpPage);
 
         if(tmpBitmap != FULL_BITMAP_OF_LOGIC_PAGE)
         {
@@ -1070,8 +1071,6 @@ __TRY_WRITE_PHYSIC_PAGE:
 __s32 LML_FlushPageCache(void)
 {
     __s32   result;
-
-    CAPTION;
 
     result = _WritePageCacheToNand();
     if(result < 0)

@@ -168,7 +168,7 @@ static int cache_align_page_request(struct nand_blk_ops * nandr, struct nand_blk
 		dbg_inf("READ:%lu from %lu\n",nsector,start);
 
 		#ifndef NAND_CACHE_RW
-			LML_FlushPageCache();
+		LML_FlushPageCache();
   		ret = LML_Read(start, nsector, buf);
 		#else
 			//printk("Rs %lu %lu \n",start, nsector);
@@ -237,7 +237,7 @@ static int nand_transfer(struct nand_blk_dev * dev, unsigned long start,unsigned
   			ret = LML_Read(start, nsector, buf);
 		#else
 			//printk("Rs %lu %lu \n",start, nsector);
-      		LML_FlushPageCache();
+			LML_FlushPageCache();
 			ret = NAND_CacheRead(start, nsector, buf);
 			//printk("Rs %lu %lu \n",start, nsector);
 		#endif
@@ -680,7 +680,7 @@ static int nand_add_dev(struct nand_blk_ops *nandr, struct nand_disk *part)
 	struct nand_blk_dev *dev;
 	struct list_head *this;
 	struct gendisk *gd;
-	unsigned long temp;
+	unsigned long temp = 16 * 1024;
 
 	int last_devnum = -1;
 
@@ -697,8 +697,7 @@ static int nand_add_dev(struct nand_blk_ops *nandr, struct nand_disk *part)
 
 	dev->cylinders = 1024;
 	dev->heads = 16;
-
-	temp = dev->cylinders * dev->heads;
+	temp = 16 * 1024;
 	dev->sectors = ( dev->size) / temp;
 	if ((dev->size) % temp) {
 		dev->sectors++;
@@ -711,6 +710,10 @@ static int nand_add_dev(struct nand_blk_ops *nandr, struct nand_disk *part)
 			dev->cylinders = (dev->size)  / temp;
 		}
 	}
+
+	DBG("mutex %x locked? %d  -- trying to lock...",
+	    (u32) &nand_mutex,
+	    mutex_is_locked(&nand_mutex));
 
 	if (!down_trylock(&nand_mutex)) {
 		up(&nand_mutex);
@@ -796,6 +799,10 @@ static int nand_remove_dev(struct nand_blk_dev *dev)
 	struct gendisk *gd;
 	gd = dev->blkcore_priv;
 
+	DBG("mutex %x locked? %d  -- trying to lock...",
+	    (u32) &nand_mutex,
+	    mutex_is_locked(&nand_mutex));
+
 	if (!down_trylock(&nand_mutex)) {
 		DBG("cannot obtain mutex");
 		up(&nand_mutex);
@@ -847,6 +854,10 @@ int nand_blk_register(struct nand_blk_ops *nandr)
 	int i,ret;
 	__u32 part_cnt;
 
+	DBG("mutex %x locked? %d  -- locking...",
+	    (u32) &nand_mutex,
+	    mutex_is_locked(&nand_mutex));
+
 	down(&nand_mutex);
 
 	ret = register_blkdev(nandr->major, nandr->name);
@@ -855,7 +866,6 @@ int nand_blk_register(struct nand_blk_ops *nandr)
 		up(&nand_mutex);
 		return -1;
 	}
-
 
 	spin_lock_init(&nandr->queue_lock);
 	init_completion(&nandr->thread_exit);
@@ -932,6 +942,10 @@ void nand_blk_unregister(struct nand_blk_ops *nandr)
 
 	CAPTION;
 
+	DBG("mutex %x locked? %d  -- locking...",
+	    (u32) &nand_mutex,
+	    mutex_is_locked(&nand_mutex));
+
 	down(&nand_mutex);
 	/* Clean up the kernel thread */
 	nandr->quit = 1;
@@ -992,7 +1006,9 @@ static struct nand_blk_ops mytr = {
 
 static int nand_flush(struct nand_blk_dev *dev)
 {
-	CAPTION;
+	DBG("mutex %x locked? %d  -- trying to lock...",
+	    (u32) &mytr.nand_ops_mutex,
+	    mutex_is_locked(&mytr.nand_ops_mutex));
 
 	if (0 == down_trylock(&mytr.nand_ops_mutex))
 	{
@@ -1004,8 +1020,7 @@ static int nand_flush(struct nand_blk_dev *dev)
 	#endif
 		up(&mytr.nand_ops_mutex);
 		IS_IDLE = 1;
-
-		dbg_inf("nand_flush \n");
+		DBG("Caches flushed");
 	}
 
 	return 0;
