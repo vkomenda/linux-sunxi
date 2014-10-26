@@ -65,7 +65,6 @@ struct nand_disk disk_array[ND_MAX_PART_COUNT+1];
 #define dbg_err(fmt, ...)  ({})
 #endif
 
-
 //#define BLK_INFO_MSG_ON
 #ifdef  BLK_INFO_MSG_ON
 #define dbg_inf(fmt, args...) printk("[NAND]"fmt, ## args)
@@ -492,12 +491,12 @@ static int nand_blktrans_thread(void *arg)
 
 
 		if((req->cmd_flags&REQ_SYNC)&&(req->cmd_flags&REQ_WRITE)&&(part_secur[dev->devnum]== 1)){
-		    //printk("req sync: 0x%x form part: 0x%x \n", req->cmd_flags, dev->devnum);
-		    spin_unlock_irq(rq->queue_lock);
+			//printk("req sync: 0x%x form part: 0x%x \n", req->cmd_flags, dev->devnum);
+			spin_unlock_irq(rq->queue_lock);
 			down(&nandr->nand_ops_mutex);
 			nand_current_dev_num = dev->devnum;
-		    nand_flush_force(nand_current_dev_num);
-		    up(&nandr->nand_ops_mutex);
+			nand_flush_force(nand_current_dev_num);
+			up(&nandr->nand_ops_mutex);
 			spin_lock_irq(rq->queue_lock);
 		}
 
@@ -546,9 +545,8 @@ static int nand_blktrans_thread(void *arg)
 		__blk_end_request_all(req, -EIO);
 	spin_unlock_irq(rq->queue_lock);
 
+	DBG("done");
 	complete_and_exit(&nandr->thread_exit, 0);
-
-	return 0;
 }
 
 
@@ -711,7 +709,7 @@ static int nand_add_dev(struct nand_blk_ops *nandr, struct nand_disk *part)
 		}
 	}
 
-	DBG("mutex %x locked? %d  -- trying to lock...",
+	DBG("mutex %x locked? %d  -- bugging out if not...",
 	    (u32) &nand_mutex,
 	    mutex_is_locked(&nand_mutex));
 
@@ -799,12 +797,11 @@ static int nand_remove_dev(struct nand_blk_dev *dev)
 	struct gendisk *gd;
 	gd = dev->blkcore_priv;
 
-	DBG("mutex %x locked? %d  -- trying to lock...",
+	DBG("mutex %x locked? %d  -- bugging out if not...",
 	    (u32) &nand_mutex,
 	    mutex_is_locked(&nand_mutex));
 
 	if (!down_trylock(&nand_mutex)) {
-		DBG("cannot obtain mutex");
 		up(&nand_mutex);
 		BUG();
 	}
@@ -812,7 +809,7 @@ static int nand_remove_dev(struct nand_blk_dev *dev)
 	gd->queue = NULL;
 	del_gendisk(gd);
 	put_disk(gd);
-	up(&nand_mutex);
+//	up(&nand_mutex);
 
 	DBG("block device removed");
 
@@ -845,6 +842,7 @@ static int collect_thread(void *tmparg)
 		arg->timeout = TIMEOUT;
 	}
 
+	DBG("done");
 	complete_and_exit(&arg->thread_exit, 0);
 }
 #endif
@@ -858,7 +856,11 @@ int nand_blk_register(struct nand_blk_ops *nandr)
 	    (u32) &nand_mutex,
 	    mutex_is_locked(&nand_mutex));
 
-	down(&nand_mutex);
+	ret = down_interruptible(&nand_mutex);
+	if (ret < 0) {          // timeout or interrupt
+		up(&nand_mutex);
+		return ret;
+	}
 
 	ret = register_blkdev(nandr->major, nandr->name);
 	if(ret){
@@ -958,16 +960,13 @@ void nand_blk_unregister(struct nand_blk_ops *nandr)
 	wait_for_completion(&collect_arg.thread_exit);
 #endif
 	/* Remove it from the list of active majors */
-
-
 	list_for_each_safe(this, next, &nandr->devs) {
-		struct nand_blk_dev *dev = list_entry(this, struct nand_blk_dev, list);
+		struct nand_blk_dev *dev =
+			list_entry(this, struct nand_blk_dev, list);
 		nandr->remove_dev(dev);
 	}
-
 	//devfs_remove(nandr->name);
 	blk_cleanup_queue(nandr->rq);
-
 	unregister_blkdev(nandr->major, nandr->name);
 
 	up(&nand_mutex);
@@ -996,8 +995,8 @@ static struct nand_blk_ops mytr = {
 	.name 			=  "nand",
 	.major 			= 93,
 	.minorbits 		= 3,
-	.getgeo 			= nand_getgeo,
-	.add_dev			= nand_add_dev,
+	.getgeo 		= nand_getgeo,
+	.add_dev		= nand_add_dev,
 	.remove_dev 		= nand_remove_dev,
 	.flush 			= nand_flush,
 	.owner 			= THIS_MODULE,
@@ -1006,11 +1005,8 @@ static struct nand_blk_ops mytr = {
 
 static int nand_flush(struct nand_blk_dev *dev)
 {
-	DBG("mutex %x locked? %d  -- trying to lock...",
-	    (u32) &mytr.nand_ops_mutex,
-	    mutex_is_locked(&mytr.nand_ops_mutex));
-
-	if (0 == down_trylock(&mytr.nand_ops_mutex))
+/*
+	if (!down_trylock(&mytr.nand_ops_mutex))
 	{
 		IS_IDLE = 0;
 	#ifdef NAND_CACHE_RW
@@ -1022,7 +1018,21 @@ static int nand_flush(struct nand_blk_dev *dev)
 		IS_IDLE = 1;
 		DBG("Caches flushed");
 	}
+*/
+	DBG("mutex %x locked? %d  -- trying to lock...",
+	    (u32) &mytr.nand_ops_mutex,
+	    mutex_is_locked(&mytr.nand_ops_mutex));
 
+	down(&mytr.nand_ops_mutex))
+	IS_IDLE = 0;
+#ifdef NAND_CACHE_RW
+	NAND_CacheFlush();
+#else
+	LML_FlushPageCache();
+#endif
+	up(&mytr.nand_ops_mutex);
+	IS_IDLE = 1;
+	DBG("Caches flushed");
 	return 0;
 }
 
@@ -1066,6 +1076,9 @@ static void nand_flush_all(void)
     LML_FlushPageCache();
     #endif
     BMM_WriteBackAllMapTbl();
+
+    up(&mytr.nand_ops_mutex);
+
     printk("Nand flash shutdown ok!\n");
 }
 
