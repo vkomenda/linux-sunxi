@@ -709,9 +709,7 @@ static int nand_add_dev(struct nand_blk_ops *nandr, struct nand_disk *part)
 		}
 	}
 
-	DBG("mutex %x locked? %d  -- bugging out if not...",
-	    (u32) &nand_mutex,
-	    mutex_is_locked(&nand_mutex));
+	DBG("mutex %x locked? bugging out if not...", (u32) &nand_mutex);
 
 	if (!down_trylock(&nand_mutex)) {
 		up(&nand_mutex);
@@ -797,9 +795,7 @@ static int nand_remove_dev(struct nand_blk_dev *dev)
 	struct gendisk *gd;
 	gd = dev->blkcore_priv;
 
-	DBG("mutex %x locked? %d  -- bugging out if not...",
-	    (u32) &nand_mutex,
-	    mutex_is_locked(&nand_mutex));
+	DBG("mutex %x locked? -- bugging out if not...", (u32) &nand_mutex);
 
 	if (!down_trylock(&nand_mutex)) {
 		up(&nand_mutex);
@@ -852,9 +848,8 @@ int nand_blk_register(struct nand_blk_ops *nandr)
 	int i,ret;
 	__u32 part_cnt;
 
-	DBG("mutex %x locked? %d  -- locking...",
-	    (u32) &nand_mutex,
-	    mutex_is_locked(&nand_mutex));
+	DBG("locking mutex %x",
+	    (u32) &nand_mutex);
 
 	ret = down_interruptible(&nand_mutex);
 	if (ret < 0) {          // timeout or interrupt
@@ -944,9 +939,8 @@ void nand_blk_unregister(struct nand_blk_ops *nandr)
 
 	CAPTION;
 
-	DBG("mutex %x locked? %d  -- locking...",
-	    (u32) &nand_mutex,
-	    mutex_is_locked(&nand_mutex));
+	DBG("locking mutex %x",
+	    (u32) &nand_mutex);
 
 	down(&nand_mutex);
 	/* Clean up the kernel thread */
@@ -1019,11 +1013,9 @@ static int nand_flush(struct nand_blk_dev *dev)
 		DBG("Caches flushed");
 	}
 */
-	DBG("mutex %x locked? %d  -- trying to lock...",
-	    (u32) &mytr.nand_ops_mutex,
-	    mutex_is_locked(&mytr.nand_ops_mutex));
+	DBG("locking mutex %x", (u32) &mytr.nand_ops_mutex);
 
-	down(&mytr.nand_ops_mutex))
+	down(&mytr.nand_ops_mutex);
 	IS_IDLE = 0;
 #ifdef NAND_CACHE_RW
 	NAND_CacheFlush();
