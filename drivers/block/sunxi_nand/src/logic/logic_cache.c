@@ -78,7 +78,7 @@ __s32 _flush_w_cache(void)
 {
 	__u32	i;
 
-	PRECONDITION(nand_w_cache != NULL);
+//	PRECONDITION(nand_w_cache != NULL);
 
 	for(i = 0; i < N_NAND_W_CACHE; i++)
 	{
