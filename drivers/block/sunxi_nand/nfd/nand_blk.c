@@ -79,7 +79,7 @@ struct nand_disk disk_array[ND_MAX_PART_COUNT+1];
 #define PART_WRITEONLY 0x86
 #define PART_NO_ACCESS 0x87
 
-#define TIMEOUT 				300			// ms
+#define TIMEOUT	(500 * HZ / 1000)  // milliseconds converted to jiffies
 
 #define NAND_CACHE_FLUSH_EVERY_SEC
 #define NAND_CACHE_RW
@@ -712,6 +712,7 @@ static int nand_add_dev(struct nand_blk_ops *nandr, struct nand_disk *part)
 	DBG("mutex %x locked? bugging out if not...", (u32) &nand_mutex);
 
 	if (!down_trylock(&nand_mutex)) {
+		DBG("...wasn't locked, so, BUG");
 		up(&nand_mutex);
 		BUG();
 	}
@@ -795,14 +796,16 @@ static int nand_remove_dev(struct nand_blk_dev *dev)
 	struct gendisk *gd;
 	gd = dev->blkcore_priv;
 
+	PRECONDITION(dev != NULL && gd != NULL);
 	DBG("mutex %x locked? -- bugging out if not...", (u32) &nand_mutex);
 
 	if (!down_trylock(&nand_mutex)) {
+		DBG("...wasn't locked, so, BUG");
 		up(&nand_mutex);
 		BUG();
 	}
 	list_del(&dev->list);
-	gd->queue = NULL;
+//	gd->queue = NULL;
 	del_gendisk(gd);
 	put_disk(gd);
 //	up(&nand_mutex);
@@ -829,7 +832,9 @@ static int collect_thread(void *tmparg)
 
 	while (!arg->quit)
 	{
-		ret = wait_event_interruptible_timeout(arg->wait, 0, arg->timeout*HZ);
+//		DBG("waiting %d ms...", arg->timeout * 1000 / HZ);
+
+		ret = wait_event_interruptible_timeout(arg->wait, 0, arg->timeout);
 		if (0 ==  ret)
 		{
 			nand_flush(NULL);
@@ -932,50 +937,6 @@ int nand_blk_register(struct nand_blk_ops *nandr)
 	return 0;
 }
 
-
-void nand_blk_unregister(struct nand_blk_ops *nandr)
-{
-	struct list_head *this, *next;
-
-	CAPTION;
-
-	DBG("locking mutex %x",
-	    (u32) &nand_mutex);
-
-	down(&nand_mutex);
-	/* Clean up the kernel thread */
-	nandr->quit = 1;
-	wake_up(&nandr->thread_wq);
-	wait_for_completion(&nandr->thread_exit);
-
-#ifdef NAND_CACHE_FLUSH_EVERY_SEC
-	collect_arg.quit =1;
-	wake_up(&collect_arg.wait);
-	wait_for_completion(&collect_arg.thread_exit);
-#endif
-	/* Remove it from the list of active majors */
-	list_for_each_safe(this, next, &nandr->devs) {
-		struct nand_blk_dev *dev =
-			list_entry(this, struct nand_blk_dev, list);
-		nandr->remove_dev(dev);
-	}
-	//devfs_remove(nandr->name);
-	blk_cleanup_queue(nandr->rq);
-	unregister_blkdev(nandr->major, nandr->name);
-
-	up(&nand_mutex);
-
-	if (!list_empty(&nandr->devs)) {
-		DBG("device list is not empty");
-		BUG();
-	}
-
-	DBG("block device unregistered");
-}
-
-
-
-
 static int nand_getgeo(struct nand_blk_dev *dev,  struct hd_geometry *geo)
 {
 	geo->heads = dev->heads;
@@ -996,35 +957,72 @@ static struct nand_blk_ops mytr = {
 	.owner 			= THIS_MODULE,
 };
 
+void nand_blk_unregister(struct nand_blk_ops *nandr)
+{
+	struct list_head *this, *next;
+
+	CAPTION;
+
+	DBG("locking mutex %x", (u32) &nand_mutex);
+
+	down(&nand_mutex);
+	/* Clean up the kernel thread */
+	nandr->quit = 1;
+	wake_up(&nandr->thread_wq);
+	wait_for_completion(&nandr->thread_exit);
+
+#ifdef NAND_CACHE_FLUSH_EVERY_SEC
+	collect_arg.quit =1;
+	wake_up(&collect_arg.wait);
+	wait_for_completion(&collect_arg.thread_exit);
+#endif
+	/* Remove it from the list of active majors */
+	list_for_each_safe(this, next, &nandr->devs) {
+		struct nand_blk_dev *dev =
+			list_entry(this, struct nand_blk_dev, list);
+		nandr->remove_dev(dev);
+	}
+	//devfs_remove(nandr->name);
+
+	free_irq(SW_INT_IRQNO_NAND, &mytr);
+	blk_cleanup_queue(nandr->rq);
+	unregister_blkdev(nandr->major, nandr->name);
+
+	up(&nand_mutex);
+
+	if (!list_empty(&nandr->devs)) {
+		DBG("device list is not empty");
+		BUG();
+	}
+
+	DBG("block device unregistered");
+}
 
 static int nand_flush(struct nand_blk_dev *dev)
 {
-/*
-	if (!down_trylock(&mytr.nand_ops_mutex))
-	{
+	int flushCount = 0;
+
+//	DBG("trying to lock mutex %x...", (u32) &mytr.nand_ops_mutex);
+	if (!down_trylock(&mytr.nand_ops_mutex)) {
+//		DBG("...locked");
 		IS_IDLE = 0;
-	#ifdef NAND_CACHE_RW
+#ifdef NAND_CACHE_RW
 		NAND_CacheFlush();
-	#else
+#else
 		LML_FlushPageCache();
-	#endif
+#endif
 		up(&mytr.nand_ops_mutex);
 		IS_IDLE = 1;
-		DBG("Caches flushed");
-	}
-*/
-	DBG("locking mutex %x", (u32) &mytr.nand_ops_mutex);
 
-	down(&mytr.nand_ops_mutex);
-	IS_IDLE = 0;
-#ifdef NAND_CACHE_RW
-	NAND_CacheFlush();
-#else
-	LML_FlushPageCache();
-#endif
-	up(&mytr.nand_ops_mutex);
-	IS_IDLE = 1;
-	DBG("Caches flushed");
+		flushCount++;
+		if (flushCount % 1000 == 0) {
+			DBG("caches flushed %d times", flushCount);
+			flushCount = 0;
+		}
+	}
+	else {
+//		DBG("...busy");
+	}
 	return 0;
 }
 
@@ -1122,12 +1120,12 @@ static int __init init_blklayer(void)
 	ret = script_parser_fetch("nand_para","good_block_ratio",
 				  &nand_good_block_ratio, sizeof(int));
 	if (ret)
-		printk(KERN_INFO "[NAND] nand_good_block_ratio is undefined\n");
+		printk(KERN_INFO "[NAND] good_block_ratio is undefined\n");
 	else {
 		if(nand_good_block_ratio <= 0)
-			printk(KERN_INFO "[NAND] use nand_good_block_ratio from default parameter\n");
+			printk(KERN_INFO "[NAND] use good_block_ratio from default parameter\n");
 		else {
-			printk(KERN_INFO "[NAND] get nand_good_block_ratio from script: %d\n",
+			printk(KERN_INFO "[NAND] get good_block_ratio from script: %d\n",
 			       nand_good_block_ratio);
 			NAND_SetValidBlkRatio(nand_good_block_ratio);
 		}
@@ -1135,31 +1133,41 @@ static int __init init_blklayer(void)
 
 	ret = PHY_ChangeMode(1);
 	if (ret < 0)
-		return ret;
+		goto err_out_free_irq;
 
 	ret = PHY_ScanDDRParam();
 	if (ret < 0)
-		return ret;
+		goto err_out_free_irq;
 
 	ret = FMT_Init();
 	if (ret < 0)
-		return ret;
+		goto err_out_free_irq;
 
 	ret = FMT_FormatNand();
 	if (ret < 0)
-		return ret;
+		goto err_out_free_irq;
+
 	FMT_Exit();
 
 	/*init logic layer*/
 	ret = LML_Init();
 	if (ret < 0)
-		return ret;
+		goto err_out_free_irq;
 
-	#ifdef NAND_CACHE_RW
-		NAND_CacheOpen();
-	#endif
+#ifdef NAND_CACHE_RW
+	NAND_CacheOpen();
+#endif
 
-	return nand_blk_register(&mytr);
+	ret = nand_blk_register(&mytr);
+	if (ret < 0)
+		goto err_out_free_irq;
+
+	return 0;
+
+  err_out_free_irq:
+	free_irq(SW_INT_IRQNO_NAND, &mytr);
+
+	return ret;
 }
 
 static void __exit exit_blklayer(void)
@@ -1237,13 +1245,13 @@ static int nand_resume(struct platform_device *plat_dev)
 	return 0;
 }
 
-static int __init nand_probe(struct platform_device *plat_dev)
+static int nand_probe(struct platform_device *plat_dev)
 {
 	CAPTION;
 	return 0;
 }
 
-static int __exit nand_remove(struct platform_device *plat_dev)
+static int nand_remove(struct platform_device *plat_dev)
 {
 	CAPTION;
 	return 0;
