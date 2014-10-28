@@ -431,6 +431,8 @@ static __s32 _VirtualBlockErase(__u32 nDieNum, __u32 nBlkNum)
     __s32 i, result = 0;
     struct __PhysicOpPara_t tmpPhyBlk;
 
+    DBG("die %x block %x", nDieNum, nBlkNum);
+
     //erase every block belonged to different banks
     for(i=0; i<INTERLEAVE_BANK_CNT; i++)
     {
@@ -928,7 +930,9 @@ static __s32 _GetBlkLogicInfo(struct __ScanDieInfo_t *pDieInfo)
     __u64   spare_bitmap;
     struct  __NandUserData_t tmpSpare[2];
 
-	if(pDieInfo->nDie == 0)
+    CAPTION;
+
+    if(pDieInfo->nDie == 0)
     {
         tmpStartBlk = DIE0_FIRST_BLK_NUM;
     }
@@ -1539,6 +1543,8 @@ static __s32 _GetMapTblBlock(struct __ScanDieInfo_t *pDieInfo)
 {
     __s32   i, result, tmpTryGet;
 
+    CAPTION;
+
     for(i=0; i<ZONE_CNT_OF_DIE; i++)
     {
         //check if the physical block for saving block mapping table is already exist
@@ -1608,6 +1614,8 @@ static __s32 _KickValidTblBlk(struct __ScanDieInfo_t *pDieInfo)
     __u32   tmpTblBlk, tmpTblPage;
     __u16   tmpPhyBlk;
 
+    CAPTION;
+
     for(i=0; i<ZONE_CNT_OF_DIE; i++)
     {
         //check if the block mapping table of the zone is valid
@@ -1664,11 +1672,13 @@ static __s32 _KickValidTblBlk(struct __ScanDieInfo_t *pDieInfo)
 *               < 0     repair log block table failed.
 ************************************************************************************************************************
 */
-static __s32 _RepairLogBlkTbl(struct __ScanDieInfo_t *pDieInfo)
+static void _RepairLogBlkTbl(struct __ScanDieInfo_t *pDieInfo)
 {
 
     __s32 i, tmpZone, tmpLastUsedPage;
     struct __LogBlkType_t *tmpLogTbl;
+
+    CAPTION;
 
     for(tmpZone=0; tmpZone<ZONE_CNT_OF_DIE; tmpZone++)
     {
@@ -1692,8 +1702,6 @@ static __s32 _RepairLogBlkTbl(struct __ScanDieInfo_t *pDieInfo)
             tmpLogTbl++;
         }
     }
-
-    return 0;
 }
 
 
@@ -1715,8 +1723,9 @@ static __s32 _RepairLogBlkTbl(struct __ScanDieInfo_t *pDieInfo)
 static __s32 _DistributeFreeBlk(struct __ScanDieInfo_t *pDieInfo)
 {
     __s32   i, tmpZone, tmpFreeBlk;
-
     struct __SuperPhyBlkType_t *tmpZoneTbl;
+
+    CAPTION;
 
     //initiate the first super block of the die
     if(pDieInfo->nDie == 0)
@@ -1824,6 +1833,8 @@ static __s32 _FillZoneTblInfo(struct __ScanDieInfo_t *pDieInfo)
     __u16   tmpLogicInfo;
     __u32   i, tmpPhyBlk, tmpBlkErase[8];
     __s32   result;
+
+    CAPTION;
 
     //calculte the first block is used in the die
     if(pDieInfo->nDie == 0)
@@ -2051,6 +2062,8 @@ static __s32 _WriteBlkMapTbl(struct __ScanDieInfo_t *pDieInfo)
     struct __NandUserData_t tmpSpare[2];
     struct __SuperPhyBlkType_t *tmpDataBlk;
     struct __LogBlkType_t *tmpLogBlk;
+
+    CAPTION;
 
     for(tmpZone=0; tmpZone<ZONE_CNT_OF_DIE; tmpZone++)
     {
@@ -2289,8 +2302,19 @@ static __s32 _SearchZoneTbls(struct __ScanDieInfo_t *pDieInfo)
             FORMAT_DBG("[FORMAT_DBG] Find the table block %d for zone 0x%x of die 0x%x,"
                        " but the data block table is invalid!\n",tmpSuperBlk,tmpZoneInDie, pDieInfo->nDie);
 
+	    // FIXME: Is there a way to repair a block mapping copy?
+            result = _VirtualBlockErase(pDieInfo->nDie, tmpSuperBlk);
+            if (result) {
+		    DBG("invalid block %x die %x mapping copy erase ERROR %d",
+			tmpSuperBlk, pDieInfo->nDie, result);
+		    _WriteBadBlkFlag(pDieInfo->nDie, tmpSuperBlk);
+	    }
+	    else {
+		    DBG("invalid block %x die %x mapping copy erase SUCCESS");
+	    }
             //release the data block table buffer
             FREE(tmpDataBlkTbl,BLOCK_CNT_OF_ZONE * sizeof(struct __SuperPhyBlkType_t));
+
             continue;
         }
         FREE(tmpDataBlkTbl,BLOCK_CNT_OF_ZONE * sizeof(struct __SuperPhyBlkType_t));
@@ -2346,6 +2370,8 @@ static __s32 _SearchZoneTbls(struct __ScanDieInfo_t *pDieInfo)
 static __s32 _RebuildZoneTbls(struct __ScanDieInfo_t *pDieInfo)
 {
     __s32 i, result;
+
+    CAPTION;
 
     //request buffer for get the logical information of every physical block in the die
     pDieInfo->pPhyBlk = (__u16 *)MALLOC(SuperBlkCntOfDie * sizeof(__u16));
@@ -2410,7 +2436,7 @@ static __s32 _RebuildZoneTbls(struct __ScanDieInfo_t *pDieInfo)
     }
 
     //repair the log block table
-    result = _RepairLogBlkTbl(pDieInfo);
+    _RepairLogBlkTbl(pDieInfo);
 
     //allocate the free block to every block mapping table
     result = _DistributeFreeBlk(pDieInfo);
