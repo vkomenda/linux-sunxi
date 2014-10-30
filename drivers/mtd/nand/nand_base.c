@@ -2947,7 +2947,7 @@ static int parse_hynix_sizes(struct mtd_info *mtd, u8 sz)
 	default:
 		mtd->oobsize = 640;  break;
 	}
-	mtd->erasesize = 1024 << (6 + (erase_code & 0x3));
+	mtd->erasesize = 0x100000 << (erase_code & 0x3);
 
 	return 0;
 }
