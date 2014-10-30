@@ -2919,7 +2919,7 @@ static int nand_flash_detect_onfi(struct mtd_info *mtd, struct nand_chip *chip,
  */
 static int parse_hynix_sizes(struct mtd_info *mtd, u8 sz)
 {
-	int oob_code, erase_code;
+	u8 oob_code, erase_code;
 	u8 sizes = sz;
 
 	mtd->writesize = 2048 << (sizes & 0x03);
@@ -2928,11 +2928,14 @@ static int parse_hynix_sizes(struct mtd_info *mtd, u8 sz)
 	sizes >>= 2;
 	erase_code = sizes & 0x03;
 	sizes >>= 2;
-	oob_code &= (sizes & 0x01) << 2;
+	oob_code |= (sizes & 0x01) << 2;
 	sizes >>= 1;
-	erase_code &= (sizes & 0x01) << 2;
+	erase_code |= (sizes & 0x01) << 2;
 	pr_info("Hynix codes: page size %d, block size %d, oob size %d\n",
 		mtd->writesize, erase_code, oob_code);
+	if (oob_code >= 0x4 || erase_code < 0x4)
+		return -EINVAL;
+
 	switch (oob_code) {
 	case 0:
 		mtd->oobsize = 2048; break;
@@ -2944,7 +2947,7 @@ static int parse_hynix_sizes(struct mtd_info *mtd, u8 sz)
 	default:
 		mtd->oobsize = 640;  break;
 	}
-	mtd->erasesize = 1024 << (6 + erase_code);
+	mtd->erasesize = 1024 << (6 + (erase_code & 0x3));
 
 	return 0;
 }
@@ -2973,9 +2976,6 @@ static struct nand_flash_dev *nand_get_flash_type(struct mtd_info *mtd,
 
 	/* Send the command for reading device ID */
 	chip->cmdfunc(mtd, NAND_CMD_READID, 0x00, -1);
-
-	for (i = 0; i < 8; i++)
-		id_data[i] =
 
 	/* Take the manufacturer and device codes */
 	*maf_id = chip->read_byte(mtd);
