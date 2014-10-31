@@ -101,12 +101,13 @@ struct nand_bbt_descr {
 #define NAND_BBT_WRITE		0x00002000
 /* Read and write back block contents when writing bbt */
 #define NAND_BBT_SAVECONTENT	0x00004000
-/* Search good / bad pattern on the first page and
+/*
+ * Search for the good block marker on the first page and
  *  - if the NAND_BBT_SCANLASTPAGE bit is NOT set then on the second page, or
  *  - if the NAND_BBT_SCANLASTPAGE is set then on the last page.
  */
 #define NAND_BBT_SCAN2NDPAGE	0x00008000
-/* Search good / bad pattern on the last page of the eraseblock */
+/* Search for the good block marker on the last page of the eraseblock. */
 #define NAND_BBT_SCANLASTPAGE	0x00010000
 /*
  * Use a flash based bad block table. By default, OOB identifier is saved in

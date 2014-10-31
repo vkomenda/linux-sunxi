@@ -260,8 +260,10 @@ static inline int mtd_read_oob(struct mtd_info *mtd, loff_t from,
 			       struct mtd_oob_ops *ops)
 {
 	ops->retlen = ops->oobretlen = 0;
-	if (!mtd->_read_oob)
+	if (!mtd->_read_oob) {
+		pr_debug("[mtd] ERROR: _read_oob not implemented\n");
 		return -EOPNOTSUPP;
+	}
 	return mtd->_read_oob(mtd, from, ops);
 }
 
