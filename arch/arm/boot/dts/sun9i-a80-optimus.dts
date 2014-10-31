@@ -60,6 +60,40 @@
 	};
 
 	soc {
+		ehci0: usb@00a00000 {
+			status = "okay";
+		};
+
+		ohci0: usb@00a00400 {
+			status = "okay";
+		};
+
+		usbphy0: phy@00a00800 {
+			vbus-supply = <&reg_usb0_vbus>;
+			status = "okay";
+		};
+
+		ehci1: usb@00a01000 {
+			status = "okay";
+		};
+
+		usbphy1: phy@00a01800 {
+			status = "okay";
+		};
+
+		ehci2: usb@00a02000 {
+			status = "okay";
+		};
+
+		ohci2: usb@00a02400 {
+			status = "okay";
+		};
+
+		usbphy2: phy@00a02800 {
+			vbus-supply = <&reg_usb2_vbus>;
+			status = "okay";
+		};
+
 		mmc0: mmc@01c0f000 {
 			pinctrl-names = "default";
 			pinctrl-0 = <&mmc0_pins>, <&mmc0_cd_pin_optimus>;
@@ -103,6 +137,20 @@
 				/* Enable internal pull-up */
 				allwinner,pull = <1>;
 			};
+
+			usb0_vbus_pin_optimus: usb0_vbus_pin@1 {
+				allwinner,pins = "PH4";
+				allwinner,function = "gpio_out";
+				allwinner,drive = <0>;
+				allwinner,pull = <0>;
+			};
+
+			usb2_vbus_pin_optimus: usb2_vbus_pin@1 {
+				allwinner,pins = "PH5";
+				allwinner,function = "gpio_out";
+				allwinner,drive = <0>;
+				allwinner,pull = <0>;
+			};
 		};
 
 		uart0: serial@07000000 {
@@ -142,5 +190,17 @@
 			label = "optimus:led4:usr";
 			gpios = <&pio 7 0 0>;
 		};
+	};
+
+	reg_usb0_vbus: usb0-vbus {
+		pinctrl-0 = <&usb0_vbus_pin_optimus>;
+		gpio = <&pio 7 4 0>; /* PH4 */
+		status = "okay";
+	};
+
+	reg_usb2_vbus: usb2-vbus {
+		pinctrl-0 = <&usb2_vbus_pin_optimus>;
+		gpio = <&pio 7 5 0>; /* PH5 */
+		status = "okay";
 	};
 };
