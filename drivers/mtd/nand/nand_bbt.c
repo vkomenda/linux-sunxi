@@ -474,8 +474,11 @@ static int scan_first_last_pages(struct mtd_info *mtd, loff_t offs,
 			return ret;
 
 		/* Check the first byte of the spare area of the page. */
-		if (buf[0] != 0xff)
+		if (buf[0] != 0xff) {
+			pr_debug("BB marker #%d at offset %x is %.2x (%.2x)\n",
+				 i + 1, offs, buf[0], buf[1]);
 			return i + 1;
+		}
 	}
 	return 0;
 }
