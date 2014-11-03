@@ -405,6 +405,8 @@ static int scan_block_full(struct mtd_info *mtd, struct nand_bbt_descr *bd,
 {
 	int ret, j;
 
+	printk("%s: offset %x\n", __FUNCTION__, offs);
+
 	ret = scan_read_raw_oob(mtd, buf, offs, readlen);
 	/* Ignore ECC errors when checking for BBM */
 	if (ret && !mtd_is_bitflip_or_eccerr(ret))
@@ -429,6 +431,8 @@ static int scan_block_fast(struct mtd_info *mtd, struct nand_bbt_descr *bd,
 	ops.ooboffs = 0;
 	ops.datbuf = NULL;
 	ops.mode = MTD_OPS_PLACE_OOB;
+
+	printk("%s: offset %x\n", __FUNCTION__, offs);
 
 	for (j = 0; j < len; j++) {
 		/*
@@ -456,6 +460,7 @@ static int scan_first_last_pages(struct mtd_info *mtd, loff_t offs,
 {
 	struct mtd_oob_ops ops;
 	int ret, i, ecc;
+	loff_t page_offsets[2] = {offs, offs + mtd->erasesize - mtd->writesize};
 
 	ops.ooblen = mtd->oobsize;
 	ops.oobbuf = buf;
@@ -463,20 +468,22 @@ static int scan_first_last_pages(struct mtd_info *mtd, loff_t offs,
 	ops.datbuf = NULL;
 	ops.mode = MTD_OPS_PLACE_OOB;
 
-	for (i = 0; i < 2; i++, offs += mtd->erasesize - mtd->writesize) {
-		ret = mtd_read_oob(mtd, offs, &ops);
-		ecc = mtd_is_bitflip_or_eccerr(ret);
-		if (ecc)
-			pr_info("ECC or bitflip error in cycle %d\n", i);
-
-		/* Ignore ECC errors when checking for BBM */
-		if (ret && !ecc)
+	for (i = 0; i < 2; i++) {
+		ret = mtd_read_oob(mtd, page_offsets[i], &ops);
+		if (ret && !mtd_is_bitflip_or_eccerr(ret)) {
+			pr_err("OOB read ERROR %d at offset %x\n",
+			       ret, page_offsets[i]);
 			return ret;
+		}
 
 		/* Check the first byte of the spare area of the page. */
-		if (buf[0] != 0xff) {
-			pr_debug("BB marker #%d at offset %x is %.2x (%.2x)\n",
-				 i + 1, offs, buf[0], buf[1]);
+		if (buf[0] == 0xFF) {
+			pr_info("BB marker #%d at offset %x OK\n",
+				 i + 1, page_offsets[i]);
+		}
+		else {
+			pr_info("BB marker #%d at offset %x is %.2x (%.2x)\n",
+				 i + 1, page_offsets[i], buf[0], buf[1]);
 			return i + 1;
 		}
 	}
@@ -521,9 +528,11 @@ static int create_bbt(struct mtd_info *mtd, uint8_t *buf,
 		scanlen = mtd->writesize + mtd->oobsize;
 		readlen = len * mtd->writesize;
 	}
-	pr_info("Scanning device [%s] for bad blocks. Options %.8x %.8x. "
+	pr_info("Scanning device [%s] chip %d for bad blocks. "
+		"Options %.8x %.8x. "
 		"Scan %d page(s), scan %d B, read %d B\n",
-		mtd->name, bd->options, this->bbt_options,
+		mtd->name, chip,
+		bd->options, this->bbt_options,
 		len, scanlen, readlen);
 
 	if (chip == -1) {
@@ -545,6 +554,8 @@ static int create_bbt(struct mtd_info *mtd, uint8_t *buf,
 		numblocks += startblock;
 		from = (loff_t)startblock << (this->bbt_erase_shift - 1);
 	}
+	pr_debug("%s: numblocks %x, startblock %x, from %x\n",
+		 __FUNCTION__, numblocks, startblock, from);
 
 	if ( (bd->options & NAND_BBT_SCANLASTPAGE) &&
 	    !(bd->options & NAND_BBT_SCAN2NDPAGE))
