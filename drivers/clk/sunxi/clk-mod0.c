@@ -130,6 +130,30 @@ static struct platform_driver sun4i_a10_mod0_clk_driver = {
 };
 module_platform_driver(sun4i_a10_mod0_clk_driver);
 
+static const struct factors_data sun9i_a80_mod0_data __initconst = {
+	.enable = 31,
+	.mux = 24,
+	.muxmask = BIT(3) | BIT(2) | BIT(1) | BIT(0),
+	.table = &sun4i_a10_mod0_config,
+	.getter = sun4i_a10_get_mod0_factors,
+};
+
+static void __init sun9i_a80_mod0_setup(struct device_node *node)
+{
+	void __iomem *reg;
+
+	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
+	if (!reg) {
+		pr_err("Could not get registers for mod0-clk: %s\n",
+		       node->name);
+		return;
+	}
+
+	sunxi_factors_register(node, &sun9i_a80_mod0_data,
+			       &sun4i_a10_mod0_lock, reg);
+}
+CLK_OF_DECLARE(sun9i_a80_mod0, "allwinner,sun9i-a80-mod0-clk", sun9i_a80_mod0_setup);
+
 static DEFINE_SPINLOCK(sun5i_a13_mbus_lock);
 
 static void __init sun5i_a13_mbus_setup(struct device_node *node)
@@ -346,3 +370,78 @@ err_free_data:
 	kfree(clk_data);
 }
 CLK_OF_DECLARE(sun4i_a10_mmc, "allwinner,sun4i-a10-mmc-clk", sun4i_a10_mmc_setup);
+
+static DEFINE_SPINLOCK(sun9i_a80_mmc_lock);
+
+static void __init sun9i_a80_mmc_setup(struct device_node *node)
+{
+	struct clk_onecell_data *clk_data;
+	const char *parent;
+	void __iomem *reg;
+	int i;
+
+	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
+	if (IS_ERR(reg)) {
+		pr_err("Couldn't map the %s clock registers\n", node->name);
+		return;
+	}
+
+	clk_data = kmalloc(sizeof(*clk_data), GFP_KERNEL);
+	if (!clk_data)
+		return;
+
+	clk_data->clks = kcalloc(3, sizeof(*clk_data->clks), GFP_KERNEL);
+	if (!clk_data->clks)
+		goto err_free_data;
+
+	clk_data->clk_num = 3;
+	clk_data->clks[0] = sunxi_factors_register(node,
+						   &sun9i_a80_mod0_data,
+						   &sun9i_a80_mmc_lock, reg);
+	if (!clk_data->clks[0])
+		goto err_free_clks;
+
+	parent = __clk_get_name(clk_data->clks[0]);
+
+	for (i = 1; i < 3; i++) {
+		struct clk_init_data init = {
+			.num_parents	= 1,
+			.parent_names	= &parent,
+			.ops		= &mmc_clk_ops,
+		};
+		struct mmc_phase *phase;
+
+		phase = kmalloc(sizeof(*phase), GFP_KERNEL);
+		if (!phase)
+			continue;
+
+		phase->hw.init = &init;
+		phase->reg = reg;
+		phase->lock = &sun9i_a80_mmc_lock;
+
+		if (i == 1)
+			phase->offset = 8;
+		else
+			phase->offset = 20;
+
+		if (of_property_read_string_index(node, "clock-output-names",
+						  i, &init.name))
+			init.name = node->name;
+
+		clk_data->clks[i] = clk_register(NULL, &phase->hw);
+		if (IS_ERR(clk_data->clks[i])) {
+			kfree(phase);
+			continue;
+		}
+	}
+
+	of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
+
+	return;
+
+err_free_clks:
+	kfree(clk_data->clks);
+err_free_data:
+	kfree(clk_data);
+}
+CLK_OF_DECLARE(sun9i_a80_mmc, "allwinner,sun9i-a80-mmc-clk", sun9i_a80_mmc_setup);
