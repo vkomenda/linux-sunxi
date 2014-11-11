@@ -2234,13 +2234,18 @@ static __s32 _SearchZoneTbls(struct __ScanDieInfo_t *pDieInfo)
         _VirtualPageRead(pDieInfo->nDie, tmpSuperBlk, 0, SPARE_DATA_BITMAP, FORMAT_PAGE_BUF, (void *)&tmpSpareData);
 
         //check if the bock is a valid block-mapping-table block
-        if((tmpSpareData[0].BadBlkFlag != 0xff) || (tmpSpareData[1].BadBlkFlag != 0xff) || \
-                (GET_LOGIC_INFO_TYPE(tmpSpareData[0].LogicInfo) != 1) || \
-                        (GET_LOGIC_INFO_BLK(tmpSpareData[0].LogicInfo) != 0xaa))
+        if((tmpSpareData[0].BadBlkFlag != 0xff) || (tmpSpareData[1].BadBlkFlag != 0xff) ||
+	   (GET_LOGIC_INFO_TYPE(tmpSpareData[0].LogicInfo) != 1) ||
+	   (GET_LOGIC_INFO_BLK(tmpSpareData[0].LogicInfo) != 0xaa))
         {
-            //the block is not a valid block-mapping-table block, ignore it
-            continue;
+		FORMAT_DBG("[FORMAT_DBG] Invalid block mapping table block %x, ignoring it\n",
+			   tmpSuperBlk);
+		continue;
         }
+	else {
+		FORMAT_DBG("[FORMAT_DBG] Block %x page 0 spare data logic info %x\n",
+			   tmpSuperBlk, tmpSpareData[0].LogicInfo);
+	}
 
         tmpZoneInDie = GET_LOGIC_INFO_ZONE(tmpSpareData[0].LogicInfo);
         //check if the zone number in the logicial information of the block is valid
@@ -2283,8 +2288,9 @@ static __s32 _SearchZoneTbls(struct __ScanDieInfo_t *pDieInfo)
         if(FORMAT_PAGE_BUF[0] != 0xff)
         {
             //the block mapping table is invalid
-            FORMAT_DBG("[FORMAT_DBG] Find the table block %d for zone 0x%x of die 0x%x, but the table is invalid!\n",
-                        tmpSuperBlk,tmpZoneInDie, pDieInfo->nDie);
+            FORMAT_DBG("[FORMAT_DBG] Find the table block %d for zone 0x%x of die 0x%x, "
+		       "but the DIRTY flag is set\n",
+		       tmpSuperBlk,tmpZoneInDie, pDieInfo->nDie);
             continue;
         }
 
@@ -2310,7 +2316,8 @@ static __s32 _SearchZoneTbls(struct __ScanDieInfo_t *pDieInfo)
 		    _WriteBadBlkFlag(pDieInfo->nDie, tmpSuperBlk);
 	    }
 	    else {
-		    DBG("invalid block %x die %x mapping copy erase SUCCESS");
+		    DBG("invalid block %x die %x mapping copy erase SUCCESS",
+			tmpSuperBlk, pDieInfo->nDie);
 	    }
             //release the data block table buffer
             FREE(tmpDataBlkTbl,BLOCK_CNT_OF_ZONE * sizeof(struct __SuperPhyBlkType_t));
