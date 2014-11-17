@@ -2193,6 +2193,84 @@ static __s32 _WriteBlkMapTbl(struct __ScanDieInfo_t *pDieInfo)
 
 
 /*
+ * Erases the block mapping table at a given location.
+ */
+static int erase_BMT(u8 die, u32 blk)
+{
+	int result, i;
+//	u32 checksum;
+	struct __NandUserData_t spare[2];
+//	struct __SuperPhyBlkType_t *data;
+
+	DBG("Block mapping table erase in die %x, block %x", die, blk);
+
+	result = _VirtualBlockErase(die, blk);
+	if (result < 0) {
+                DBG("Block %x erase ERROR %d; marking the block as bad",
+		    blk, result);
+                _WriteBadBlkFlag(die, blk);
+                return -EHWPOISON;
+	}
+
+        /* Erase "user data" in the spare area. */
+	memset(spare, 0xFF, 2 * sizeof(__NandUserData_t));
+
+        /* Compute a valid checksum. */
+	/*
+        checksum = _CalCheckSum((u32*) data, BLOCK_CNT_OF_ZONE - 1);
+        *(u32*) &data[BLOCK_CNT_OF_ZONE - 1] = checksum;
+	*/
+
+        /* Erase the data block translation table copies. */
+        memset(FORMAT_PAGE_BUF, 0xFF, SECTOR_CNT_OF_SUPER_PAGE * SECTOR_SIZE);
+
+	for (i = 0; i < 2; i++) {
+		/*
+		u32* data_copy; // address of a copy of the data block table
+
+		if (i == 0) {
+			data_copy = (u32*) data;
+		}
+		else {
+			data_copy = (u32*) &data[BLOCK_CNT_OF_ZONE / 2];
+		}
+		memcpy(FORMAT_PAGE_BUF, data_copy, 4 * SECTOR_SIZE);
+		*/
+
+		result = _VirtualPageWrite(die, blk, DATA_TBL_OFFSET + i,
+					   FULL_BITMAP_OF_SUPER_PAGE, FORMAT_PAGE_BUF,
+					   (void*) spare);
+		if (result < 0) {
+			DBG("ERROR %d while writing page %d of the data block table; "
+			    "marking the block %x as bad", result, i + 1, blk);
+			_WriteBadBlkFlag(die, blk);
+			return -EHWPOISON;
+		}
+        }
+
+        /* Erase "logic" page allocation table copies. */
+        memset(FORMAT_PAGE_BUF, 0xFF, SECTOR_CNT_OF_SUPER_PAGE * SECTOR_SIZE);
+//        memcpy(FORMAT_PAGE_BUF, (u32*) pagetbl,
+//	       LOG_BLK_CNT_OF_ZONE * sizeof(struct __LogBlkType_t));
+
+        /* Compute a valid checksum. */
+//	checksum = _CalCheckSum((u32*) FORMAT_PAGE_BUF,
+//				LOG_BLK_CNT_OF_ZONE * sizeof(struct __LogBlkType_t) / sizeof(u32));
+//	((u32*) FORMAT_PAGE_BUF)[511] = checksum;
+        result = _VirtualPageWrite(die, blk, LOG_TBL_OFFSET,
+				   FULL_BITMAP_OF_SUPER_PAGE, FORMAT_PAGE_BUF,
+				   (void*) spare);
+        if (result < 0) {
+		DBG("ERROR %d while erasing translation tables; "
+		    "marking block %x as bad", result, blk);
+		_WriteBadBlkFlag(die, blk);
+		return -EHWPOISON;
+        }
+
+	return 0;
+}
+
+/*
 ************************************************************************************************************************
 *                       SEARCH ZONE TABLES FROM ONE NAND DIE
 *
@@ -2307,6 +2385,8 @@ static __s32 _SearchZoneTbls(struct __ScanDieInfo_t *pDieInfo)
             //the checksum of the data block table is invalid
             FORMAT_DBG("[FORMAT_DBG] Find the table block %d for zone 0x%x of die 0x%x,"
                        " but the data block table is invalid!\n",tmpSuperBlk,tmpZoneInDie, pDieInfo->nDie);
+
+	    erase_BMT(pDieInfo->nDie, tmpSuperBlk);
 
 	    // FIXME: Is there a way to repair a block mapping copy?
             result = _VirtualBlockErase(pDieInfo->nDie, tmpSuperBlk);
