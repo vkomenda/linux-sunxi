@@ -861,7 +861,7 @@ __s32 LML_PageWrite(__u32 nPage, __u64 nBitmap, void* pBuf)
     struct __NandUserData_t tmpSpare[2];
     struct __LogBlkType_t tmpLogBlk;
 
-    DGB("page %x, bitmap %x", nPage, nBitmap);
+    DBG("page %x, bitmap %x", nPage, nBitmap);
 
     //check if the bitmap of valid sectors is full, if not, report error
     if(nBitmap != FULL_BITMAP_OF_LOGIC_PAGE)
