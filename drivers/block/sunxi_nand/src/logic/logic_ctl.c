@@ -245,42 +245,37 @@ static __s32 _MergeCachePageData(__u32 nPage, __u64 nBitmap, __u8 *pBuf)
 */
 static __s32 _WritePageCacheToNand(void)
 {
-    __s32   result = 0;
-    __u32   tmpPage;
+	__s32   result = 0;
+	__u32   tmpPage;
 	__u64	tmpBitmap;
-    __u8    *tmpBuf;
+	__u8    *tmpBuf;
 
-    tmpPage = CachePage.LogicPageNum;
-    tmpBitmap = CachePage.SectorBitmap;
-    tmpBuf = LML_WRITE_PAGE_CACHE;
+	tmpPage = CachePage.LogicPageNum;
+	tmpBitmap = CachePage.SectorBitmap;
+	tmpBuf = LML_WRITE_PAGE_CACHE;
 
-    if(tmpPage != 0xffffffff)
-    {
-	    DBG("page %x", tmpPage);
+	DBG("page %x, bitmap %x", tmpPage, tmpBitmap);
 
-        if(tmpBitmap != FULL_BITMAP_OF_LOGIC_PAGE)
-        {
-            //get the data from logical page to fill the page cache
-            result = LML_PageRead(tmpPage, tmpBitmap ^ FULL_BITMAP_OF_LOGIC_PAGE, tmpBuf);
-            if(result < 0)
-            {
-                return -1;
-            }
+	if (tmpPage == 0xffffffff)
+		// Ignore blank cache.
+		return 0;
+
+	if(tmpBitmap != FULL_BITMAP_OF_LOGIC_PAGE) {
+		//get the data from logical page to fill the page cache
+		result = LML_PageRead(tmpPage, tmpBitmap ^ FULL_BITMAP_OF_LOGIC_PAGE, tmpBuf);
+		if (result < 0)
+			return result;
         }
 
         //the data in the page cache is full, write it to nand flash
         result = LML_PageWrite(tmpPage, FULL_BITMAP_OF_LOGIC_PAGE, tmpBuf);
-        if(result < 0)
-        {
-            return -1;
-        }
+        if (result < 0)
+		return result;
 
         //clear the buffer page parameter
         CachePage.LogicPageNum = 0xffffffff;
         CachePage.SectorBitmap = 0x00;
-    }
-
-    return 0;
+	return 0;
 }
 
 
@@ -866,6 +861,7 @@ __s32 LML_PageWrite(__u32 nPage, __u64 nBitmap, void* pBuf)
     struct __NandUserData_t tmpSpare[2];
     struct __LogBlkType_t tmpLogBlk;
 
+    DGB("page %x, bitmap %x", nPage, nBitmap);
 
     //check if the bitmap of valid sectors is full, if not, report error
     if(nBitmap != FULL_BITMAP_OF_LOGIC_PAGE)
