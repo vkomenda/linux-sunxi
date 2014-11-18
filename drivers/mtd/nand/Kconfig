@@ -573,7 +573,7 @@ config MTD_NAND_FSMC
 
 config MTD_NAND_SUNXI
 	tristate "Support for NAND on Allwinner SoCs"
-	depends on ARCH_SUNXI
+	depends on PLAT_SUNXI
 	help
 	  Enables support for NAND Flash chips on Allwinner SoCs.
 
