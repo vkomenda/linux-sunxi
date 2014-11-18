@@ -2213,7 +2213,7 @@ static int erase_BMT(u8 die, u32 blk)
 	}
 
         /* Erase "user data" in the spare area. */
-	memset(spare, 0xFF, 2 * sizeof(__NandUserData_t));
+	memset(spare, 0xFF, 2 * sizeof(struct __NandUserData_t));
 
         /* Compute a valid checksum. */
 	/*
@@ -2386,19 +2386,9 @@ static __s32 _SearchZoneTbls(struct __ScanDieInfo_t *pDieInfo)
             FORMAT_DBG("[FORMAT_DBG] Find the table block %d for zone 0x%x of die 0x%x,"
                        " but the data block table is invalid!\n",tmpSuperBlk,tmpZoneInDie, pDieInfo->nDie);
 
-	    erase_BMT(pDieInfo->nDie, tmpSuperBlk);
-
 	    // FIXME: Is there a way to repair a block mapping copy?
-            result = _VirtualBlockErase(pDieInfo->nDie, tmpSuperBlk);
-            if (result) {
-		    DBG("invalid block %x die %x mapping copy erase ERROR %d",
-			tmpSuperBlk, pDieInfo->nDie, result);
-		    _WriteBadBlkFlag(pDieInfo->nDie, tmpSuperBlk);
-	    }
-	    else {
-		    DBG("invalid block %x die %x mapping copy erase SUCCESS",
-			tmpSuperBlk, pDieInfo->nDie);
-	    }
+	    erase_BMT(pDieInfo->nDie, tmpSuperBlk);  // result doesn't matter
+
             //release the data block table buffer
             FREE(tmpDataBlkTbl,BLOCK_CNT_OF_ZONE * sizeof(struct __SuperPhyBlkType_t));
 
