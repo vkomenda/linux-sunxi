@@ -503,6 +503,10 @@ struct nand_chip {
 			int status, int page);
 	int (*write_page)(struct mtd_info *mtd, struct nand_chip *chip,
 			const uint8_t *buf, int page, int cached, int raw);
+	int (*setup_read_retry)(struct mtd_info *mtd, int retry_mode);
+	void (*manuf_cleanup)(struct mtd_info *mtd);
+
+	void *manuf_priv;
 
 	int chip_delay;
 	unsigned int options;
@@ -556,6 +560,91 @@ struct nand_chip {
 #define NAND_MFR_MICRON		0x2c
 #define NAND_MFR_AMD		0x01
 #define NAND_MFR_MACRONIX	0xc2
+#define NAND_MFR_EON		0x92
+#define NAND_MFR_SANDISK	0x45
+#define NAND_MFR_INTEL		0x89
+
+/* The maximum expected count of bytes in the NAND ID sequence */
+#define NAND_MAX_ID_LEN 8
+
+/*
+ * A helper for defining older NAND chips where the second ID byte fully
+ * defined the chip, including the geometry (chip size, eraseblock size, page
+ * size). All these chips have 512 bytes NAND page size.
+ */
+#define LEGACY_ID_NAND(nm, devid, chipsz, erasesz, opts)          \
+	{ .name = (nm), {{ .dev_id = (devid) }}, .pagesize = 512, \
+	  .chipsize = (chipsz), .erasesize = (erasesz), .options = (opts) }
+
+/*
+ * A helper for defining newer chips which report their page size and
+ * eraseblock size via the extended ID bytes.
+ *
+ * The real difference between LEGACY_ID_NAND and EXTENDED_ID_NAND is that with
+ * EXTENDED_ID_NAND, manufacturers overloaded the same device ID so that the
+ * device ID now only represented a particular total chip size (and voltage,
+ * buswidth), and the page size, eraseblock size, and OOB size could vary while
+ * using the same device ID.
+ */
+#define EXTENDED_ID_NAND(nm, devid, chipsz, opts)                      \
+	{ .name = (nm), {{ .dev_id = (devid) }}, .chipsize = (chipsz), \
+	  .options = (opts) }
+
+#define NAND_ECC_INFO(_strength, _step)	\
+			{ .strength_ds = (_strength), .step_ds = (_step) }
+#define NAND_ECC_STRENGTH(type)		((type)->ecc.strength_ds)
+#define NAND_ECC_STEP(type)		((type)->ecc.step_ds)
+
+/**
+ * struct nand_flash_dev - NAND Flash Device ID Structure
+ * @name: a human-readable name of the NAND chip
+ * @dev_id: the device ID (the second byte of the full chip ID array)
+ * @mfr_id: manufecturer ID part of the full chip ID array (refers the same
+ *          memory address as @id[0])
+ * @dev_id: device ID part of the full chip ID array (refers the same memory
+ *          address as @id[1])
+ * @id: full device ID array
+ * @pagesize: size of the NAND page in bytes; if 0, then the real page size (as
+ *            well as the eraseblock size) is determined from the extended NAND
+ *            chip ID array)
+ * @chipsize: total chip size in MiB
+ * @erasesize: eraseblock size in bytes (determined from the extended ID if 0)
+ * @options: stores various chip bit options
+ * @id_len: The valid length of the @id.
+ * @oobsize: OOB size
+ * @ecc: ECC correctability and step information from the datasheet.
+ * @ecc.strength_ds: The ECC correctability from the datasheet, same as the
+ *                   @ecc_strength_ds in nand_chip{}.
+ * @ecc.step_ds: The ECC step required by the @ecc.strength_ds, same as the
+ *               @ecc_step_ds in nand_chip{}, also from the datasheet.
+ *               For example, the "4bit ECC for each 512Byte" can be set with
+ *               NAND_ECC_INFO(4, 512).
+ * @onfi_timing_mode_default: the default ONFI timing mode entered after a NAND
+ *			      reset. Should be deduced from timings described
+ *			      in the datasheet.
+ *
+ */
+struct nand_flash_dev {
+	char *name;
+	union {
+		struct {
+			uint8_t mfr_id;
+			uint8_t dev_id;
+		};
+		uint8_t id[NAND_MAX_ID_LEN];
+	};
+	unsigned int pagesize;
+	unsigned int chipsize;
+	unsigned int erasesize;
+	unsigned int options;
+	uint16_t id_len;
+	uint16_t oobsize;
+	struct {
+		uint16_t strength_ds;
+		uint16_t step_ds;
+	} ecc;
+	int onfi_timing_mode_default;
+};
 
 /**
  * struct nand_flash_dev - NAND Flash Device ID Structure
@@ -586,9 +675,10 @@ struct nand_flash_dev {
 struct nand_manufacturers {
 	int id;
 	char *name;
+	int (*init)(struct mtd_info *mtd, const uint8_t *id);
 };
 
-extern struct nand_flash_dev nand_flash_ids[];
+extern struct nand_flash_dev nand_3flash_ids[];
 extern struct nand_manufacturers nand_manuf_ids[];
 
 extern int nand_scan_bbt(struct mtd_info *mtd, struct nand_bbt_descr *bd);
