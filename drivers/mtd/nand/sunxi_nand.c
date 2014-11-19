@@ -41,6 +41,8 @@
 #include <linux/interrupt.h>
 #include <linux/io.h>
 
+#define GENMASK(h, l)		(((U32_C(1) << ((h) - (l) + 1)) - 1) << (l))
+
 #define NFC_REG_CTL		0x0000
 #define NFC_REG_ST		0x0004
 #define NFC_REG_INT		0x0008
