@@ -1256,6 +1256,23 @@ static void sunxi_nand_rnd_ctrl_cleanup(struct nand_rnd_ctrl *rnd)
 	kfree(hwrnd);
 }
 
+static u16 preset_seeds[128] = {
+	//0        1      2       3        4      5        6       7       8       9
+	0x2b75, 0x0bd0, 0x5ca3, 0x62d1, 0x1c93, 0x07e9, 0x2162, 0x3a72, 0x0d67, 0x67f9,
+	0x1be7, 0x077d, 0x032f, 0x0dac, 0x2716, 0x2436, 0x7922, 0x1510, 0x3860, 0x5287,
+	0x480f, 0x4252, 0x1789, 0x5a2d, 0x2a49, 0x5e10, 0x437f, 0x4b4e, 0x2f45, 0x216e,
+	0x5cb7, 0x7130, 0x2a3f, 0x60e4, 0x4dc9, 0x0ef0, 0x0f52, 0x1bb9, 0x6211, 0x7a56,
+	0x226d, 0x4ea7, 0x6f36, 0x3692, 0x38bf, 0x0c62, 0x05eb, 0x4c55, 0x60f4, 0x728c,
+	0x3b6f, 0x2037, 0x7f69, 0x0936, 0x651a, 0x4ceb, 0x6218, 0x79f3, 0x383f, 0x18d9,
+	0x4f05, 0x5c82, 0x2912, 0x6f17, 0x6856, 0x5938, 0x1007, 0x61ab, 0x3e7f, 0x57c2,
+	0x542f, 0x4f62, 0x7454, 0x2eac, 0x7739, 0x42d4, 0x2f90, 0x435a, 0x2e52, 0x2064,
+	0x637c, 0x66ad, 0x2c90, 0x0bad, 0x759c, 0x0029, 0x0986, 0x7126, 0x1ca7, 0x1605,
+	0x386a, 0x27f5, 0x1380, 0x6d75, 0x24c3, 0x0f8e, 0x2b7a, 0x1418, 0x1fd1, 0x7dc1,
+	0x2d8e, 0x43af, 0x2267, 0x7da3, 0x4e3d, 0x1338, 0x50db, 0x454d, 0x764d, 0x40a3,
+	0x42e6, 0x262b, 0x2d2e, 0x1aea, 0x2e17, 0x173d, 0x3a6e, 0x71bf, 0x25f9, 0x0a5d,
+	0x7c57, 0x0fbe, 0x46ce, 0x4939, 0x6b17, 0x37bb, 0x3e91, 0x76db
+};
+
 static int sunxi_nand_rnd_ctrl_init(struct mtd_info *mtd,
 				    struct nand_rnd_ctrl *rnd,
 				    struct nand_ecc_ctrl *ecc,
@@ -1269,23 +1286,24 @@ static int sunxi_nand_rnd_ctrl_init(struct mtd_info *mtd,
 	if (!hwrnd)
 		return -ENOMEM;
 
+	/*
 	hwrnd->seeds = default_seeds;
 	hwrnd->nseeds = ARRAY_SIZE(default_seeds);
+	*/
 
-	if (of_get_property(np, "nand-randomizer-seeds", &ret)) {
-		hwrnd->nseeds = ret / sizeof(*hwrnd->seeds);
-		hwrnd->seeds = kzalloc(hwrnd->nseeds * sizeof(*hwrnd->seeds),
-				       GFP_KERNEL);
-		if (!hwrnd->seeds) {
-			ret = -ENOMEM;
-			goto err;
-		}
-
-		ret = of_property_read_u16_array(np, "nand-randomizer-seeds",
-						 hwrnd->seeds, hwrnd->nseeds);
-		if (ret)
-			goto err;
+	hwrnd->nseeds = ARRAY_SIZE(preset_seeds);
+	/*
+	hwrnd->seeds = kzalloc(hwrnd->nseeds * sizeof(*hwrnd->seeds),
+			       GFP_KERNEL);
+	if (!hwrnd->seeds) {
+		ret = -ENOMEM;
+		goto err;
 	}
+	*/
+
+	hwrnd->seeds = preset_seeds;
+	if (ret)
+		goto err;
 
 	switch (ecc->mode) {
 	case NAND_ECC_HW_SYNDROME:
@@ -1612,20 +1630,18 @@ static int sunxi_nand_rnd_init(struct mtd_info *mtd,
 {
 	int ret;
 
-	rnd->mode = NAND_RND_NONE;
+	rnd->mode = NAND_RND_HW;    // NAND_RND_NONE;
+	return sunxi_nand_rnd_ctrl_init(mtd, rnd, ecc, np);
 
-	ret = of_get_nand_rnd_mode(np);
-	if (ret >= 0)
-		rnd->mode = ret;
-
+	/*
 	switch (rnd->mode) {
 	case NAND_RND_HW:
 		return sunxi_nand_rnd_ctrl_init(mtd, rnd, ecc, np);
 	default:
 		break;
 	}
-
 	return 0;
+	*/
 }
 
 static void sunxi_nand_ecc_cleanup(struct nand_ecc_ctrl *ecc)
@@ -1646,10 +1662,11 @@ static int sunxi_nand_ecc_init(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc,
 			       struct device_node *np)
 {
 	struct nand_chip *nand = mtd->priv;
-	int strength;
-	int blk_size;
+//	int strength;
+//	int blk_size;
 	int ret;
 
+	/*
 	blk_size = of_get_nand_ecc_step_size(np);
 	strength = of_get_nand_ecc_strength(np);
 	if (blk_size > 0 && strength > 0) {
@@ -1659,6 +1676,10 @@ static int sunxi_nand_ecc_init(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc,
 		ecc->size = nand->ecc_step_ds;
 		ecc->strength = nand->ecc_strength_ds;
 	}
+	*/
+
+	ecc->size = nand->ecc_step_ds;
+	ecc->strength = nand->ecc_strength_ds;
 
 	if (!ecc->size || !ecc->strength) {
 		if (ecc == &nand->ecc)
@@ -1669,7 +1690,11 @@ static int sunxi_nand_ecc_init(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc,
 	}
 
 	ecc->mode = NAND_ECC_HW;
+	ret = sunxi_nand_hw_ecc_ctrl_init(mtd, ecc, np);
+	if (ret)
+		return ret;
 
+	/*
 	ret = of_get_nand_ecc_mode(np);
 	if (ret >= 0)
 		ecc->mode = ret;
@@ -1699,6 +1724,7 @@ static int sunxi_nand_ecc_init(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc,
 	default:
 		return -EINVAL;
 	}
+	*/
 
 	return 0;
 }
@@ -1915,6 +1941,11 @@ static int sunxi_nand_chips_init(struct device *dev, struct sunxi_nfc *nfc)
 {
 	struct device_node *np = dev->of_node;
 	struct device_node *nand_np;
+
+	// FIXME: take the number of chips from the Allwinner FEX script.
+	return sunxi_nand_chip_init(dev, nfc, nand_np);
+
+	/*
 	int nchips = of_get_child_count(np);
 	int ret;
 
@@ -1930,6 +1961,7 @@ static int sunxi_nand_chips_init(struct device *dev, struct sunxi_nfc *nfc)
 	}
 
 	return 0;
+	*/
 }
 
 static void sunxi_nand_chips_cleanup(struct sunxi_nfc *nfc)
