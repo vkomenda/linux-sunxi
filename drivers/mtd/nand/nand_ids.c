@@ -50,10 +50,6 @@ struct nand_flash_dev nand_flash_ids[] = {
 		{ .id = {0xad, 0xde, 0x94, 0xda, 0x74, 0xc4} },
 		  SZ_8K, SZ_8K, SZ_2M, 0, 6, 640, NAND_ECC_INFO(40, SZ_1K),
 		  4 },
-	{"H27UCG8T2ETR-BC 64G 3.3V 8-bit",
-		{ .id = {0xad, 0xde, 0x14, 0xa7, 0x42, 0x4a} },
-		  SZ_8K, SZ_8K, SZ_2M, 0, 6, 640, NAND_ECC_INFO(40, SZ_1K),
-		  4 },
 	{"K9GBG08U0B 32G 3.3V 8-bit",
 		{ .id = {0xec, 0xd7, 0x94, 0x7e, 0x64, 0x44} },
 		  SZ_8K, SZ_4K, SZ_1M, 0, 6, 1024, NAND_ECC_INFO(40, SZ_1K) },
@@ -167,27 +163,11 @@ struct nand_flash_dev nand_flash_ids[] = {
 	EXTENDED_ID_NAND("NAND 64GiB 1,8V 16-bit", 0x2E, 65536, LP_OPTIONS16),
 	EXTENDED_ID_NAND("NAND 64GiB 3,3V 16-bit", 0x4E, 65536, LP_OPTIONS16),
 
-	/*
-	 * Renesas AND 1 Gigabit. Those chips do not support extended id and
-	 * have a strange page/block layout !  The chosen minimum erasesize is
-	 * 4 * 2 * 2048 = 16384 Byte, as those chips have an array of 4 page
-	 * planes 1 block = 2 pages, but due to plane arrangement the blocks
-	 * 0-3 consists of page 0 + 4,1 + 5, 2 + 6, 3 + 7 Anyway JFFS2 would
-	 * increase the eraseblock size so we chose a combined one which can be
-	 * erased in one go There are more speed improvements for reads and
-	 * writes possible, but not implemented now
-	 */
-	LEGACY_ID_NAND("AND 128MiB 3,3V 8-bit",
-		       0x01, 2048, 128, 0x4000,
-		       NAND_IS_AND | NAND_NO_AUTOINCR |NAND_NO_READRDY |
-		       NAND_4PAGE_ARRAY | BBT_AUTO_REFRESH),
-
 	{NULL}
 };
 
-/*
-*	Manufacturer ID list
-*/
+
+/* Manufacturer IDs */
 struct nand_manufacturers nand_manuf_ids[] = {
 	{NAND_MFR_TOSHIBA, "Toshiba"},
 	{NAND_MFR_SAMSUNG, "Samsung"},
@@ -195,10 +175,13 @@ struct nand_manufacturers nand_manuf_ids[] = {
 	{NAND_MFR_NATIONAL, "National"},
 	{NAND_MFR_RENESAS, "Renesas"},
 	{NAND_MFR_STMICRO, "ST Micro"},
-	{NAND_MFR_HYNIX, "Hynix"},
+	{NAND_MFR_HYNIX, "Hynix", hynix_nand_init},
 	{NAND_MFR_MICRON, "Micron"},
-	{NAND_MFR_AMD, "AMD"},
+	{NAND_MFR_AMD, "AMD/Spansion"},
 	{NAND_MFR_MACRONIX, "Macronix"},
+	{NAND_MFR_EON, "Eon"},
+	{NAND_MFR_SANDISK, "SanDisk"},
+	{NAND_MFR_INTEL, "Intel"},
 	{0x0, "Unknown"}
 };
 

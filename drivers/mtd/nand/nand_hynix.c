@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Boris BREZILLON <b.brezillon.dev@...il.com>
+ * Copyright (C) 2014 Boris BREZILLON <b.brezillon.dev@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -147,5 +147,5 @@ int hynix_nand_init(struct mtd_info *mtd, const uint8_t *id)
 EXPORT_SYMBOL(hynix_nand_init);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Boris BREZILLON <b.brezillon.dev@...il.com>");
+MODULE_AUTHOR("Boris BREZILLON <b.brezillon.dev@gmail.com>");
 MODULE_DESCRIPTION("Hynix NAND specific code");
