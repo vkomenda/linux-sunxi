@@ -27,10 +27,10 @@
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/platform_device.h>
-#include <linux/of.h>
-#include <linux/of_device.h>
-#include <linux/of_gpio.h>
-#include <linux/of_mtd.h>
+//#include <linux/of.h>
+//#include <linux/of_device.h>
+//#include <linux/of_gpio.h>
+//#include <linux/of_mtd.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/nand.h>
 #include <linux/mtd/partitions.h>
@@ -1292,6 +1292,7 @@ static int sunxi_nand_rnd_ctrl_init(struct mtd_info *mtd,
 	*/
 
 	hwrnd->nseeds = ARRAY_SIZE(preset_seeds);
+	hwrnd->seeds = preset_seeds;
 	/*
 	hwrnd->seeds = kzalloc(hwrnd->nseeds * sizeof(*hwrnd->seeds),
 			       GFP_KERNEL);
@@ -1299,11 +1300,9 @@ static int sunxi_nand_rnd_ctrl_init(struct mtd_info *mtd,
 		ret = -ENOMEM;
 		goto err;
 	}
-	*/
-
-	hwrnd->seeds = preset_seeds;
 	if (ret)
 		goto err;
+	*/
 
 	switch (ecc->mode) {
 	case NAND_ECC_HW_SYNDROME:
@@ -1628,7 +1627,7 @@ static int sunxi_nand_rnd_init(struct mtd_info *mtd,
 			       struct nand_ecc_ctrl *ecc,
 			       struct device_node *np)
 {
-	int ret;
+//	int ret;
 
 	rnd->mode = NAND_RND_HW;    // NAND_RND_NONE;
 	return sunxi_nand_rnd_ctrl_init(mtd, rnd, ecc, np);
@@ -1729,11 +1728,14 @@ static int sunxi_nand_ecc_init(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc,
 	return 0;
 }
 
+/*
 static void sunxi_nand_part_release(struct nand_part *part)
 {
 	kfree(to_sunxi_nand_part(part));
 }
+*/
 
+/*
 struct nand_part *sunxi_ofnandpart_parse(void *priv, struct mtd_info *master,
 					 struct device_node *pp)
 {
@@ -1771,6 +1773,7 @@ err:
 	kfree(part);
 	return ERR_PTR(ret);
 }
+*/
 
 static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 				struct device_node *np)
@@ -1784,7 +1787,7 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 	int ret;
 	int i;
 	u32 tmp;
-
+/*
 	if (!of_get_property(np, "reg", &nsels))
 		return -EINVAL;
 
@@ -1793,6 +1796,8 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 		dev_err(dev, "invalid reg property size\n");
 		return -EINVAL;
 	}
+*/
+	nsels = 1;
 
 	chip = devm_kzalloc(dev,
 			    sizeof(*chip) +
@@ -1805,7 +1810,7 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 
 	chip->nsels = nsels;
 	chip->selected = -1;
-
+/*
 	for (i = 0; i < nsels; i++) {
 		ret = of_property_read_u32_index(np, "reg", i, &tmp);
 		if (ret) {
@@ -1850,7 +1855,7 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 			}
 		}
 	}
-
+*/
 	timings = onfi_async_timing_mode_to_sdr_timings(0);
 	if (IS_ERR(timings)) {
 		ret = PTR_ERR(timings);
@@ -1875,10 +1880,10 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 	nand->read_buf = sunxi_nfc_read_buf;
 	nand->write_buf = sunxi_nfc_write_buf;
 	nand->read_byte = sunxi_nfc_read_byte;
-
+/*
 	if (of_get_nand_on_flash_bbt(np))
 		nand->bbt_options |= NAND_BBT_USE_FLASH | NAND_BBT_NO_OOB;
-
+*/
 	mtd = &chip->mtd;
 	mtd->dev.parent = dev;
 	mtd->priv = nand;
@@ -1918,6 +1923,7 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 		return ret;
 	}
 
+	/*
 	ppdata.node = np;
 	ppdata.parse = sunxi_ofnandpart_parse;
 	ret = ofnandpart_parse(mtd, &ppdata);
@@ -1925,6 +1931,8 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 		ret = mtd_device_register(mtd, NULL, 0);
 	else if (ret > 0)
 		ret = 0;
+	*/
+	ret = mtd_device_register(mtd, NULL, 0);
 
 	if (ret) {
 		dev_err(dev, "failed to register mtd device: %d\n", ret);
@@ -1939,11 +1947,11 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 
 static int sunxi_nand_chips_init(struct device *dev, struct sunxi_nfc *nfc)
 {
-	struct device_node *np = dev->of_node;
-	struct device_node *nand_np;
+//	struct device_node *np = dev->of_node;
+//	struct device_node *nand_np;
 
 	// FIXME: take the number of chips from the Allwinner FEX script.
-	return sunxi_nand_chip_init(dev, nfc, nand_np);
+	return sunxi_nand_chip_init(dev, nfc, NULL /* don't use device trees */);
 
 	/*
 	int nchips = of_get_child_count(np);
@@ -1996,27 +2004,30 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
 	INIT_LIST_HEAD(&nfc->chips);
 
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	nfc->regs = devm_ioremap_resource(dev, r);
+	nfc->regs = ioremap(r->start, resource_size(r));
+	// nfc->regs = devm_ioremap_resource(dev, r);
 	if (IS_ERR(nfc->regs))
 		return PTR_ERR(nfc->regs);
 
 	irq = platform_get_irq(pdev, 0);
 	if (irq < 0) {
 		dev_err(dev, "failed to retrieve irq\n");
-		return irq;
+		ret = irq;
+		goto err_reg_unmap;
 	}
 
-	nfc->ahb_clk = devm_clk_get(dev, "ahb");
+	nfc->ahb_clk = clk_get(dev, "ahb");
 	if (IS_ERR(nfc->ahb_clk)) {
 		dev_err(dev, "failed to retrieve ahb clk\n");
-		return PTR_ERR(nfc->ahb_clk);
+		ret = PTR_ERR(nfc->ahb_clk);
+		goto err_reg_unmap;
 	}
 
 	ret = clk_prepare_enable(nfc->ahb_clk);
 	if (ret)
-		return ret;
+		goto err_reg_unmap;
 
-	nfc->mod_clk = devm_clk_get(dev, "mod");
+	nfc->mod_clk = clk_get(dev, "mod");
 	if (IS_ERR(nfc->mod_clk)) {
 		dev_err(dev, "failed to retrieve mod clk\n");
 		ret = PTR_ERR(nfc->mod_clk);
@@ -2058,6 +2069,8 @@ out_mod_clk_unprepare:
 	clk_disable_unprepare(nfc->mod_clk);
 out_ahb_clk_unprepare:
 	clk_disable_unprepare(nfc->ahb_clk);
+err_reg_unmap:
+	iounmap(nfc->regs);
 
 	return ret;
 }
@@ -2067,20 +2080,22 @@ static int sunxi_nfc_remove(struct platform_device *pdev)
 	struct sunxi_nfc *nfc = platform_get_drvdata(pdev);
 
 	sunxi_nand_chips_cleanup(nfc);
+	iounmap(nfc->regs);
 
 	return 0;
 }
 
-static const struct of_device_id sunxi_nfc_ids[] = {
-	{ .compatible = "allwinner,sun4i-a10-nand" },
-	{ /* sentinel */ }
-};
-MODULE_DEVICE_TABLE(of, sunxi_nfc_ids);
+//static const struct of_device_id sunxi_nfc_ids[] = {
+//	{ .compatible = "allwinner,sun4i-a10-nand" },
+//	{ /* sentinel */ }
+//};
+
+//MODULE_DEVICE_TABLE(of, sunxi_nfc_ids);
 
 static struct platform_driver sunxi_nfc_driver = {
 	.driver = {
 		.name = "sunxi_nand",
-		.of_match_table = sunxi_nfc_ids,
+//		.of_match_table = sunxi_nfc_ids,
 	},
 	.probe = sunxi_nfc_probe,
 	.remove = sunxi_nfc_remove,
