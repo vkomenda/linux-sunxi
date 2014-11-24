@@ -3978,6 +3978,69 @@ static int nand_get_bits_per_cell(u8 cellinfo)
 }
 
 /*
+ * Parse the Hynix ID size byte and calculate the relevant physical parameters.
+ */
+static int parse_hynix_sizes(struct mtd_info *mtd, u8 sz)
+{
+	u8 oob_code, erase_code;
+	u8 sizes = sz;
+
+	mtd->writesize = 2048 << (sizes & 0x03);
+	sizes >>= 2;
+	oob_code = sizes & 0x03;
+	sizes >>= 2;
+	erase_code = sizes & 0x03;
+	sizes >>= 2;
+	oob_code |= (sizes & 0x01) << 2;
+	sizes >>= 1;
+	erase_code |= (sizes & 0x01) << 2;
+	pr_info("Hynix codes: page size %d, block size %d, oob size %d\n",
+		mtd->writesize, erase_code, oob_code);
+	if (oob_code >= 0x4 || erase_code < 0x4)
+		return -EINVAL;
+
+	switch (oob_code) {
+	case 0:
+		mtd->oobsize = 2048; break;
+	case 1:
+		mtd->oobsize = 1664; break;
+	case 2:
+		mtd->oobsize = 1024; break;
+	case 3:
+	default:
+		mtd->oobsize = 640;  break;
+	}
+/* For older Hynix chips:
+	switch (oob_code) {
+	case 0:
+		mtd->oobsize = 128;
+		break;
+	case 1:
+		mtd->oobsize = 224;
+		break;
+	case 2:
+		mtd->oobsize = 448;
+		break;
+	case 3:
+		mtd->oobsize = 64;
+		break;
+	case 4:
+		mtd->oobsize = 32;
+		break;
+	case 5:
+		mtd->oobsize = 16;
+		break;
+	default:
+		mtd->oobsize = 640;
+		break;
+	}
+*/
+	mtd->erasesize = 0x100000 << (erase_code & 0x3);
+
+	return 0;
+}
+
+/*
  * Many new NAND share similar device ID codes, which represent the size of the
  * chip. The rest of the parameters must be decoded according to generic or
  * manufacturer-specific "extended ID" decoding patterns.
@@ -4039,44 +4102,7 @@ static void nand_decode_ext_id(struct mtd_info *mtd, struct nand_chip *chip,
 		*busw = 0;
 	} else if (id_len == 6 && id_data[0] == NAND_MFR_HYNIX &&
 			!nand_is_slc(chip)) {
-		unsigned int tmp;
-
-		/* Calc pagesize */
-		mtd->writesize = 2048 << (extid & 0x03);
-		extid >>= 2;
-		/* Calc oobsize */
-		switch (((extid >> 2) & 0x04) | (extid & 0x03)) {
-		case 0:
-			mtd->oobsize = 128;
-			break;
-		case 1:
-			mtd->oobsize = 224;
-			break;
-		case 2:
-			mtd->oobsize = 448;
-			break;
-		case 3:
-			mtd->oobsize = 64;
-			break;
-		case 4:
-			mtd->oobsize = 32;
-			break;
-		case 5:
-			mtd->oobsize = 16;
-			break;
-		default:
-			mtd->oobsize = 640;
-			break;
-		}
-		extid >>= 2;
-		/* Calc blocksize */
-		tmp = ((extid >> 1) & 0x04) | (extid & 0x03);
-		if (tmp < 0x03)
-			mtd->erasesize = (128 * 1024) << tmp;
-		else if (tmp == 0x03)
-			mtd->erasesize = 768 * 1024;
-		else
-			mtd->erasesize = (64 * 1024) << tmp;
+		parse_hynix_sizes(mtd, id_data[3]);
 		*busw = 0;
 	} else {
 		/* Calc pagesize */

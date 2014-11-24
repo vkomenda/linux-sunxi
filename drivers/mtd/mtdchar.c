@@ -1211,7 +1211,7 @@ static struct file_system_type mtd_inodefs_type = {
        .kill_sb = kill_anon_super,
 };
 
-static int __init init_mtdchar(void)
+int __init init_mtdchar(void)
 {
 	int ret;
 
@@ -1235,7 +1235,7 @@ err_unregister_chdev:
 	return ret;
 }
 
-static void __exit cleanup_mtdchar(void)
+void __exit cleanup_mtdchar(void)
 {
 	unregister_filesystem(&mtd_inodefs_type);
 	__unregister_chrdev(MTD_CHAR_MAJOR, 0, 1 << MINORBITS, "mtd");
