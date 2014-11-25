@@ -70,6 +70,15 @@
 			status = "okay";
 		};
 
+		mmc2: mmc@01c11000 {
+			pinctrl-names = "default";
+			pinctrl-0 = <&mmc2_8bit_pins>;
+			vmmc-supply = <&reg_vcc3v0>;
+			bus-width = <8>;
+			non-removable;
+			status = "okay";
+		};
+
 		pio: pinctrl@06000800 {
 			i2c3_pins_a: i2c3@0 {
 				/* Enable internal pull-up */
