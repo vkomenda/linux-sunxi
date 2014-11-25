@@ -49,6 +49,7 @@
 
 /dts-v1/;
 /include/ "sun9i-a80.dtsi"
+/include/ "sunxi-common-regulators.dtsi"
 
 / {
 	model = "Merrii A80 Optimus Board";
@@ -59,6 +60,16 @@
 	};
 
 	soc {
+		mmc0: mmc@01c0f000 {
+			pinctrl-names = "default";
+			pinctrl-0 = <&mmc0_pins>, <&mmc0_cd_pin_optimus>;
+			vmmc-supply = <&reg_vcc3v0>;
+			bus-width = <4>;
+			cd-gpios = <&pio 7 18 0>; /* PH8 */
+			cd-inverted;
+			status = "okay";
+		};
+
 		pio: pinctrl@06000800 {
 			i2c3_pins_a: i2c3@0 {
 				/* Enable internal pull-up */
@@ -70,6 +81,13 @@
 				allwinner,function = "gpio_out";
 				allwinner,drive = <0>;
 				allwinner,pull = <0>;
+			};
+
+			mmc0_cd_pin_optimus: mmc0_cd_pin@0 {
+				allwinner,pins = "PH18";
+				allwinner,function = "gpio_in";
+				allwinner,drive = <0>;
+				allwinner,pull = <1>;
 			};
 
 			uart4_pins_a: uart4@0 {
