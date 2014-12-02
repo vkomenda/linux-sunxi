@@ -2050,8 +2050,9 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
 	ret = devm_request_irq(dev, irq, sunxi_nfc_interrupt,
 			       0, "sunxi-nand", nfc);
 	if (ret) {
-		dev_err();
+		dev_err(dev, "failed to obtain IRQ\n");
 		goto out_mod_clk_unprepare;
+	}
 
 	platform_set_drvdata(pdev, nfc);
 
