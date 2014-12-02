@@ -1780,7 +1780,7 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 {
 	const struct nand_sdr_timings *timings;
 	struct sunxi_nand_chip *chip;
-	struct ofnandpart_data ppdata;
+//	struct ofnandpart_data ppdata;
 	struct mtd_info *mtd;
 	struct nand_chip *nand;
 	int nsels;
@@ -2035,17 +2035,22 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
 	}
 
 	ret = clk_prepare_enable(nfc->mod_clk);
-	if (ret)
+	if (ret) {
+		dev_err(dev, "failed to prepare clk\n");
 		goto out_ahb_clk_unprepare;
+	}
 
 	ret = sunxi_nfc_rst(nfc);
-	if (ret)
+	if (ret) {
+		dev_err(dev, "failed to reset NFC\n");
 		goto out_mod_clk_unprepare;
+	}
 
 	writel(0, nfc->regs + NFC_REG_INT);
 	ret = devm_request_irq(dev, irq, sunxi_nfc_interrupt,
 			       0, "sunxi-nand", nfc);
-	if (ret)
+	if (ret) {
+		dev_err();
 		goto out_mod_clk_unprepare;
 
 	platform_set_drvdata(pdev, nfc);
