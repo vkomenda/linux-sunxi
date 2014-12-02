@@ -1248,26 +1248,36 @@ static int __init init_mtd(void)
 	int ret;
 
 	ret = class_register(&mtd_class);
-	if (ret)
+	if (ret) {
+		pr_err("class_register ERROR %d\n", ret);
 		goto err_reg;
+	}
 
 	ret = mtd_bdi_init(&mtd_bdi_unmappable, "mtd-unmap");
-	if (ret)
+	if (ret) {
+		pr_err("mtd_bdi_init(1) ERROR %d\n", ret);
 		goto err_bdi1;
+	}
 
 	ret = mtd_bdi_init(&mtd_bdi_ro_mappable, "mtd-romap");
-	if (ret)
+	if (ret) {
+		pr_err("mtd_bdi_init(2) ERROR %d\n", ret);
 		goto err_bdi2;
+	}
 
 	ret = mtd_bdi_init(&mtd_bdi_rw_mappable, "mtd-rwmap");
-	if (ret)
+	if (ret) {
+		pr_err("mtd_bdi_init(3) ERROR %d\n", ret);
 		goto err_bdi3;
+	}
 
 	proc_mtd = proc_create("mtd", 0, NULL, &mtd_proc_ops);
 
 	ret = init_mtdchar();
-	if (ret)
+	if (ret) {
+		pr_err("init_mtdchar ERROR %d\n", ret);
 		goto out_procfs;
+	}
 
 	return 0;
 
