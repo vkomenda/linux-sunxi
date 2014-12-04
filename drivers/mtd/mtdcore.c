@@ -1247,6 +1247,8 @@ static int __init init_mtd(void)
 {
 	int ret;
 
+	pr_info("%s", __FUNCTION__);
+
 	ret = class_register(&mtd_class);
 	if (ret) {
 		pr_err("class_register ERROR %d\n", ret);
