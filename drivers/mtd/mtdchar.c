@@ -1241,8 +1241,8 @@ void __exit cleanup_mtdchar(void)
 	__unregister_chrdev(MTD_CHAR_MAJOR, 0, 1 << MINORBITS, "mtd");
 }
 
-module_init(init_mtdchar);
-module_exit(cleanup_mtdchar);
+//module_init(init_mtdchar);
+//module_exit(cleanup_mtdchar);
 
 MODULE_ALIAS_CHARDEV_MAJOR(MTD_CHAR_MAJOR);
 

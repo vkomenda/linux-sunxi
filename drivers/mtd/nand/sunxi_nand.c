@@ -41,6 +41,12 @@
 #include <linux/interrupt.h>
 #include <linux/io.h>
 
+unsigned int bbt_use_flash = 1;
+module_param(bbt_use_flash, uint, 1);
+MODULE_PARM_DESC(bbt_use_flash,
+		 "use the flash to store the bad block table: "
+		 "1 - use, 0 - don't use");
+
 #define GENMASK(h, l)		(((U32_C(1) << ((h) - (l) + 1)) - 1) << (l))
 
 #define NFC_REG_CTL		0x0000
@@ -1880,22 +1886,26 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 	nand->read_buf = sunxi_nfc_read_buf;
 	nand->write_buf = sunxi_nfc_write_buf;
 	nand->read_byte = sunxi_nfc_read_byte;
-/*
-	if (of_get_nand_on_flash_bbt(np))
+
+	if (bbt_use_flash)
 		nand->bbt_options |= NAND_BBT_USE_FLASH | NAND_BBT_NO_OOB;
-*/
+
 	mtd = &chip->mtd;
 	mtd->dev.parent = dev;
 	mtd->priv = nand;
 	mtd->owner = THIS_MODULE;
 
 	ret = nand_scan_ident(mtd, nsels, NULL);
-	if (ret)
+	if (ret) {
+		dev_err(dev, "unknown chip\n");
 		return ret;
+	}
 
 	chip->buffer = kzalloc(mtd->writesize + mtd->oobsize, GFP_KERNEL);
-	if (!chip->buffer)
+	if (!chip->buffer) {
+		dev_err(dev, "cannot allocate IO buffer\n");
 		return -ENOMEM;
+	}
 
 	ret = sunxi_nand_chip_init_timings(chip, np);
 	if (ret) {
@@ -1904,8 +1914,10 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 	}
 
 	ret = nand_pst_create(mtd);
-	if (ret)
+	if (ret) {
+		dev_err(dev, "cannot create page status table\n");
 		return ret;
+	}
 
 	ret = sunxi_nand_ecc_init(mtd, &nand->ecc, np);
 	if (ret) {
@@ -1995,8 +2007,10 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
 	int ret;
 
 	nfc = devm_kzalloc(dev, sizeof(*nfc), GFP_KERNEL);
-	if (!nfc)
+	if (!nfc) {
+		dev_err(dev, "failed to allocate device memory\n");
 		return -ENOMEM;
+	}
 
 	nfc->dev = dev;
 	spin_lock_init(&nfc->controller.lock);
@@ -2006,8 +2020,10 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	nfc->regs = ioremap(r->start, resource_size(r));
 	// nfc->regs = devm_ioremap_resource(dev, r);
-	if (IS_ERR(nfc->regs))
+	if (IS_ERR(nfc->regs)) {
+		dev_err(dev, "ioremap failed\n");
 		return PTR_ERR(nfc->regs);
+	}
 
 	irq = platform_get_irq(pdev, 0);
 	if (irq < 0) {
@@ -2024,8 +2040,10 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
 	}
 
 	ret = clk_prepare_enable(nfc->ahb_clk);
-	if (ret)
+	if (ret) {
+		dev_err(dev, "failed to enable ahb clk\n");
 		goto err_reg_unmap;
+	}
 
 	nfc->mod_clk = clk_get(dev, "mod");
 	if (IS_ERR(nfc->mod_clk)) {
@@ -2036,7 +2054,7 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
 
 	ret = clk_prepare_enable(nfc->mod_clk);
 	if (ret) {
-		dev_err(dev, "failed to prepare clk\n");
+		dev_err(dev, "failed to enable clk\n");
 		goto out_ahb_clk_unprepare;
 	}
 
