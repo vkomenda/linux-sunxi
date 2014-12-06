@@ -281,4 +281,14 @@ config HYPERV_KEYBOARD
 	  To compile this driver as a module, choose M here: the module will
 	  be called hyperv_keyboard.
 
+config SERIO_SUNXI_PS2
+	tristate "Allwinner Sun4i-A10/Sun7i-A20 PS/2 controller"
+	default n
+	depends on ARCH_SUNXI || COMPILE_TEST
+	help
+	  Say Y here if you have Sun4i-A10/Sun7i-A20 Allwinner PS/2 ports.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called sunxi-ps2.
+
 endif
