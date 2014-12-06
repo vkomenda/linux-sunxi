@@ -112,6 +112,19 @@
 			pinctrl-0 = <&uart0_pins_a>;
 			status = "okay";
 		};
+		/* PS2 0 and PS2 1 are disabled by default
+		To enable PS2 0 and PS2 1 uncomment below ps20 and ps21 nodes
+		Please note that ps20 pins conflict with HDMI on Lime2 Board*/
+		/*ps20: ps2@0x01c2a000 {
+			pinctrl-names = "default";
+			pinctrl-0 = <&ps2_0_pins>;
+			status = "okay";
+		};
+		ps21: ps2@0x01c2a400 {
+			pinctrl-names = "default";
+			pinctrl-0 = <&ps2_1_pins>;
+			status = "okay";
+		};*/
 
 		i2c0: i2c@01c2ac00 {
 			pinctrl-names = "default";
