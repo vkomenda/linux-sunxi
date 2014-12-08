@@ -47,6 +47,8 @@ MODULE_PARM_DESC(bbt_use_flash,
 		 "use the flash to store the bad block table: "
 		 "1 - use, 0 - don't use");
 
+static const char *part_probe_types[] = { "cmdlinepart", NULL };
+
 #define GENMASK(h, l)		(((U32_C(1) << ((h) - (l) + 1)) - 1) << (l))
 
 #define NFC_REG_CTL		0x0000
@@ -222,8 +224,7 @@ struct sunxi_nand_part {
 	struct nand_rnd_ctrl rnd;
 };
 
-static inline struct sunxi_nand_part *
-to_sunxi_nand_part(struct nand_part *part)
+static inline struct sunxi_nand_part* to_sunxi_nand_part(struct nand_part *part)
 {
 	return container_of(part, struct sunxi_nand_part, part);
 }
@@ -1452,6 +1453,8 @@ static int sunxi_nand_chip_init_timings(struct sunxi_nand_chip *chip,
 	int ret;
 	int mode;
 
+	pr_debug("%s\n", __FUNCTION__);
+
 	mode = onfi_get_async_timing_mode(&chip->nand);
 	if (mode == ONFI_TIMING_MODE_UNKNOWN) {
 		mode = chip->nand.onfi_timing_mode_default;
@@ -1489,6 +1492,8 @@ static int sunxi_nand_hw_common_ecc_ctrl_init(struct mtd_info *mtd,
 	struct nand_ecclayout *layout;
 	int ret;
 	int i;
+
+	pr_debug("%s\n", __FUNCTION__);
 
 	data = kzalloc(sizeof(*data), GFP_KERNEL);
 	if (!data)
@@ -1734,12 +1739,10 @@ static int sunxi_nand_ecc_init(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc,
 	return 0;
 }
 
-/*
 static void sunxi_nand_part_release(struct nand_part *part)
 {
 	kfree(to_sunxi_nand_part(part));
 }
-*/
 
 /*
 struct nand_part *sunxi_ofnandpart_parse(void *priv, struct mtd_info *master,
@@ -1793,6 +1796,9 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 	int ret;
 	int i;
 	u32 tmp;
+
+	pr_debug("%s\n", __FUNCTION__);
+
 /*
 	if (!of_get_property(np, "reg", &nsels))
 		return -EINVAL;
@@ -1926,8 +1932,10 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 	}
 
 	ret = sunxi_nand_rnd_init(mtd, &nand->rnd, &nand->ecc, np);
-	if (ret)
+	if (ret) {
+		dev_err(dev, "randomizer init failed\n");
 		return ret;
+	}
 
 	ret = nand_scan_tail(mtd);
 	if (ret) {
@@ -1998,13 +2006,15 @@ static void sunxi_nand_chips_cleanup(struct sunxi_nfc *nfc)
 	}
 }
 
-static int sunxi_nfc_probe(struct platform_device *pdev)
+static int __devinit sunxi_nfc_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct resource *r;
 	struct sunxi_nfc *nfc;
 	int irq;
 	int ret;
+
+	pr_debug("%s\n", __FUNCTION__);
 
 	nfc = devm_kzalloc(dev, sizeof(*nfc), GFP_KERNEL);
 	if (!nfc) {
@@ -2017,7 +2027,16 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
 	init_waitqueue_head(&nfc->controller.wq);
 	INIT_LIST_HEAD(&nfc->chips);
 
+	pr_debug("%s getting memory\n", __FUNCTION__);
+
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (IS_ERR(r)) {
+		dev_err(dev, "failed to get memory resource\n");
+		return PTR_ERR(r);
+	}
+
+	pr_debug("%s ioremap\n", __FUNCTION__);
+
 	nfc->regs = ioremap(r->start, resource_size(r));
 	// nfc->regs = devm_ioremap_resource(dev, r);
 	if (IS_ERR(nfc->regs)) {
@@ -2025,12 +2044,16 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
 		return PTR_ERR(nfc->regs);
 	}
 
+	pr_debug("%s getting irq\n", __FUNCTION__);
+
 	irq = platform_get_irq(pdev, 0);
 	if (irq < 0) {
 		dev_err(dev, "failed to retrieve irq\n");
 		ret = irq;
 		goto err_reg_unmap;
 	}
+
+	pr_debug("%s ahb clk\n", __FUNCTION__);
 
 	nfc->ahb_clk = clk_get(dev, "ahb");
 	if (IS_ERR(nfc->ahb_clk)) {
@@ -2045,6 +2068,8 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
 		goto err_reg_unmap;
 	}
 
+	pr_debug("%s mod clk\n", __FUNCTION__);
+
 	nfc->mod_clk = clk_get(dev, "mod");
 	if (IS_ERR(nfc->mod_clk)) {
 		dev_err(dev, "failed to retrieve mod clk\n");
@@ -2058,11 +2083,15 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
 		goto out_ahb_clk_unprepare;
 	}
 
+	pr_debug("%s nfc reset\n", __FUNCTION__);
+
 	ret = sunxi_nfc_rst(nfc);
 	if (ret) {
 		dev_err(dev, "failed to reset NFC\n");
 		goto out_mod_clk_unprepare;
 	}
+
+	pr_debug("%s irq request\n", __FUNCTION__);
 
 	writel(0, nfc->regs + NFC_REG_INT);
 	ret = devm_request_irq(dev, irq, sunxi_nfc_interrupt,
@@ -2074,6 +2103,8 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, nfc);
 
+	pr_debug("%s writing magic\n", __FUNCTION__);
+
 	/*
 	 * TODO: replace these magic values with proper flags as soon as we
 	 * know what they are encoding.
@@ -2081,13 +2112,13 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
 	writel(0x100, nfc->regs + NFC_REG_TIMING_CTL);
 	writel(0x7ff, nfc->regs + NFC_REG_TIMING_CFG);
 
+	pr_debug("%s init chips\n", __FUNCTION__);
+
 	ret = sunxi_nand_chips_init(dev, nfc);
 	if (ret) {
 		dev_err(dev, "failed to init nand chips\n");
 		goto out_mod_clk_unprepare;
 	}
-
-	return 0;
 
 out_mod_clk_unprepare:
 	clk_disable_unprepare(nfc->mod_clk);
@@ -2099,30 +2130,38 @@ err_reg_unmap:
 	return ret;
 }
 
-static int sunxi_nfc_remove(struct platform_device *pdev)
+static int __devexit sunxi_nfc_remove(struct platform_device *pdev)
 {
 	struct sunxi_nfc *nfc = platform_get_drvdata(pdev);
+	struct platform_nand_data *pdata = dev_get_platdata(&pdev->dev);
+	struct resource *res;
+
+	pr_debug("%s\n", __FUNCTION__);
+
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 
 	sunxi_nand_chips_cleanup(nfc);
 	iounmap(nfc->regs);
+	release_mem_region(res->start, resource_size(res));
+	kfree(nfc);
 
 	return 0;
 }
 
-//static const struct of_device_id sunxi_nfc_ids[] = {
-//	{ .compatible = "allwinner,sun4i-a10-nand" },
-//	{ /* sentinel */ }
-//};
-
-//MODULE_DEVICE_TABLE(of, sunxi_nfc_ids);
+static const struct of_device_id sunxi_nfc_ids[] = {
+	{ .compatible = "allwinner,sun4i-a10-nand" },
+	{ /* sentinel */ }
+};
+MODULE_DEVICE_TABLE(of, sunxi_nfc_ids);
 
 static struct platform_driver sunxi_nfc_driver = {
 	.driver = {
 		.name = "sunxi_nand",
-//		.of_match_table = sunxi_nfc_ids,
+		.owner = THIS_MODULE,
+		.of_match_table = sunxi_nfc_ids,
 	},
 	.probe = sunxi_nfc_probe,
-	.remove = sunxi_nfc_remove,
+	.remove = __devexit_p(sunxi_nfc_remove),
 };
 module_platform_driver(sunxi_nfc_driver);
 
