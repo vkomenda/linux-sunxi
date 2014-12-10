@@ -1215,6 +1215,8 @@ int __init init_mtdchar(void)
 {
 	int ret;
 
+	pr_info("[MTD] registering the character driver\n");
+
 	ret = __register_chrdev(MTD_CHAR_MAJOR, 0, 1 << MINORBITS,
 				   "mtd", &mtd_fops);
 	if (ret < 0) {
@@ -1246,7 +1248,7 @@ void __exit cleanup_mtdchar(void)
 
 MODULE_ALIAS_CHARDEV_MAJOR(MTD_CHAR_MAJOR);
 
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("David Woodhouse <dwmw2@infradead.org>");
-MODULE_DESCRIPTION("Direct character-device access to MTD devices");
-MODULE_ALIAS_CHARDEV_MAJOR(MTD_CHAR_MAJOR);
+//MODULE_LICENSE("GPL");
+//MODULE_AUTHOR("David Woodhouse <dwmw2@infradead.org>");
+//MODULE_DESCRIPTION("Direct character-device access to MTD devices");
+//MODULE_ALIAS_CHARDEV_MAJOR(MTD_CHAR_MAJOR);
