@@ -53,7 +53,7 @@ static int program_column = -1, program_page = -1;
 static int sunxi_nand_read_page_addr = 0;
 
 unsigned int hwecc_switch = 1;
-module_param(hwecc_switch, uint, 0);
+module_param(hwecc_switch, uint, 1);
 MODULE_PARM_DESC(hwecc_switch, "hardware ECC switch, 1=on, 0=off");
 
 unsigned int use_flash_bbt = 0;
