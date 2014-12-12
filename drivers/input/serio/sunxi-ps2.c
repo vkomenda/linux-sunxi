@@ -340,7 +340,6 @@ static int sunxips2_remove(struct platform_device *pdev)
 
 /* Match table for of_platform binding */
 static const struct of_device_id sunxips2_of_match[] = {
-	{ .compatible = "allwinner,sun7i-a20-ps2", },
 	{ .compatible = "allwinner,sun4i-a10-ps2", },
 	{ },
 };
