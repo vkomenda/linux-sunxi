@@ -1,0 +1,5 @@
+config MTD_SUNXI_NAND1K
+	tristate "Sunxi NAND flash driver with the fixed 1K page size"
+	depends on PLAT_SUNXI
+	help
+	  A driver that writes a Sunxi SPL boot loader image onto NAND flash.

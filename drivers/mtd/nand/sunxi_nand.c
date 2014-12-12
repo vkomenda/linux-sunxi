@@ -42,10 +42,21 @@
 unsigned int bbt_use_flash = 1;
 module_param(bbt_use_flash, uint, 1);
 MODULE_PARM_DESC(bbt_use_flash,
-		 "use the flash to store the bad block table: "
+		 "use of the flash to store the bad block table: "
 		 "1 - use, 0 - don't use");
 
-//static const char *part_probe_types[] = { "cmdlinepart", NULL };
+unsigned int debug = 0;
+module_param(debug, uint, 0);
+MODULE_PARM_DESC(debug, "print debug output: 0 - don't print, 1 - print any");
+
+//#define CAPTION pr_info(">>> %s\n", __FUNCTION__)
+
+#define DBG(fmt, arg...)						\
+	{								\
+		if (debug)						\
+			pr_info("%s: " fmt "\n", __FUNCTION__, ##arg);	\
+	}
+//#define DBG(...) {}
 
 #define DRIVER_NAME "sunxi_nand"
 
@@ -300,7 +311,7 @@ struct sunxi_nfc {
 	void __iomem *regs;
 //	struct clk *ahb_clk;
 //	struct clk *mod_clk;
-	unsigned long assigned_cs;
+//	unsigned long assigned_cs;
 	unsigned long clk_rate;
 	struct list_head chips;
 	struct completion complete;
@@ -334,7 +345,8 @@ static irqreturn_t sunxi_nfc_interrupt(int irq, void *dev_id)
 static int sunxi_nfc_wait_int(struct sunxi_nfc *nfc, u32 flags,
 			      unsigned int timeout_ms)
 {
-	printk("%s\n", __FUNCTION__);
+	DBG("flags %x, timeout %d, NFC_REG_ST %x",
+	    flags, timeout_ms, readl(nfc->regs + NFC_REG_ST));
 
 	init_completion(&nfc->complete);
 
@@ -357,7 +369,7 @@ static int sunxi_nfc_wait_cmd_fifo_empty(struct sunxi_nfc *nfc)
 	unsigned long timeout = jiffies +
 				msecs_to_jiffies(NFC_DEFAULT_TIMEOUT_MS);
 
-	printk("%s\n", __FUNCTION__);
+	DBG("timeout %ld, NFC_REG_ST %x", timeout, readl(nfc->regs + NFC_REG_ST));
 
 	do {
 		if (!(readl(nfc->regs + NFC_REG_ST) & NFC_CMD_FIFO_STATUS))
@@ -373,7 +385,7 @@ static int sunxi_nfc_rst(struct sunxi_nfc *nfc)
 	unsigned long timeout = jiffies +
 				msecs_to_jiffies(NFC_DEFAULT_TIMEOUT_MS);
 
-	printk("%s\n", __FUNCTION__);
+	DBG("timeout %ld, NFC_REG_ST %x", timeout, readl(nfc->regs + NFC_REG_ST));
 
 	writel(0, nfc->regs + NFC_REG_ECC_CTL);
 	writel(NFC_RESET, nfc->regs + NFC_REG_CTL);
@@ -471,7 +483,7 @@ static uint32_t sunxi_get_pll5_clk(void)
 	factor_m = ((reg_val & PLL5_FACTOR_M_MASK) >> PLL5_FACTOR_M_SHIFT) + 1;
 
 	clock = 24 * factor_n * factor_k / div_p / factor_m;
-	printk("cmu_clk is %d \n", clock);
+	DBG("PLL5 clk %d", clock);
 
 	return clock;
 }
@@ -515,6 +527,10 @@ static void sunxi_set_nfc_clk(uint32_t nand_max_clock)
 	// set divm
 	cfg &= ~CLK_DIV_RATIO_M_MASK;
 	cfg |= (nand_clk_divid_ratio << CLK_DIV_RATIO_M_SHIFT) & CLK_DIV_RATIO_M_MASK;
+
+	// TEST
+	//cfg |= (4 << CLK_DIV_RATIO_M_SHIFT) & CLK_DIV_RATIO_M_MASK;
+
 	writel(cfg, NAND_SCLK_CFG_REG);
 
 	printk("NFC clk init end\n");
@@ -550,11 +566,13 @@ static void sunxi_set_nfc_pio(void)
 	printk("%s\n", __FUNCTION__);
 
 	pioc_handle = gpio_request_ex("nand_para", NULL);
-	if (pioc_handle) {
-		printk("%s OK\n", __FUNCTION__);
-	}
-	else {
-		printk("%s FAILURE\n", __FUNCTION__);
+	if (debug) {
+		if (pioc_handle) {
+			printk("%s OK, handle %d\n", __FUNCTION__, pioc_handle);
+		}
+		else {
+			printk("%s FAILURE\n", __FUNCTION__);
+		}
 	}
 
 	/*
@@ -610,16 +628,20 @@ static void sunxi_nfc_select_chip(struct mtd_info *mtd, int chip)
 		}
 
 		writel(mtd->writesize, nfc->regs + NFC_REG_SPARE_AREA);
-/*
+
 		if (nfc->clk_rate != sunxi_nand->clk_rate) {
+			DBG("BEFORE: NFC clock %ld, chip clock %ld",
+			    nfc->clk_rate, sunxi_nand->clk_rate);
 			sunxi_set_nfc_clk(sunxi_nand->clk_rate);
 			// with a proper NFC clock source the above would be:
 			// clk_set_rate(nfc->mod_clk, sunxi_nand->clk_rate);
 			nfc->clk_rate = sunxi_nand->clk_rate;
+			DBG("AFTER:  NFC clock %ld, chip clock %ld",
+			    nfc->clk_rate, sunxi_nand->clk_rate);
 		}
-*/
 	}
 
+	DBG("ctl %x", ctl);
 	writel(ctl, nfc->regs + NFC_REG_CTL);
 
 	sunxi_nand->selected = chip;
@@ -900,7 +922,7 @@ static void sunxi_nfc_cmd_ctrl(struct mtd_info *mtd, int dat,
 	int ret;
 	u32 tmp;
 
-	printk("%s\n", __FUNCTION__);
+	DBG("dat %x, ctrl %x", dat, ctrl);
 
 	ret = sunxi_nfc_wait_cmd_fifo_empty(nfc);
 	if (ret)
@@ -2002,7 +2024,7 @@ err:
 static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 				struct device_node *np)
 {
-//	const struct nand_sdr_timings *timings;
+	const struct nand_sdr_timings *timings;
 	struct sunxi_nand_chip *chip;
 //	struct ofnandpart_data ppdata;
 	struct mtd_info *mtd;
@@ -2082,8 +2104,12 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 	}
 */
 
-	/*
-	dev_info(dev, "%s: get timings\n", __FUNCTION__);
+	// FIXME: works only for a single chip
+	chip->sels[0].cs = 0;               // chip select 0
+	chip->sels[0].rb.type = RB_NATIVE;  // use the controller R/nB line
+	chip->sels[0].rb.info.nativeid = 0; // fn parameter "rb" in nand1k sources
+/*
+	DBG("get timings");
 
 	timings = onfi_async_timing_mode_to_sdr_timings(0);
 	if (IS_ERR(timings)) {
@@ -2094,18 +2120,17 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 		return ret;
 	}
 
-	dev_info(dev, "%s: set timings\n", __FUNCTION__);
+	DBG("set timings");
 
 	ret = sunxi_nand_chip_set_timings(chip, timings);
 	if (ret) {
 		dev_err(dev, "could not configure chip timings: %d\n", ret);
 		return ret;
 	}
-	*/
-
+*/
 	nand = &chip->nand;
 	/* Default tR value specified in the ONFI spec (chapter 4.15.1) */
-//	nand->chip_delay = 200;
+	nand->chip_delay = 200;
 	nand->controller = &nfc->controller;
 	nand->select_chip = sunxi_nfc_select_chip;
 	nand->cmd_ctrl = sunxi_nfc_cmd_ctrl;
@@ -2121,7 +2146,7 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 	mtd->priv = nand;
 	mtd->owner = THIS_MODULE;
 
-	dev_info(dev, "%s: scan chip ID\n", __FUNCTION__);
+	DBG("scan chip ID");
 
 	ret = nand_scan_ident(mtd, nsels, NULL);
 	if (ret) {
@@ -2129,26 +2154,24 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 		return ret;
 	}
 
-	dev_info(dev, "%s: allocating IO buffer of %d + %d bytes\n",
-		 __FUNCTION__, mtd->writesize, mtd->oobsize);
+	DBG("allocating IO buffer of %d + %d bytes",
+	    mtd->writesize, mtd->oobsize);
 
 	chip->buffer = kzalloc(mtd->writesize + mtd->oobsize, GFP_KERNEL);
 	if (!chip->buffer) {
 		dev_err(dev, "cannot allocate IO buffer\n");
 		return -ENOMEM;
 	}
-
-	/*
-	dev_info(dev, "%s: init timings\n", __FUNCTION__);
+/*
+	DBG("init timings");
 
 	ret = sunxi_nand_chip_init_timings(chip, np);
 	if (ret) {
 		dev_err(dev, "could not configure chip timings: %d\n", ret);
 		return ret;
 	}
-	*/
-
-	dev_info(dev, "%s: create Page Status Table\n", __FUNCTION__);
+*/
+	DBG("create Page Status Table");
 
 	ret = nand_pst_create(mtd);
 	if (ret) {
@@ -2156,7 +2179,7 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 		return ret;
 	}
 
-	dev_info(dev, "%s: init ECC\n", __FUNCTION__);
+	DBG("init ECC");
 
 	ret = sunxi_nand_ecc_init(mtd, &nand->ecc, np);
 	if (ret) {
@@ -2164,7 +2187,7 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 		return ret;
 	}
 
-	dev_info(dev, "%s: init randomiser\n", __FUNCTION__);
+	DBG("init randomiser");
 
 	ret = sunxi_nand_rnd_init(mtd, &nand->rnd, &nand->ecc, np);
 	if (ret) {
@@ -2172,7 +2195,7 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 		return ret;
 	}
 
-	dev_info(dev, "%s: requesting IRQ\n", __FUNCTION__);
+	DBG("requesting IRQ");
 
 	// disable interrupts
 	writel(0, nfc->regs + NFC_REG_INT);
@@ -2183,7 +2206,7 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 		return ret;
 	}
 
-	dev_info(dev, "%s: scan tail\n", __FUNCTION__);
+	DBG("scan tail");
 
 	ret = nand_scan_tail(mtd);
 	if (ret) {
@@ -2201,7 +2224,7 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 		ret = 0;
 	*/
 
-	dev_info(dev, "%s: MTD register\n", __FUNCTION__);
+	DBG("MTD register");
 
 	ret = mtd_device_register(mtd, NULL, 0);
 
@@ -2213,7 +2236,7 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 
 	list_add_tail(&chip->node, &nfc->chips);
 
-	dev_info(dev, "%s SUCCESS\n", __FUNCTION__);
+	DBG("SUCCESS");
 
 	return 0;
 
@@ -2300,7 +2323,7 @@ static int __devinit sunxi_nfc_probe(struct platform_device *pdev)
 	int irq;
 	int ret;
 
-	dev_info(dev, "%s\n", __FUNCTION__);
+	DBG("");
 
 	nfc = devm_kzalloc(dev, sizeof(*nfc), GFP_KERNEL);
 	if (!nfc) {
@@ -2364,13 +2387,10 @@ static int __devinit sunxi_nfc_probe(struct platform_device *pdev)
 	}
 */
 
-	dev_info(dev, "%s: setting initial NFC clock\n", __FUNCTION__);
-	sunxi_set_nfc_clk(30);
-
-	dev_info(dev, "%s: setting IO pins\n", __FUNCTION__);
+	DBG("setting IO pins");
 	sunxi_set_nfc_pio();
 
-	dev_info(dev, "%s: resetting NFC\n", __FUNCTION__);
+	DBG("resetting NFC");
 	ret = sunxi_nfc_rst(nfc);
 	if (ret) {
 		dev_err(dev, "failed to reset NFC\n");
@@ -2388,10 +2408,10 @@ static int __devinit sunxi_nfc_probe(struct platform_device *pdev)
 		goto out_mod_clk_unprepare;
 	}
 */
-	dev_info(dev, "%s: setting driver data\n", __FUNCTION__);
+	DBG("setting driver data");
 	platform_set_drvdata(pdev, nfc);
 
-	dev_info(dev, "%s: timing magic\n", __FUNCTION__);
+	DBG("timing magic");
 	/*
 	 * serial_access_mode = 1
 	 * this is needed by some nand chip to read ID
