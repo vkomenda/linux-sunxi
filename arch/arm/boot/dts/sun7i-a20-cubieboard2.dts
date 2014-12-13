@@ -178,11 +178,13 @@
 		blue {
 			label = "cubieboard2:blue:usr";
 			gpios = <&pio 7 21 0>;
+			linux,default-trigger = "heartbeat";
 		};
 
 		green {
 			label = "cubieboard2:green:usr";
 			gpios = <&pio 7 20 0>;
+			linux,default-trigger = "mmc0";
 		};
 	};
 

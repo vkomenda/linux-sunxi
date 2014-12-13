@@ -254,21 +254,25 @@
 		blue {
 			label = "cubietruck:blue:usr";
 			gpios = <&pio 7 21 0>;
+			linux,default-trigger = "cpu0";
 		};
 
 		orange {
 			label = "cubietruck:orange:usr";
 			gpios = <&pio 7 20 0>;
+			linux,default-trigger = "nand-disk";
 		};
 
 		white {
 			label = "cubietruck:white:usr";
 			gpios = <&pio 7 11 0>;
+			linux,default-trigger = "cpu1";
 		};
 
 		green {
 			label = "cubietruck:green:usr";
 			gpios = <&pio 7 7 0>;
+			linux,default-trigger = "mmc0";
 		};
 	};
 
