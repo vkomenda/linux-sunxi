@@ -36,4 +36,10 @@
 
 #endif
 
+#define DBG(fmt, arg...)						\
+	{								\
+		if (debug)						\
+			pr_info("%s: " fmt "\n", __FUNCTION__, ##arg);	\
+	}
+
 #endif

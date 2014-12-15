@@ -27,7 +27,9 @@
 #include <linux/fs.h>
 
 #include "nfc.h"
+#include "defs.h"
 
+extern int debug;
 
 //////////////////////////////////////////////////////////////////////////////
 // Linux charactor device interface
@@ -153,6 +155,8 @@ int nand1k_init(void)
 	int err;
 	struct device *dev;
 
+	DBG("");
+
 	rw_buff = kzalloc(RW_BUFFER_SIZE, GFP_KERNEL);
 	if (!rw_buff) {
 		printk(KERN_ERR "allocate read buffer fail\n");
@@ -196,6 +200,8 @@ error0:
 
 void nand1k_exit(void)
 {
+	DBG("");
+
 	device_destroy(dev_class, MKDEV(nand1k_major, 0));
 	unregister_chrdev(nand1k_major, CHAR_DEV_NAME);
 	class_destroy(dev_class);

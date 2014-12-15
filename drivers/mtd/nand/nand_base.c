@@ -30,6 +30,7 @@
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+#define DBG(fmt, arg...) pr_info(pr_fmt("%s: " fmt "\n"), __FUNCTION__, ##arg)
 
 #include <linux/module.h>
 #include <linux/delay.h>
@@ -3551,6 +3552,8 @@ static void nand_resume(struct mtd_info *mtd)
 /* Set default functions */
 static void nand_set_defaults(struct nand_chip *chip, int busw)
 {
+	DBG("chip %p, bus width %d", chip, busw);
+
 	/* check for proper chip_delay setup, set 20us if not */
 	if (!chip->chip_delay)
 		chip->chip_delay = 20;
@@ -4249,6 +4252,8 @@ static struct nand_flash_dev *nand_get_flash_type(struct mtd_info *mtd,
 	int i, maf_idx;
 	u8 id_data[8];
 
+	DBG("");
+
 	/* Select the device */
 	chip->select_chip(mtd, 0);
 
@@ -4425,6 +4430,8 @@ int nand_scan_ident(struct mtd_info *mtd, int maxchips,
 	int i, nand_maf_id, nand_dev_id;
 	struct nand_chip *chip = mtd->priv;
 	struct nand_flash_dev *type;
+
+	DBG("mtd %p, chips %d, table %p", mtd, maxchips, table);
 
 	/* Set the default functions */
 	nand_set_defaults(chip, chip->options & NAND_BUSWIDTH_16);
