@@ -345,7 +345,7 @@ static irqreturn_t sunxi_nfc_interrupt(int irq, void *dev_id)
 static int sunxi_nfc_wait_int(struct sunxi_nfc *nfc, u32 flags,
 			      unsigned int timeout_ms)
 {
-	DBG("flags %x, timeout %d, NFC_REG_ST %x",
+	DBG("flags %x, timeout %u, NFC_REG_ST %x",
 	    flags, timeout_ms, readl(nfc->regs + NFC_REG_ST));
 
 	init_completion(&nfc->complete);
@@ -369,7 +369,7 @@ static int sunxi_nfc_wait_cmd_fifo_empty(struct sunxi_nfc *nfc)
 	unsigned long timeout = jiffies +
 				msecs_to_jiffies(NFC_DEFAULT_TIMEOUT_MS);
 
-	DBG("timeout %ld, NFC_REG_ST %x", timeout, readl(nfc->regs + NFC_REG_ST));
+	DBG("timeout %lu, NFC_REG_ST %x", timeout, readl(nfc->regs + NFC_REG_ST));
 
 	do {
 		if (!(readl(nfc->regs + NFC_REG_ST) & NFC_CMD_FIFO_STATUS))
@@ -385,7 +385,7 @@ static int sunxi_nfc_rst(struct sunxi_nfc *nfc)
 	unsigned long timeout = jiffies +
 				msecs_to_jiffies(NFC_DEFAULT_TIMEOUT_MS);
 
-	DBG("timeout %ld, NFC_REG_ST %x", timeout, readl(nfc->regs + NFC_REG_ST));
+	DBG("timeout %lu, NFC_REG_ST %x", timeout, readl(nfc->regs + NFC_REG_ST));
 
 	writel(0, nfc->regs + NFC_REG_ECC_CTL);
 	writel(NFC_RESET, nfc->regs + NFC_REG_CTL);

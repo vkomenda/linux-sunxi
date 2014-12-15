@@ -15,6 +15,9 @@
 #include <linux/module.h>
 #include <linux/mtd/nand.h>
 #include <linux/slab.h>
+#include <linux/kernel.h>
+
+#define DBG(fmt, arg...) pr_info(pr_fmt("%s: " fmt "\n"), __FUNCTION__, ##arg)
 
 static u8 h27ucg8t2a_read_retry_regs[] = {
 	0xcc, 0xbf, 0xaa, 0xab, 0xcd, 0xad, 0xae, 0xaf
@@ -139,6 +142,9 @@ static int h27ucg8t2e_init(struct mtd_info *mtd, const uint8_t *id)
 	u8 rrtOTP[1024];
 	int rrtReg, rrtSet;
 	int ret;
+
+	DBG("mtd %p, ID %.2x %.2x %.2x %.2x %.2x %.2x",
+	    mtd, id[0], id[1], id[2], id[3], id[4], id[5]);
 
 	chip->select_chip(mtd, 0);
 	chip->cmdfunc(mtd, NAND_CMD_RESET, -1, -1);

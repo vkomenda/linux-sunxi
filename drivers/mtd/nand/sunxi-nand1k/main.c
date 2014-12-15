@@ -32,10 +32,11 @@
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("yuq");
 
-#define	DRIVER_NAME	"mtd-nand-sunxi"
+#define	DRIVER_NAME "mtd-nand-sunxi"
 
 extern irqreturn_t nfc_interrupt_handler(int irq, void *dev_id);
 
+extern int debug;
 
 struct sunxi_nand_info {
 	struct mtd_info mtd;
@@ -46,6 +47,8 @@ static int __devinit nand_probe(struct platform_device *pdev)
 {
 	int err;
 	struct sunxi_nand_info *info;
+
+	DBG("");
 
 	if ((info = kzalloc(sizeof(*info), GFP_KERNEL)) == NULL) {
 		ERR_INFO("alloc nand info fail\n");
@@ -62,9 +65,11 @@ static int __devinit nand_probe(struct platform_device *pdev)
 		goto out_free_info;
 	}
 
+	DBG("scan chip ID");
+
 	// first scan to find the device and get the page size
 	if ((err = nand_scan_ident(&info->mtd, 1, NULL)) < 0) {
-		ERR_INFO("nand scan ident fail\n");
+		pr_err(pr_fmt("ID scan ERROR %d\n"), err);
 		goto out_nfc_exit;
 	}
 
@@ -111,6 +116,8 @@ static int __devexit nand_remove(struct platform_device *pdev)
 {
 	struct sunxi_nand_info *info = platform_get_drvdata(pdev);
 
+	DBG("");
+
 	platform_set_drvdata(pdev, NULL);
 	mtd_device_unregister(&info->mtd);
 	nand_release(&info->mtd);
@@ -141,12 +148,12 @@ static void	nfc_dev_release(struct device *dev)
 }
 
 static struct platform_driver plat_driver = {
-	.probe		= nand_probe,
-	.remove		= nand_remove,
+	.probe      =             nand_probe,
+	.remove     = __devexit_p(nand_remove),
 	.shutdown   = nand_shutdown,
 	.suspend    = nand_suspend,
 	.resume     = nand_resume,
-	.driver		= {
+	.driver     = {
 		.name	= DRIVER_NAME,
 		.owner	= THIS_MODULE,
 	},
@@ -167,6 +174,8 @@ static int __init nand_init(void)
 {
 	int err;
 	int nand_used = 0;
+
+	DBG("");
 
     if (script_parser_fetch("nand_para", "nand_used", &nand_used, sizeof(int)))
     	ERR_INFO("nand init fetch emac using configuration failed\n");
@@ -201,6 +210,8 @@ static int __init nand_init(void)
 static void __exit nand_exit(void)
 {
 	int nand_used = 0;
+
+	DBG("");
 
 	if (script_parser_fetch("nand_para", "nand_used", &nand_used, sizeof(int)))
 		ERR_INFO("nand init fetch emac using configuration failed\n");
