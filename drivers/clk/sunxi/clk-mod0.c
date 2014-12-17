@@ -17,6 +17,7 @@
 #include <linux/clk-provider.h>
 #include <linux/clkdev.h>
 #include <linux/of_address.h>
+#include <linux/platform_device.h>
 
 #include "clk-factors.h"
 
@@ -67,7 +68,7 @@ static struct clk_factors_config sun4i_a10_mod0_config = {
 	.pwidth = 2,
 };
 
-static const struct factors_data sun4i_a10_mod0_data __initconst = {
+static const struct factors_data sun4i_a10_mod0_data = {
 	.enable = 31,
 	.mux = 24,
 	.muxmask = BIT(1) | BIT(0),
@@ -82,16 +83,46 @@ static void __init sun4i_a10_mod0_setup(struct device_node *node)
 	void __iomem *reg;
 
 	reg = of_iomap(node, 0);
-	if (!reg) {
-		pr_err("Could not get registers for mod0-clk: %s\n",
-		       node->name);
+	if (!reg)
 		return;
-	}
 
 	sunxi_factors_register(node, &sun4i_a10_mod0_data,
 			       &sun4i_a10_mod0_lock, reg);
 }
 CLK_OF_DECLARE(sun4i_a10_mod0, "allwinner,sun4i-a10-mod0-clk", sun4i_a10_mod0_setup);
+
+static int sun4i_a10_mod0_clk_probe(struct platform_device *pdev)
+{
+	struct device_node *np = pdev->dev.of_node;
+	struct resource *r;
+	void __iomem *reg;
+
+	if (!np)
+		return -ENODEV;
+
+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	reg = devm_ioremap_resource(&pdev->dev, r);
+	if (IS_ERR(reg))
+		return PTR_ERR(reg);
+
+	sunxi_factors_register(np, &sun4i_a10_mod0_data,
+			       &sun4i_a10_mod0_lock, reg);
+	return 0;
+}
+
+static const struct of_device_id sun4i_a10_mod0_clk_dt_ids[] = {
+	{ .compatible = "allwinner,sun4i-a10-mod0-clk" },
+	{ /* sentinel */ }
+};
+
+static struct platform_driver sun4i_a10_mod0_clk_driver = {
+	.driver = {
+		.name = "sun4i-a10-mod0-clk",
+		.of_match_table = sun4i_a10_mod0_clk_dt_ids,
+	},
+	.probe = sun4i_a10_mod0_clk_probe,
+};
+module_platform_driver(sun4i_a10_mod0_clk_driver);
 
 static DEFINE_SPINLOCK(sun5i_a13_mbus_lock);
 
