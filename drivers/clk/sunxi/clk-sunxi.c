@@ -120,7 +120,7 @@ static long sun6i_ahb1_clk_round(unsigned long rate, u8 *divp, u8 *pre_divp,
 
 static long sun6i_ahb1_clk_determine_rate(struct clk_hw *hw, unsigned long rate,
 					  unsigned long *best_parent_rate,
-					  struct clk **best_parent_clk)
+					  struct clk_hw **best_parent_clk)
 {
 	struct clk *clk = hw->clk, *parent, *best_parent = NULL;
 	int i, num_parents;
@@ -148,7 +148,7 @@ static long sun6i_ahb1_clk_determine_rate(struct clk_hw *hw, unsigned long rate,
 	}
 
 	if (best_parent)
-		*best_parent_clk = best_parent;
+		*best_parent_clk = __clk_get_hw(best_parent);
 	*best_parent_rate = best;
 
 	return best_child_rate;
