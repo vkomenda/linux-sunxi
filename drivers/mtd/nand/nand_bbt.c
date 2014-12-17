@@ -450,7 +450,7 @@ static int scan_first_last_pages(struct mtd_info *mtd, loff_t offs,
 				 uint8_t *buf)
 {
 	struct mtd_oob_ops ops;
-	int ret, i;
+	int ret = 0, i;
 	loff_t page_offsets[2] = {offs, offs + mtd->erasesize - mtd->writesize};
 
 	ops.ooblen = mtd->oobsize;
@@ -464,21 +464,18 @@ static int scan_first_last_pages(struct mtd_info *mtd, loff_t offs,
 		if (ret && !mtd_is_bitflip_or_eccerr(ret)) {
 			pr_err("OOB read ERROR %d at offset %012llx\n",
 			       ret, page_offsets[i]);
-			return ret;
+			break;
 		}
 
 		/* Check the first byte of the spare area of the page. */
-		if (buf[0] == 0xFF) {
-			pr_info("Good BB marker #%d at offset %012llx\n",
-				i + 1, page_offsets[i]);
-		}
-		else {
+		if (buf[0] != 0xFF) {
+			ret = i + 1;
 			pr_info("Bad BB marker #%d at offset %012llx: %.2x (%.2x)\n",
-				 i + 1, page_offsets[i], buf[0], buf[1]);
-			return i + 1;
+				ret, page_offsets[i], buf[0], buf[1]);
+			break;
 		}
 	}
-	return 0;
+	return ret;
 }
 
 /**
@@ -500,7 +497,14 @@ static int create_bbt(struct mtd_info *mtd, uint8_t *buf,
 	int startblock;
 	loff_t from;
 
-	pr_info("Scanning device for bad blocks\n");
+	pr_info("Scanning device for bad blocks\n"
+		" chip %d"
+		" chip size %lld"
+		" bbt_erase_shift %d"
+		"\n",
+		chip,
+		this->chipsize,
+		this->bbt_erase_shift);
 
 	/* FIXME: numpages is redundant if both NAND_BBT_SCANLASTPAGE and
 	 * NAND_BBT_SCAN2NDPAGE bits are set. */
@@ -525,11 +529,16 @@ static int create_bbt(struct mtd_info *mtd, uint8_t *buf,
 		from = (loff_t)startblock << this->bbt_erase_shift;
 	}
 
+	pr_info("numblocks %d, startblock %d\n", numblocks, startblock);
+
 	/* Recalculate the starting address only when the start page is not to
 	 * be scanned. */
 	if ( (bd->options & NAND_BBT_SCANLASTPAGE) &&
 	    !(bd->options & NAND_BBT_SCAN2NDPAGE))
 		from += mtd->erasesize - (mtd->writesize * numpages);
+
+	pr_info("numblocks 0x%x, startblock 0x%x, from 0x%llx\n",
+		numblocks, startblock, from);
 
 	for (i = startblock; i < numblocks; i++) {
 		int ret;

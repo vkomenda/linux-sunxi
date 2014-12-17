@@ -73,7 +73,7 @@ static int h27ucg8t2a_init(struct mtd_info *mtd, const uint8_t *id)
 {
 	struct nand_chip *chip = mtd->priv;
 	struct hynix_nand *hynix;
-	u8 buf[1024];
+	u8 buf[1024];  // max(RR count register count, RR set register count)
 	int i, j;
 	int ret;
 
@@ -87,11 +87,21 @@ static int h27ucg8t2a_init(struct mtd_info *mtd, const uint8_t *id)
 	chip->cmdfunc(mtd, 0x17, -1, -1);
 	chip->cmdfunc(mtd, 0x04, -1, -1);
 	chip->cmdfunc(mtd, 0x19, -1, -1);
+	// FIXME: this will only read 1024 bytes at a time if flash chip RAM is
+	// used as a buffer. Therefore the last 16 bytes of the last RRT copy
+	// will be lost. If the last RRT copy is not used, the 0<=j<8 loop below
+	// should be restricted to 0<=j<7.
 	chip->cmdfunc(mtd, NAND_CMD_READ0, 0x0, 0x200);
 
-	chip->read_buf(mtd, buf, 2);
-	if (buf[0] != 0x8 || buf[1] != 0x8)
+	// Read total RR count - 1 byte x 8 times - and
+	// RR register count - also 1 byte x 8 times.
+	chip->read_buf(mtd, buf, 16);
+	if ((buf[0] != 8 || buf[1] != 8) &&
+	    (buf[8] != 8 || buf[9] != 8))
 		return -EINVAL;
+	// Read 8 RR register sets, each consisting of a 64-byte original and
+	// its 64-byte inverse copy. Every set stores 8 lists of values for the
+	// 8 RR registers on the flash chip.
 	chip->read_buf(mtd, buf, 1024);
 
 	ret = 0;
@@ -135,12 +145,14 @@ static void h27ucg8t2e_cleanup(struct mtd_info *mtd)
 	kfree(chip->manuf_priv);
 }
 
+#define UCG8T2E_RRT_OTP_SIZE 528
+
 static int h27ucg8t2e_init(struct mtd_info *mtd, const uint8_t *id)
 {
 	struct nand_chip *chip = mtd->priv;
 	struct hynix_nand *hynix;
-	u8 rrtOTP[1024];
-	int rrtReg, rrtSet;
+	u8 rrtOTP[UCG8T2E_RRT_OTP_SIZE];
+	int rrtReg, rrtSet, i;
 	int ret;
 
 	DBG("mtd %p, ID %.2x %.2x %.2x %.2x %.2x %.2x",
@@ -158,31 +170,53 @@ static int h27ucg8t2e_init(struct mtd_info *mtd, const uint8_t *id)
 	chip->cmdfunc(mtd, 0x19, -1, -1);
 	chip->cmdfunc(mtd, NAND_CMD_READ0, 0, 0x200);
 
-	chip->read_buf(mtd, rrtOTP, 2);
-	if (rrtOTP[0] != 0x8 || rrtOTP[1] != 0x8)
+	/*
+	 *  1. Read total RR count - 1 byte x 8 times - and RR register count -
+	 *  also 1 byte x 8 times.
+	 *
+	 *  2. Read 8 RR register sets, each consisting of a 32-byte original
+	 *  and its 32-byte inverse copy. Every set stores 8 lists of values for
+	 *  the 4 RR registers on the flash chip.
+	 */
+	chip->read_buf(mtd, rrtOTP, UCG8T2E_RRT_OTP_SIZE);
+	printk("RR count (8 copies), RR reg. count (8 copies):\n");
+	for (i = 0; i < 16; i++) {
+		printk(" %.2x", rrtOTP[i]);
+	}
+
+	if (rrtOTP[0] != 8 || rrtOTP[1] != 8) {
+		DBG("wrong total RR count %u (%u)", rrtOTP[0], rrtOTP[1]);
 		return -EINVAL;
-	chip->read_buf(mtd, rrtOTP, 1024);
+	}
+
+//	chip->read_buf(mtd, rrtOTP, 512);
 
 	/* copy RRT from OTP, command suffix */
 	chip->cmdfunc(mtd, NAND_CMD_RESET, -1, -1);
 	chip->cmdfunc(mtd, 0x36, 0x38, -1);
 	chip->write_byte(mtd, 0);
 
-	/* dummy write from any address */
+	/* dummy read from any address */
 	chip->cmdfunc(mtd, NAND_CMD_READ0, 0, 0);
 
 	chip->select_chip(mtd, -1);
 
 	/* FIXME: common function - majority check, not "all correct" */
 	ret = 0;
+	printk("RRT sets in OTP: original (inverse)...\n");
 	for (rrtSet = 0; rrtSet < 8; rrtSet++) {
+		u8 *cur = rrtOTP + 16 + (64 * rrtSet);
 		for (rrtReg = 0; rrtReg < 32; rrtReg++) {
-			u8 *cur = rrtOTP + (64 * rrtSet);
-			if ((cur[rrtReg] | cur[rrtReg + 64]) != 0xff) {
+			uint8_t original = cur[rrtReg];
+			uint8_t inverse  = cur[rrtReg + 32];
+			printk(" %.2x (%.2x)", original, inverse);
+			if ((original | inverse) != 0xff) {
 				ret = -EINVAL;
 				break;
 			}
 		}
+		printk("\n");
+
 		if (ret)
 			// read the next set
 			continue;
@@ -191,7 +225,9 @@ static int h27ucg8t2e_init(struct mtd_info *mtd, const uint8_t *id)
 			break;
 	}
 
-	if (!ret) {
+	if (ret) {
+		DBG("Loading of RRT from OTP failed. Using defaults.");
+
 		hynix = kzalloc(sizeof(*hynix), GFP_KERNEL);
 		if (!hynix)
 			return -ENOMEM;
