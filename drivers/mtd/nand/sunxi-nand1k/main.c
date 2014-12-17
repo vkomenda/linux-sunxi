@@ -61,7 +61,7 @@ static int __devinit nand_probe(struct platform_device *pdev)
 	info->mtd.owner = THIS_MODULE;
 
 	if ((err = nfc_first_init(&info->mtd)) < 0) {
-		ERR_INFO("nfc first inti fail\n");
+		pr_err(pr_fmt("first init ERROR %d\n"), err);
 		goto out_free_info;
 	}
 
@@ -75,7 +75,7 @@ static int __devinit nand_probe(struct platform_device *pdev)
 
 	// init NFC with flash chip info got from first scan
 	if ((err = nfc_second_init(&info->mtd)) < 0) {
-		ERR_INFO("nfc second init fail\n");
+		pr_err(pr_fmt("second init ERROR %d\n"), err);
 		goto out_nfc_exit;
 	}
 

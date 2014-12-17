@@ -3736,6 +3736,8 @@ static int nand_flash_detect_onfi(struct mtd_info *mtd, struct nand_chip *chip,
 	int i, j;
 	int val;
 
+	DBG("");
+
 	/* Try ONFI for unknown chip or LP */
 	chip->cmdfunc(mtd, NAND_CMD_READID, 0x20, -1);
 	if (chip->read_byte(mtd) != 'O' || chip->read_byte(mtd) != 'N' ||
@@ -3840,6 +3842,8 @@ static int nand_flash_detect_jedec(struct mtd_info *mtd, struct nand_chip *chip,
 	struct jedec_ecc_info *ecc;
 	int val;
 	int i, j;
+
+	DBG("");
 
 	/* Try JEDEC for unknown chip or LP */
 	chip->cmdfunc(mtd, NAND_CMD_READID, 0x40, -1);
@@ -4040,6 +4044,8 @@ static int parse_hynix_sizes(struct mtd_info *mtd, u8 sz)
 */
 	mtd->erasesize = 0x100000 << (erase_code & 0x3);
 
+	DBG("erasesize %d", mtd->erasesize);
+
 	return 0;
 }
 
@@ -4052,6 +4058,9 @@ static void nand_decode_ext_id(struct mtd_info *mtd, struct nand_chip *chip,
 				u8 id_data[8], int *busw)
 {
 	int extid, id_len;
+
+	DBG("");
+
 	/* The 3rd id byte holds MLC / multichip data */
 	chip->bits_per_cell = nand_get_bits_per_cell(id_data[2]);
 	/* The 4th id byte is the important one */
@@ -4304,12 +4313,16 @@ static struct nand_flash_dev *nand_get_flash_type(struct mtd_info *mtd,
 	chip->onfi_version = 0;
 	if (!type->name || !type->pagesize) {
 		/* Check if the chip is ONFI compliant */
-		if (nand_flash_detect_onfi(mtd, chip, &busw))
+		if (nand_flash_detect_onfi(mtd, chip, &busw)) {
+			pr_info(pr_fmt("chip is ONFI-compliant\n"));
 			goto ident_done;
+		}
 
 		/* Check if the chip is JEDEC compliant */
-		if (nand_flash_detect_jedec(mtd, chip, &busw))
+		if (nand_flash_detect_jedec(mtd, chip, &busw)) {
+			pr_info(pr_fmt("chip is JEDEC-compliant\n"));
 			goto ident_done;
+		}
 	}
 
 	if (!type->name)
@@ -4373,6 +4386,9 @@ ident_done:
 
 	chip->bbt_erase_shift = chip->phys_erase_shift =
 		ffs(mtd->erasesize) - 1;
+	DBG("erase shift %d derived from erase size %d\n",
+	    chip->bbt_erase_shift, mtd->erasesize);
+
 	if (chip->chipsize & 0xffffffff)
 		chip->chip_shift = ffs((unsigned)chip->chipsize) - 1;
 	else {

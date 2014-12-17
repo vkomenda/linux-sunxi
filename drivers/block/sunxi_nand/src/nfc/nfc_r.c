@@ -1258,7 +1258,7 @@ __s32 _vender_get_param_otp_hynix(__u8 *para, __u32 count)
 		/* address #1 */
 		address[0] = reg_addr[1];
 		_set_addr(address, 1);
-		cfg = (NFC_SEND_ADR);
+		cfg = NFC_SEND_ADR;
 		_wait_cmdfifo_free();
 		NFC_WRITE_REG(NFC_REG_CMD, cfg);
 		_wait_cmd_finish();
@@ -1285,7 +1285,7 @@ __s32 _vender_get_param_otp_hynix(__u8 *para, __u32 count)
 	address[3] = 2;
 
 	_set_addr(address, 5);
-	cfg = NFC_SEND_ADR | (1 << 18);  // FIXME: define this flag
+	cfg = NFC_SEND_ADR | (1 << 18);  // (address_cycles - 1) << 16
 	_wait_cmdfifo_free();
 	NFC_WRITE_REG(NFC_REG_CMD, cfg);
 	_wait_cmd_finish();

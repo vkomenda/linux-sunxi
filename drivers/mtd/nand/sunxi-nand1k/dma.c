@@ -111,6 +111,5 @@ void dma_nand_config_start(int dma, int rw, unsigned int buff_addr, size_t len)
 int dma_nand_wait_finish(void)
 {
 	wait_event(DMA_wait, nanddma_completed_flag);
-    return 0;
+	return 0;
 }
-
