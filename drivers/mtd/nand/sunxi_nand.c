@@ -568,7 +568,7 @@ static void sunxi_set_nfc_pio(void)
 	pioc_handle = gpio_request_ex("nand_para", NULL);
 	if (debug) {
 		if (pioc_handle) {
-			printk("%s OK, handle %d\n", __FUNCTION__, pioc_handle);
+			printk("%s OK, handle 0x%x\n", __FUNCTION__, pioc_handle);
 		}
 		else {
 			printk("%s FAILURE\n", __FUNCTION__);

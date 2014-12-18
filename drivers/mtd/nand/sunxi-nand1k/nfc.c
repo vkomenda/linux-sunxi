@@ -50,7 +50,6 @@ static int dma_hdle = 0;
 static struct nand_ecclayout sunxi_ecclayout;
 static DECLARE_WAIT_QUEUE_HEAD(nand_rb_wait);
 static int program_column = -1, program_page = -1;
-static int sunxi_nand_read_page_addr = 0;
 
 // special initialisation-time mode for reading the OTP area
 static uint8_t otp_mode = 0;
@@ -199,8 +198,8 @@ static void sunxi_set_nand_clock(uint32_t nand_max_clock)
 	cfg |= (nand_clk_divid_ratio << CLK_DIV_RATIO_M_SHIFT) & CLK_DIV_RATIO_M_MASK;
 	writel(cfg, NAND_SCLK_CFG_REG);
 
-	DBG("AHB_GATING_REG0   %.8x\n", readl(AHB_GATING_REG0));
-	DBG("NAND_SCLK_CFG_REG %.8x\n", readl(NAND_SCLK_CFG_REG));
+	DBG("AHB_GATING_REG0   %.8x", readl(AHB_GATING_REG0));
+	DBG("NAND_SCLK_CFG_REG %.8x", readl(NAND_SCLK_CFG_REG));
 }
 
 static void release_nand_clock(void)
@@ -416,8 +415,8 @@ int check_ecc(int eblock_cnt)
 	for (i = 0; i < eblock_cnt; i++) {
 		if (cfg & (1<<i)) {
 			pr_err(pr_fmt("ECC status mask %x: "
-				      "Uncorrectable error at address %x sector %d\n"),
-			       cfg, sunxi_nand_read_page_addr, i);
+				      "Uncorrectable error in sector %d\n"),
+			       cfg, i);
 			return -1;
 		}
 	}
@@ -430,9 +429,8 @@ int check_ecc(int eblock_cnt)
 		for (j = 0; j < n; j++, cfg >>= 8) {
 			int bits = cfg & 0xff;
 			if (bits >= max_ecc_bit_cnt - 4) {
-				DBG("ECC limit %d/%d at %x:%d",
-				    bits, max_ecc_bit_cnt,
-				    sunxi_nand_read_page_addr, j);
+				DBG("ECC limit %d/%d in sector %d",
+				    bits, max_ecc_bit_cnt, j);
 				corrected++;
 			}
 		}
@@ -530,8 +528,6 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 				read_size = SZ_1K;
 			}
 		}
-		/* for ECC debugging purposes */
-		sunxi_nand_read_page_addr = page_addr;
 
 		if (read_buffer) {
 			//access NFC internal RAM by DMA bus
@@ -604,18 +600,15 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 		}
 		do_enable_random = 1;
 
-		if (write_buffer) {
-			//access NFC internal RAM by DMA bus
-			writel(readl(NFC_REG_CTL) | NFC_RAM_METHOD, NFC_REG_CTL);
-			dma_nand_config_start(dma_hdle, 1, (uint32_t)write_buffer, write_size);
-		}
-
+		//access NFC internal RAM by DMA bus
+		writel(readl(NFC_REG_CTL) | NFC_RAM_METHOD, NFC_REG_CTL);
+		dma_nand_config_start(dma_hdle, 1, (uint32_t)write_buffer, write_size);
 		// RAM0 is 1K size
 		byte_count = SZ_1K;
 		writel(0x00008510, NFC_REG_WCMD_SET);
 		cfg |= NFC_SEND_CMD2 | NFC_DATA_SWAP_METHOD | NFC_ACCESS_DIR;
 		cfg |= 2 << 30;
-		if (debug && column != 0) {
+		if (column != 0) {
 			DBG("cmdfunc program %d %d with %x %x %x", column, page_addr,
 			    write_buffer[0], write_buffer[1], write_buffer[2]);
 		}
@@ -633,7 +626,9 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 	case 0x17:
 	case 0x04:
 	case 0x19:
-		break;
+		if (otp_mode)
+			break;
+		// else unknown command
 	default:
 		pr_err(pr_fmt("%s: unknown command 0x%.2x\n"), __FUNCTION__, command);
 		return;
@@ -693,15 +688,14 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 
 	switch (command) {
 	case NAND_CMD_READ0:
+		// the OTP mode is switched off after a single read
+		otp_mode = 0;
 	case NAND_CMD_READOOB:
 		if (read_buffer)
 			dma_nand_wait_finish();
-		// the OTP mode is switched off after a single read
-		otp_mode = 0;
 		break;
 	case NAND_CMD_PAGEPROG:
-		if (write_buffer)
-			dma_nand_wait_finish();
+		dma_nand_wait_finish();
 		break;
 	}
 
@@ -901,7 +895,8 @@ static void set_pagesize(u32 size, struct save_sizes *save)
 
 	ctl = readl(NFC_REG_ECC_CTL);
 	save->ecc_ctl = ctl;
-	set_ecc_mode(8);
+	if (size == SZ_1K)
+		set_ecc_mode(8);
 
 	ctl = readl(NFC_REG_SPARE_AREA);
 	save->spare_area = ctl;
@@ -933,7 +928,7 @@ void nfc_read_set_pagesize(uint32_t page_addr, u32 size, void *buff)
 	set_pagesize(size, &save);
 
 	writel(readl(NFC_REG_CTL) | NFC_RAM_METHOD, NFC_REG_CTL);
-	dma_nand_config_start(dma_hdle, 0, (uint32_t)buff, SZ_1K); // FIXME: size
+	dma_nand_config_start(dma_hdle, 0, (uint32_t)buff, /* SZ_1K */ size); // FIXME: size
 
 	writel(page_addr << 16, NFC_REG_ADDR_LOW);
 	writel(page_addr >> 16, NFC_REG_ADDR_HIGH);
@@ -1295,7 +1290,7 @@ int nfc_second_init(struct mtd_info *mtd)
 	nfc_cmdfunc(mtd, NAND_CMD_READID, 0, -1);
 	for (i = 0; i < 8; i++)
 		id[i] = nfc_read_byte(mtd);
-	DBG("nand chip id: %x %x %x %x %x %x %x %x\n",
+	DBG("nand chip id: %x %x %x %x %x %x %x %x",
 	    id[0], id[1], id[2], id[3],
 	    id[4], id[5], id[6], id[7]);
 
@@ -1311,7 +1306,7 @@ int nfc_second_init(struct mtd_info *mtd)
 		}
 		if (find) {
 			chip_param = &nand_chip_param[i];
-			DBG("find nand chip in sunxi database\n");
+			DBG("found chip in Sunxi database");
 			break;
 		}
 	}
@@ -1365,16 +1360,12 @@ int nfc_second_init(struct mtd_info *mtd)
 	disable_random();
 
 	// setup ECC layout
+	nand->ecc.bytes = 0;
 	sunxi_ecclayout.eccbytes = 0;
 	sunxi_ecclayout.oobavail = mtd->writesize / 1024 * 4 - 2;
 	sunxi_ecclayout.oobfree->offset = 1;
 	sunxi_ecclayout.oobfree->length = mtd->writesize / 1024 * 4 - 2;
 	nand->ecc.layout = &sunxi_ecclayout;
-
-	// FIXME: remove the internal configuration database
-	nand->ecc.bytes = 0;
-	nand->ecc.strength = 40;
-	nand->ecc.size = SZ_1K;
 
 	// uninitialise the temporary DMA buffer
 	if (read_buffer) {
@@ -1409,8 +1400,10 @@ int nfc_second_init(struct mtd_info *mtd)
 	read_buffer_dma = dma_map_single(NULL, read_buffer, buffer_size, DMA_FROM_DEVICE);
 	write_buffer_dma = dma_map_single(NULL, write_buffer, buffer_size, DMA_TO_DEVICE);
 
-	DBG("OOB size = %u, page size = %u, block size = %u, total size = %llu\n",
-	    mtd->oobsize, mtd->writesize, mtd->erasesize, mtd->size);
+	DBG("OOB size %u, page size %u, block size %u, total size %llu\n"
+	    "DMA buffer size %u (read and write)",
+	    mtd->oobsize, mtd->writesize, mtd->erasesize, mtd->size,
+	    buffersize);
 
 	// test command
 	//test_nfc(mtd);
@@ -1418,6 +1411,7 @@ int nfc_second_init(struct mtd_info *mtd)
 	if (debug) {
 		print_page(mtd, 0, 1);
 		print_set_pagesize(mtd, SZ_1K, 0);
+		print_page(mtd, 128, 1);
 	}
 //	print_set_pagesize(mtd, SZ_2K, 0);
 //	print_set_pagesize(mtd, SZ_4K, 0);
@@ -1434,8 +1428,20 @@ out:
 	return err;
 }
 
+void nfc_disable(void)
+{
+	uint32_t cfg;
+
+	DBG("");
+
+	cfg = readl(NFC_REG_CTL);
+	cfg &= ~NFC_EN;
+	writel(cfg, NFC_REG_CTL);
+}
+
 void nfc_exit(struct mtd_info *mtd)
 {
+	nfc_disable();
 	if (read_buffer) {
 		dma_unmap_single(NULL, read_buffer_dma, buffer_size, DMA_FROM_DEVICE);
 		kfree(read_buffer);

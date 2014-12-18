@@ -497,14 +497,9 @@ static int create_bbt(struct mtd_info *mtd, uint8_t *buf,
 	int startblock;
 	loff_t from;
 
-	pr_info("Scanning device for bad blocks\n"
-		" chip %d"
-		" chip size %lld"
-		" bbt_erase_shift %d"
-		"\n",
-		chip,
-		this->chipsize,
-		this->bbt_erase_shift);
+	pr_info("Scanning device for bad blocks:"
+		" chip %d, chip size %lld, bbt_erase_shift %d\n",
+		chip, this->chipsize, this->bbt_erase_shift);
 
 	/* FIXME: numpages is redundant if both NAND_BBT_SCANLASTPAGE and
 	 * NAND_BBT_SCAN2NDPAGE bits are set. */
@@ -529,15 +524,13 @@ static int create_bbt(struct mtd_info *mtd, uint8_t *buf,
 		from = (loff_t)startblock << this->bbt_erase_shift;
 	}
 
-	pr_info("numblocks %d, startblock %d\n", numblocks, startblock);
-
 	/* Recalculate the starting address only when the start page is not to
 	 * be scanned. */
 	if ( (bd->options & NAND_BBT_SCANLASTPAGE) &&
 	    !(bd->options & NAND_BBT_SCAN2NDPAGE))
 		from += mtd->erasesize - (mtd->writesize * numpages);
 
-	pr_info("numblocks 0x%x, startblock 0x%x, from 0x%llx\n",
+	pr_info("numblocks %d, startblock %d, from %lld\n",
 		numblocks, startblock, from);
 
 	for (i = startblock; i < numblocks; i++) {
