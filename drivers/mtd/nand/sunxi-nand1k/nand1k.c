@@ -42,7 +42,7 @@ extern int debug;
  * The size of the read/write buffer enough to fit either the 1k of main data or
  * the whole of the OOB area.
  */
-#define RW_BUFFER_SIZE SZ_4K
+#define RW_BUFFER_SIZE SZ_2K
 
 static struct class *dev_class;
 static int nand1k_major;
@@ -69,7 +69,7 @@ static int nand1k_read(struct file *filp, char __user *buff, size_t count, loff_
 	if (offs > 128 * SZ_1K || offs < 0 ||
 		count < 0 || count > 128 * SZ_1K ||
 		offs + count > 128 * SZ_1K) {
-		printk(KERN_ERR "nand1k is restricted to access the first 128 1K pages\n");
+		pr_err(pr_fmt("nand1k is restricted to access the first 128 1K pages\n"));
 		return -EINVAL;
 	}
 
@@ -81,8 +81,8 @@ static int nand1k_read(struct file *filp, char __user *buff, size_t count, loff_
 			len = count - size;
 		nfc_read_set_pagesize(page, SZ_1K, rw_buff);
 		ret = copy_to_user(buff, rw_buff + offset, len);
-		printk(KERN_INFO "nand1k read page=%x offset=%x len=%x\n", page, offset, len);
-		printk(KERN_INFO "nand1k %x %x %x %x %x %x %x %x\n",
+		DBG("nand1k read page=%x offset=%x len=%x", page, offset, len);
+		DBG("nand1k %x %x %x %x %x %x %x %x",
 			   rw_buff[0], rw_buff[1], rw_buff[2], rw_buff[3],
 			   rw_buff[4], rw_buff[5], rw_buff[6], rw_buff[7]);
 		size += len - ret;
@@ -102,17 +102,17 @@ static int nand1k_write(struct file *filp, const char __user *buff, size_t count
 	uint32_t ret;
 	size_t size = 0;
 
-	printk(KERN_INFO "nand1k write off=%llx count=%x\n", offs, count);
+	DBG("nand1k write off=%llx count=%x", offs, count);
 
 	if (offs > 128 * SZ_1K || offs < 0 ||
 		count < 0 || count > 128 * SZ_1K ||
 		offs + count > 128 * SZ_1K) {
-		printk(KERN_ERR "nand1k is restricted to access the first 128 1K pages\n");
+		pr_err(pr_fmt("nand1k is restricted to access the first 128 1K pages"));
 		return -EINVAL;
 	}
 
 	if ((offs & (SZ_1K - 1)) || (count & (SZ_1K - 1))) {
-		printk(KERN_ERR "nand1k can't write non-1K-aligned data\n");
+		pr_err(pr_fmt("nand1k can't write non-1K-aligned data"));
 		return -EINVAL;
 	}
 
@@ -159,21 +159,18 @@ int nand1k_init(void)
 
 	rw_buff = kzalloc(RW_BUFFER_SIZE, GFP_KERNEL);
 	if (!rw_buff) {
-		printk(KERN_ERR "allocate read buffer fail\n");
 		err = -ENOMEM;
 		goto error0;
 	}
 
 	dev_class = class_create(THIS_MODULE, DEV_CLASS_NAME);
 	if (IS_ERR(dev_class)) {
-		printk(KERN_ERR "Create device class error\n");
 		err = PTR_ERR(dev_class);
 		goto error1;
 	}
 
 	nand1k_major = register_chrdev(0, CHAR_DEV_NAME, &nand1k_fops);
 	if (nand1k_major < 0) {
-		printk(KERN_ERR "register_chrdev fail\n");
 		err = nand1k_major;
 		goto error2;
 	}
@@ -181,7 +178,6 @@ int nand1k_init(void)
     // Send uevents to udev, so it'll create /dev nodes
 	dev = device_create(dev_class, NULL, MKDEV(nand1k_major, 0), NULL, CHAR_DEV_NAME);
 	if (IS_ERR(dev)) {
-		printk(KERN_ERR "device_create fail\n");
 		err = PTR_ERR(dev);
 		goto error3;
 	}

@@ -3987,10 +3987,13 @@ static int nand_get_bits_per_cell(u8 cellinfo)
 /*
  * Parse the Hynix ID size byte and calculate the relevant physical parameters.
  */
-static int parse_hynix_sizes(struct mtd_info *mtd, u8 sz)
+static int parse_hynix_sizes(struct mtd_info *mtd, struct nand_chip* chip,
+			     u8 id_data[8])
 {
-	u8 oob_code, erase_code;
-	u8 sizes = sz;
+	u8 density   = id_data[1];
+	u8 sizes     = id_data[3];
+	u8 plane_ecc = id_data[4];
+	u8 oob_code, erase_code, ecc;
 
 	mtd->writesize = 2048 << (sizes & 0x03);
 	sizes >>= 2;
@@ -4006,45 +4009,73 @@ static int parse_hynix_sizes(struct mtd_info *mtd, u8 sz)
 	if (oob_code >= 0x4 || erase_code < 0x4)
 		return -EINVAL;
 
-	switch (oob_code) {
-	case 0:
-		mtd->oobsize = 2048; break;
-	case 1:
-		mtd->oobsize = 1664; break;
-	case 2:
-		mtd->oobsize = 1024; break;
-	case 3:
-	default:
-		mtd->oobsize = 640;  break;
+	if (density == 0xde /* 8GiB */ ||
+	    density == 0xd7 /* 4GiB */) {
+		switch (oob_code) {
+		case 0:
+			mtd->oobsize = 2048; break;
+		case 1:
+			mtd->oobsize = 1664; break;
+		case 2:
+			mtd->oobsize = 1024; break;
+		case 3:
+		default:
+			mtd->oobsize = 640;  break;
+		}
 	}
-/* For older Hynix chips:
-	switch (oob_code) {
-	case 0:
-		mtd->oobsize = 128;
-		break;
-	case 1:
-		mtd->oobsize = 224;
-		break;
-	case 2:
-		mtd->oobsize = 448;
-		break;
-	case 3:
-		mtd->oobsize = 64;
-		break;
-	case 4:
-		mtd->oobsize = 32;
-		break;
-	case 5:
-		mtd->oobsize = 16;
-		break;
-	default:
-		mtd->oobsize = 640;
-		break;
+	else { // for older Hynix chips: 0xd5?, 0xd3?, 0xdc?
+		switch (oob_code) {
+		case 0:
+			mtd->oobsize = 128;
+			break;
+		case 1:
+			mtd->oobsize = 224;
+			break;
+		case 2:
+			mtd->oobsize = 448;
+			break;
+		case 3:
+		default:
+			mtd->oobsize = 64;
+			break;
+		case 4:
+			mtd->oobsize = 32;
+			break;
+		case 5:
+			mtd->oobsize = 16;
+			break;
+		}
 	}
-*/
 	mtd->erasesize = 0x100000 << (erase_code & 0x3);
 
-	DBG("erasesize %d", mtd->erasesize);
+	ecc = (plane_ecc >> 4) & 0x7;
+	switch (ecc) {
+	case 0:
+	default:
+		chip->ecc_strength_ds = 0;
+		break;
+	case 1:
+		chip->ecc_strength_ds = 4;
+		break;
+	case 2:
+		chip->ecc_strength_ds = 24;
+		break;
+	case 3:
+		chip->ecc_strength_ds = 32;
+		break;
+	case 4:
+		chip->ecc_strength_ds = 40;
+		break;
+	case 5:
+		chip->ecc_strength_ds = 50;
+		break;
+	case 6:
+		chip->ecc_strength_ds = 60;
+		break;
+	}
+	chip->ecc_step_ds  = SZ_1K;
+	chip->ecc.strength = chip->ecc_strength_ds;
+	chip->ecc.size     = chip->writesize;
 
 	return 0;
 }
@@ -4114,7 +4145,7 @@ static void nand_decode_ext_id(struct mtd_info *mtd, struct nand_chip *chip,
 		*busw = 0;
 	} else if (id_len == 6 && id_data[0] == NAND_MFR_HYNIX &&
 			!nand_is_slc(chip)) {
-		parse_hynix_sizes(mtd, id_data[3]);
+		parse_hynix_sizes(mtd, chip, id_data);
 		*busw = 0;
 	} else {
 		/* Calc pagesize */
@@ -4386,7 +4417,7 @@ ident_done:
 
 	chip->bbt_erase_shift = chip->phys_erase_shift =
 		ffs(mtd->erasesize) - 1;
-	DBG("erase shift %d derived from erase size %d\n",
+	DBG("erase shift %d derived from erase size %d",
 	    chip->bbt_erase_shift, mtd->erasesize);
 
 	if (chip->chipsize & 0xffffffff)
