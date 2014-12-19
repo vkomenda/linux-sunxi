@@ -4075,7 +4075,7 @@ static int parse_hynix_sizes(struct mtd_info *mtd, struct nand_chip* chip,
 	}
 	chip->ecc_step_ds  = SZ_1K;
 	chip->ecc.strength = chip->ecc_strength_ds;
-	chip->ecc.size     = chip->writesize;
+	chip->ecc.size     = mtd->writesize;
 
 	return 0;
 }
