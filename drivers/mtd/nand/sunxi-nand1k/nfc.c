@@ -1403,7 +1403,7 @@ int nfc_second_init(struct mtd_info *mtd)
 	DBG("OOB size %u, page size %u, block size %u, total size %llu\n"
 	    "DMA buffer size %u (read and write)",
 	    mtd->oobsize, mtd->writesize, mtd->erasesize, mtd->size,
-	    buffersize);
+	    buffer_size);
 
 	// test command
 	//test_nfc(mtd);
