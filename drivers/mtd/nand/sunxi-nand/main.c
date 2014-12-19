@@ -19,6 +19,7 @@
 
 #include <linux/module.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/platform_device.h>
 #include <linux/mtd/mtd.h>
@@ -70,6 +71,13 @@ static int __devinit nand_probe(struct platform_device *pdev)
 		goto out_nfc_exit;
 	}
 
+	// register IRQ
+	if ((err = request_irq(SW_INT_IRQNO_NAND, nfc_interrupt_handler,
+			       IRQF_DISABLED, "NFC", &info->mtd)) < 0) {
+		ERR_INFO("request IRQ fail\n");
+		goto out_nfc_exit;
+	}
+
 	// second phase scan
 	if ((err = nand_scan_tail(&info->mtd)) < 0) {
 		ERR_INFO("nand scan tail fail\n");
@@ -101,6 +109,7 @@ static int __devexit nand_remove(struct platform_device *pdev)
 	platform_set_drvdata(pdev, NULL);
 	mtd_device_unregister(&info->mtd);
 	nand_release(&info->mtd);
+	free_irq(SW_INT_IRQNO_NAND, &info->mtd);
 	nfc_exit(&info->mtd);
 	kfree(info);
 	return 0;
@@ -204,7 +213,3 @@ static void __exit nand_exit(void)
 
 module_init(nand_init);
 module_exit(nand_exit);
-
-
-
-
