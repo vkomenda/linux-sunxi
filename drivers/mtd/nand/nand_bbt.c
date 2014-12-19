@@ -508,7 +508,11 @@ static int create_bbt(struct mtd_info *mtd, uint8_t *buf,
 		chip, this->chipsize, this->bbt_erase_shift);
 
 	/* FIXME: numpages is redundant if both NAND_BBT_SCANLASTPAGE and
-	 * NAND_BBT_SCAN2NDPAGE bits are set. */
+	 * NAND_BBT_SCAN2NDPAGE bits are set.
+	 *
+	 * NAND_BBT_SCANALLPAGES might be broken as a result of fixing
+	 * bbt_erase_shift (was decremented by 1 and causing an error).
+	 */
 	if (bd->options & NAND_BBT_SCANALLPAGES)
 		len = 1 << (this->bbt_erase_shift - this->page_shift);
 	else if (bd->options & NAND_BBT_SCAN2NDPAGE)
@@ -527,11 +531,7 @@ static int create_bbt(struct mtd_info *mtd, uint8_t *buf,
 	}
 
 	if (chip == -1) {
-		/*
-		 * Note that numblocks is 2 * (real numblocks) here, see i+=2
-		 * below as it makes shifting and masking less painful
-		 */
-		numblocks = mtd->size >> (this->bbt_erase_shift - 1);
+		numblocks = mtd->size >> this->bbt_erase_shift;
 		startblock = 0;
 		from = 0;
 	} else {
@@ -540,10 +540,10 @@ static int create_bbt(struct mtd_info *mtd, uint8_t *buf,
 			       chip + 1, this->numchips);
 			return -EINVAL;
 		}
-		numblocks = this->chipsize >> (this->bbt_erase_shift - 1);
+		numblocks = this->chipsize >> this->bbt_erase_shift;
 		startblock = chip * numblocks;
 		numblocks += startblock;
-		from = (loff_t)startblock << (this->bbt_erase_shift - 1);
+		from = (loff_t)startblock << this->bbt_erase_shift;
 	}
 
 	if ( (bd->options & NAND_BBT_SCANLASTPAGE) &&

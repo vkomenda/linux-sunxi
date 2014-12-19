@@ -3132,8 +3132,7 @@ static struct nand_flash_dev *nand_get_flash_type(struct mtd_info *mtd,
 			mtd->erasesize = (128 * 1024) <<
 				(((extid >> 1) & 0x04) | (extid & 0x03));
 			busw = 0;
-		} else if (id_data[0] == NAND_MFR_HYNIX &&
-			   id_data[5] != 0xff && id_data[6] == 0xff) {
+		} else if (id_data[0] == NAND_MFR_HYNIX) {
 			parse_hynix_sizes(mtd, chip, id_data);
 			busw = 0;
 		} else {
