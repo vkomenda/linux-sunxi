@@ -2794,12 +2794,13 @@ static int nand_do_write_ops(struct mtd_info *mtd, loff_t to,
 		return 0;
 
 	/* Reject writes, which are not page aligned */
-	if (NOTALIGNED(to) || NOTALIGNED(ops->len)) {
-		pr_notice("%s: attempt to write non page aligned data\n",
-			   __func__);
-		return -EINVAL;
-	}
+//	if (NOTALIGNED(to) || NOTALIGNED(ops->len)) {
+//		pr_notice("%s: attempt to write non page aligned data\n",
+//			   __func__);
+//		return -EINVAL;
+//	}
 
+	/* Accept writes that are not page aligned. */
 	column = to & (mtd->writesize - 1);
 
 	chipnr = (int)(to >> chip->chip_shift);
