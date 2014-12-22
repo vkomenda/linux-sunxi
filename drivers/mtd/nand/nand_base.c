@@ -360,9 +360,7 @@ static int nand_block_bad(struct mtd_info *mtd, loff_t ofs, int getchip)
 			DBG("bad block marker %.2x on page %x", bad, page);
 
 		if (likely(chip->badblockbits == 8))
-//			res = bad != 0xFF;
-			res = !!bad;       // temporary patch for removal of
-					   // blocks marked by the AW driver
+			res = bad != 0xFF;
 		else
 			res = hweight8(bad) < chip->badblockbits;
 

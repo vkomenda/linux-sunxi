@@ -468,7 +468,8 @@ static int scan_first_last_pages(struct mtd_info *mtd, loff_t offs,
 		}
 
 		/* Check the first byte of the spare area of the page. */
-		if (buf[0] != 0xFF) {
+//		if (buf[0] != 0xFF) {
+		if (!buf[0]) {   // temporary patch to remove AW driver trace
 			ret = i + 1;
 			pr_info("Bad BB marker #%d at offset %012llx: %.2x (%.2x)\n",
 				ret, page_offsets[i], buf[0], buf[1]);
