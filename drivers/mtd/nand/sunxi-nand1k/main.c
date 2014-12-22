@@ -78,7 +78,8 @@ static struct mtd_partition sunxi_mtd_partitions[] = {
 	{
 		.name   = "root",
 		.offset = 108 * SZ_1M,
-		.size   = 8 * (uint64_t) SZ_1G - 108 * (uint64_t) SZ_1M,
+		// leave the last 4 erase blocks reserved, e.g., for a BBT
+		.size   = 8 * (uint64_t) SZ_1G - 112 * (uint64_t) SZ_1M,
 	},
 };
 
