@@ -710,10 +710,10 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 		select_rb(0);
 		while (!check_rb_ready(0));
 		// wait rb1 ready
-		select_rb(1);
-		while (!check_rb_ready(1));
+//		select_rb(1);
+//		while (!check_rb_ready(1));
 		// select rb 0 back
-		select_rb(0);
+//		select_rb(0);
 		break;
 	case NAND_CMD_READ0:
 		if (read_buffer) {

@@ -2,6 +2,7 @@
  * main.c
  *
  * Copyright (C) 2013 Qiang Yu <yuq825@gmail.com>
+ *               2014 Vladimir Komendantskiy
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -224,32 +225,28 @@ static int __init nand_init(void)
 
 	DBG("");
 
-    if (script_parser_fetch("nand_para", "nand_used", &nand_used, sizeof(int)))
-    	ERR_INFO("nand init fetch emac using configuration failed\n");
+	if (script_parser_fetch("nand_para", "nand_used", &nand_used, sizeof(int)))
+		pr_err(pr_fmt("FEX script parse error\n"));
 
-    if(nand_used == 0) {
-        DBG_INFO("nand driver is disabled \n");
-        return 0;
-    }
-
-	DBG_INFO("nand driver, init.\n");
+	if(nand_used == 0) {
+		DBG("nand driver is disabled");
+		return 0;
+	}
 
 	if ((err = platform_driver_register(&plat_driver)) != 0) {
-		ERR_INFO("platform_driver_register fail \n");
+		pr_err(pr_fmt("platform driver registration failure\n"));
 		return err;
 	}
-	DBG_INFO("nand driver, ok.\n");
 
 	// add an NFC, may be should be done by platform driver
 	if ((err = platform_device_register(&plat_device)) < 0) {
-		ERR_INFO("platform_device_register fail\n");
+		pr_err(pr_fmt("platform device registration failure\n"));
 		return err;
 	}
-	DBG_INFO("nand device, ok.\n");
 
-	if (nand1k_init()) {
-		ERR_INFO("nand1k module init fail\n");
-	}
+	if (nand1k_init())
+		// consider nand1k a non-critical component and continue
+		pr_err(pr_fmt("nand1k device registration failure\n"));
 
 	return 0;
 }
@@ -261,17 +258,16 @@ static void __exit nand_exit(void)
 	DBG("");
 
 	if (script_parser_fetch("nand_para", "nand_used", &nand_used, sizeof(int)))
-		ERR_INFO("nand init fetch emac using configuration failed\n");
+		pr_err(pr_fmt("FEX script parse error\n"));
 
 	if(nand_used == 0) {
-		DBG_INFO("nand driver is disabled \n");
+		DBG("nand driver is disabled");
 		return;
 	}
 
 	nand1k_exit();
 	platform_device_unregister(&plat_device);
 	platform_driver_unregister(&plat_driver);
-	DBG_INFO("nand driver : bye bye\n");
 }
 
 module_init(nand_init);
