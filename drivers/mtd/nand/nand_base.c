@@ -326,7 +326,8 @@ static int nand_block_bad(struct mtd_info *mtd, loff_t ofs, int getchip)
 	struct nand_chip *chip = mtd->priv;
 	u16 bad;
 
-	if (chip->bbt_options & NAND_BBT_SCANLASTPAGE)
+	if ( (chip->bbt_options & NAND_BBT_SCANLASTPAGE) &&
+	    !(chip->bbt_options & NAND_BBT_SCAN2NDPAGE))
 		ofs += mtd->erasesize - mtd->writesize;
 
 	page = (int)(ofs >> chip->page_shift) & chip->pagemask;
@@ -355,11 +356,22 @@ static int nand_block_bad(struct mtd_info *mtd, loff_t ofs, int getchip)
 			bad = chip->read_byte(mtd);
 		}
 
+		if (bad != 0xFF)
+			DBG("bad block marker %.2x on page %x", bad, page);
+
 		if (likely(chip->badblockbits == 8))
-			res = bad != 0xFF;
+//			res = bad != 0xFF;
+			res = !!bad;       // temporary patch for removal of
+					   // blocks marked by the AW driver
 		else
 			res = hweight8(bad) < chip->badblockbits;
-		ofs += mtd->writesize;
+		if (chip->bbt_options & (NAND_BBT_SCANLASTPAGE |
+					 NAND_BBT_SCAN2NDPAGE))
+			// If first and last page are scanned, do the last page
+			// of the erase block next.
+			ofs += mtd->erasesize - mtd->writesize;
+		else
+			ofs += mtd->writesize;
 		page = (int)(ofs >> chip->page_shift) & chip->pagemask;
 		i++;
 	} while (!res && i < 2 && (chip->bbt_options & NAND_BBT_SCAN2NDPAGE));

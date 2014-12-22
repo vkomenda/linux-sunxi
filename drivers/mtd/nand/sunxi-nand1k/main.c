@@ -23,6 +23,7 @@
 #include <linux/interrupt.h>
 #include <linux/platform_device.h>
 #include <linux/mtd/mtd.h>
+#include <linux/mtd/partitions.h>
 #include <linux/mtd/nand.h>
 #include <plat/sys_config.h>
 
@@ -37,6 +38,48 @@ MODULE_AUTHOR("yuq");
 extern irqreturn_t nfc_interrupt_handler(int irq, void *dev_id);
 
 extern int debug;
+
+static const char* const sunxi_mtd_part_types[] = {
+	"cmdlinepart",
+	NULL
+};
+
+/*
+ * Default partitions that are set up if the kernel command-line "mtdparts"
+ * option did not parse. Chip size is fixed to 8GiB.
+ */
+static struct mtd_partition sunxi_mtd_partitions[] = {
+	{
+		.name   = "U-Boot",
+		.offset = SZ_4M,
+		.size   = SZ_4M,
+	},
+	{
+		.name   = "env",
+		.offset = SZ_8M,
+		.size   = SZ_4M,
+	},
+	{
+		.name   = "packimg",
+		.offset = 12 * SZ_1M,
+		.size   = SZ_16M,
+	},
+	{
+		.name   = "kernel",
+		.offset = 28 * SZ_1M,
+		.size   = SZ_16M,
+	},
+	{
+		.name   = "initramfs",
+		.offset = 44 * SZ_1M,
+		.size   = SZ_64M,
+	},
+	{
+		.name   = "root",
+		.offset = 108 * SZ_1M,
+		.size   = 8 * (uint64_t) SZ_1G - 108 * (uint64_t) SZ_1M,
+	},
+};
 
 struct sunxi_nand_info {
 	struct mtd_info mtd;
@@ -82,18 +125,22 @@ static int __devinit nand_probe(struct platform_device *pdev)
 	// register IRQ
 	if ((err = request_irq(SW_INT_IRQNO_NAND, nfc_interrupt_handler,
 			       IRQF_DISABLED, "NFC", &info->mtd)) < 0) {
-		ERR_INFO("request IRQ fail\n");
+		pr_err(pr_fmt("IRQ request ERROR %d\n"), err);
 		goto out_nfc_exit;
 	}
 
 	// second phase scan
 	if ((err = nand_scan_tail(&info->mtd)) < 0) {
-		ERR_INFO("nand_scan_tail ERROR %d\n", err);
+		pr_err(pr_fmt("nand_scan_tail ERROR %d\n"), err);
 		goto out_irq;
 	}
 
-	if ((err = mtd_device_parse_register(&info->mtd, NULL, NULL, NULL, 0)) < 0) {
-		ERR_INFO("register mtd device fail\n");
+	err = mtd_device_parse_register(&info->mtd, sunxi_mtd_part_types,
+					NULL,
+					sunxi_mtd_partitions,
+					ARRAY_SIZE(sunxi_mtd_partitions));
+	if (err < 0) {
+		pr_err(pr_fmt("MTD register ERROR %d\n"), err);
 		goto out_release_nand;
 	}
 
