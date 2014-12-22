@@ -415,15 +415,20 @@ static int nand_default_block_markbad(struct mtd_info *mtd, loff_t ofs)
 	ops.mode = MTD_OPS_PLACE_OOB;
 
 	/* Write to first/last page(s) if necessary */
-	if (chip->bbt_options & NAND_BBT_SCANLASTPAGE)
+	if ( (chip->bbt_options & NAND_BBT_SCANLASTPAGE) &&
+	    !(chip->bbt_options & NAND_BBT_SCAN2NDPAGE))
 		ofs += mtd->erasesize - mtd->writesize;
 	do {
 		res = nand_do_write_oob(mtd, ofs, &ops);
 		if (!ret)
 			ret = res;
 
+		if (chip->bbt_options & (NAND_BBT_SCANLASTPAGE |
+					 NAND_BBT_SCAN2NDPAGE))
+			ofs += mtd->erasesize - mtd->writesize;
+		else
+			ofs += mtd->writesize;
 		i++;
-		ofs += mtd->writesize;
 	} while ((chip->bbt_options & NAND_BBT_SCAN2NDPAGE) && i < 2);
 
 	return ret;

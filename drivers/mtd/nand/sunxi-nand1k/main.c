@@ -95,7 +95,7 @@ static int __devinit nand_probe(struct platform_device *pdev)
 	DBG("");
 
 	if ((info = kzalloc(sizeof(*info), GFP_KERNEL)) == NULL) {
-		ERR_INFO("alloc nand info fail\n");
+		DBG("no memory");
 		err = -ENOMEM;
 		goto out;
 	}
@@ -108,8 +108,6 @@ static int __devinit nand_probe(struct platform_device *pdev)
 		pr_err(pr_fmt("first init ERROR %d\n"), err);
 		goto out_free_info;
 	}
-
-	DBG("scan chip ID");
 
 	// first scan to find the device and get the page size
 	if ((err = nand_scan_ident(&info->mtd, 1, NULL)) < 0) {
