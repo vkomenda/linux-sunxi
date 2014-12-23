@@ -32,17 +32,13 @@
 extern int debug;
 
 //////////////////////////////////////////////////////////////////////////////
-// Linux charactor device interface
+// Linux character device interface
 //////////////////////////////////////////////////////////////////////////////
 
 #define DEV_CLASS_NAME "nand1k"
 #define CHAR_DEV_NAME "nand1k"
 
-/*
- * The size of the read/write buffer enough to fit either the 1k of main data or
- * the whole of the OOB area.
- */
-#define RW_BUFFER_SIZE SZ_2K
+#define RW_BUFFER_SIZE SZ_1K
 
 static struct class *dev_class;
 static int nand1k_major;
@@ -64,11 +60,11 @@ static int nand1k_read(struct file *filp, char __user *buff, size_t count, loff_
 	uint32_t len, ret, page, offset;
 	size_t size = 0;
 
-	printk(KERN_INFO "nand1k read off=%llx count=%x\n", offs, count);
+	DBG("offset %llx count %x", offs, count);
 
 	if (offs > 128 * SZ_1K || offs < 0 ||
-		count < 0 || count > 128 * SZ_1K ||
-		offs + count > 128 * SZ_1K) {
+	    count < 0 || count > 128 * SZ_1K ||
+	    offs + count > 128 * SZ_1K) {
 		pr_err(pr_fmt("nand1k is restricted to access the first 128 1K pages\n"));
 		return -EINVAL;
 	}
@@ -81,8 +77,8 @@ static int nand1k_read(struct file *filp, char __user *buff, size_t count, loff_
 			len = count - size;
 		nfc_read_set_pagesize(page, SZ_1K, rw_buff);
 		ret = copy_to_user(buff, rw_buff + offset, len);
-		DBG("nand1k read page=%x offset=%x len=%x", page, offset, len);
-		DBG("nand1k %x %x %x %x %x %x %x %x",
+		DBG("pg %x offset %x len %x", page, offset, len);
+		DBG("read %.2x %.2x %.2x %.2x %.2x %.2x %.2x %.2x...",
 			   rw_buff[0], rw_buff[1], rw_buff[2], rw_buff[3],
 			   rw_buff[4], rw_buff[5], rw_buff[6], rw_buff[7]);
 		size += len - ret;
@@ -102,11 +98,11 @@ static int nand1k_write(struct file *filp, const char __user *buff, size_t count
 	uint32_t ret;
 	size_t size = 0;
 
-	DBG("nand1k write off=%llx count=%x", offs, count);
+	DBG("offset %llx count %x", offs, count);
 
 	if (offs > 128 * SZ_1K || offs < 0 ||
-		count < 0 || count > 128 * SZ_1K ||
-		offs + count > 128 * SZ_1K) {
+	    count < 0 || count > 128 * SZ_1K ||
+	    offs + count > 128 * SZ_1K) {
 		pr_err(pr_fmt("nand1k is restricted to access the first 128 1K pages"));
 		return -EINVAL;
 	}

@@ -55,16 +55,16 @@ static int program_column = -1, program_page = -1;
 static uint8_t otp_mode = 0;
 
 unsigned int hwecc_switch = 1;
-module_param(hwecc_switch, uint, 1);
-MODULE_PARM_DESC(hwecc_switch, "hardware ECC switch, 1=on, 0=off");
+module_param(hwecc_switch, uint, 0);
+MODULE_PARM_DESC(hwecc_switch, "hardware ECC switch: 1=on, 0=off");
 
 unsigned int bbt_use_flash = 0;
 module_param(bbt_use_flash, uint, 0);
-MODULE_PARM_DESC(bbt_use_flash, "use flash bad block table, 1=use, 0=not");
+MODULE_PARM_DESC(bbt_use_flash, "flash bad block table placement: 1=flash, 0=RAM");
 
 unsigned int random_switch = 1;
-module_param(random_switch, uint, 1);
-MODULE_PARM_DESC(random_switch, "random read/write switch, 1=on, 0=off");
+module_param(random_switch, uint, 0);
+MODULE_PARM_DESC(random_switch, "random read/write switch: 1=on, 0=off");
 
 unsigned int debug = 0;
 module_param(debug, uint, 0);
@@ -327,13 +327,14 @@ static void enable_random(uint32_t page)
 
 	if (random_switch) {
 		uint32_t ctl;
+
+		DBG("");
 		ctl = readl(NFC_REG_ECC_CTL);
 		ctl |= NFC_RANDOM_EN;
 		ctl &= ~NFC_RANDOM_DIRECTION;
 		ctl &= ~NFC_RANDOM_SEED;
 		ctl |= ((uint32_t)random_seed[page % 128] << 16);
 		writel(ctl, NFC_REG_ECC_CTL);
-//		DBG("+random");
 	}
 }
 
@@ -341,10 +342,11 @@ static void disable_random(void)
 {
 	if (random_switch) {
 		uint32_t ctl;
+
+		DBG("");
 		ctl = readl(NFC_REG_ECC_CTL);
 		ctl &= ~NFC_RANDOM_EN;
 		writel(ctl, NFC_REG_ECC_CTL);
-//		DBG("-random");
 	}
 }
 
@@ -363,8 +365,6 @@ static void enable_ecc(int pipline)
 		else
 			cfg |=   1 << 4;
 
-		//cfg |= (1 << 1); 16 bit ecc
-
 		cfg |= NFC_ECC_EN;
 		writel(cfg, NFC_REG_ECC_CTL);
 //		DBG("+ecc");
@@ -379,7 +379,7 @@ static void set_ecc_mode(int mode)
 		ctl &= ~NFC_ECC_MODE;
 		ctl |= mode << NFC_ECC_MODE_SHIFT;
 		writel(ctl, NFC_REG_ECC_CTL);
-//		DBG("ecc mode %d", mode);
+		DBG("%d", mode);
 	}
 }
 
@@ -479,10 +479,18 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 
 	wait_cmdfifo_free();
 
-	// switch to AHB
-	writel(readl(NFC_REG_CTL) & ~NFC_RAM_METHOD, NFC_REG_CTL);
+	// switch to AHB; should not be done unless DMA has been initialised
+	if (read_buffer)
+		writel(readl(NFC_REG_CTL) & ~NFC_RAM_METHOD, NFC_REG_CTL);
 
 	switch (command) {
+	case NAND_CMD_NONE: // used to set up RR
+		if (column) {
+			addr_cycle = 1;
+			byte_count = 1;
+			wait_rb_flag = 1;
+		}
+		break;
 	case NAND_CMD_RESET:
 	case NAND_CMD_ERASE2:
 		break;
@@ -491,12 +499,12 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 		// read 8 byte ID
 		byte_count = 8;
 		break;
-	case NAND_CMD_PARAM:
+	case NAND_CMD_PARAM:  // called during ONFI and JEDEC config requests
 		addr_cycle = 1;
 		byte_count = SZ_1K;
 		wait_rb_flag = 1;
 		break;
-	case NAND_CMD_RNDOUT:
+	case NAND_CMD_RNDOUT: // no calls have been logged; byte_count looks wrong
 		addr_cycle = 2;
 		writel(0xE0, NFC_REG_RCMD_SET);
 		byte_count = mtd->oobsize;
@@ -523,8 +531,8 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 				//DBG_INFO("cmdfunc read %d %d\n", column, page_addr);
 			}
 			else {
-				// Hynix initialisation-time read from the OTP:
-				// read 1K raw, don't read user data NFC registers
+				// Initialisation-time read from the OTP: read
+				// 1K raw, don't read user data NFC registers
 				read_size = SZ_1K;
 			}
 		}
@@ -591,11 +599,11 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 			do_enable_ecc = 1;
 			write_size = mtd->writesize;
 			for (i = 0; i < sector_count; i++)
-				writel(*((unsigned int *)(write_buffer + mtd->writesize) + i), NFC_REG_USER_DATA(i));
+				writel(*((unsigned int *)(write_buffer + mtd->writesize) + i),
+				       NFC_REG_USER_DATA(i));
 		}
 		else {
-			pr_err(pr_fmt("program unsupported column %d %d\n"),
-			       column, page_addr);
+			pr_err(pr_fmt("unsupported column %x\n"), column);
 			return;
 		}
 		do_enable_random = 1;
@@ -609,14 +617,16 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 		cfg |= NFC_SEND_CMD2 | NFC_DATA_SWAP_METHOD | NFC_ACCESS_DIR;
 		cfg |= 2 << 30;
 		if (column != 0) {
-			DBG("cmdfunc program %d %d with %x %x %x", column, page_addr,
-			    write_buffer[0], write_buffer[1], write_buffer[2]);
+			DBG("col %x pg %x program %.2x %.2x %.2x %.2x...",
+			    column, page_addr,
+			    write_buffer[0], write_buffer[1],
+			    write_buffer[2], write_buffer[3]);
 		}
 		break;
 	case NAND_CMD_STATUS:
 		byte_count = 1;
 		break;
-	case 0x36: // Hynix OTP read - start of the OTP mode
+	case 0x36: /* Hynix OTP read or RRT write - start of the OTP mode */
 		addr_cycle = 1;
 		otp_mode = 1;
 		write_offset = 0;
@@ -626,9 +636,13 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 	case 0x17:
 	case 0x04:
 	case 0x19:
-		if (otp_mode)
+		if (otp_mode) {
+			if (!column)
+				/* leave the OTP mode */
+				otp_mode = 0;
 			break;
-		// else unknown command
+		}
+		/* else unknown command */
 	default:
 		pr_err(pr_fmt("%s: unknown command 0x%.2x\n"), __FUNCTION__, command);
 		return;
@@ -722,8 +736,7 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 				*((u32*)(read_buffer + mtd->writesize) + i) = userdata;
 
 				if (debug)
-					DBG("READ0: sector %d user data %x",
-					    i, userdata);
+					DBG("sec %d oob %x", i, userdata);
 			}
 		}
 		break;
@@ -737,9 +750,6 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 	if (do_enable_random)
 		disable_random();
 
-	//DBG_INFO("done\n");
-
-	// read write offset
 	read_offset = 0;
 }
 
@@ -887,7 +897,7 @@ static void set_pagesize(u32 size, struct save_sizes *save)
 {
 	uint32_t ctl;
 
-//	DBG("+page %d bytes", size);
+	DBG("%d bytes", size);
 	ctl = readl(NFC_REG_CTL);
 	save->ctl = ctl;
 	ctl &= ~NFC_PAGE_SIZE;
@@ -905,7 +915,7 @@ static void set_pagesize(u32 size, struct save_sizes *save)
 
 static void restore_pagesize(struct save_sizes *save)
 {
-//	DBG("-page");
+	DBG("");
 	writel(save->ctl, NFC_REG_CTL);
 	writel(save->ecc_ctl, NFC_REG_ECC_CTL);
 	writel(save->spare_area, NFC_REG_SPARE_AREA);
@@ -1409,9 +1419,12 @@ int nfc_second_init(struct mtd_info *mtd)
 	//test_nfc(mtd);
 	///test_ops(mtd);
 	if (debug) {
+		// start of SPL, read in full mode
 		print_page(mtd, 0, 1);
+		// start of SPL, read in 1 KiB mode
 		print_set_pagesize(mtd, SZ_1K, 0);
-		print_page(mtd, 128, 1);
+		// start of U-Boot at 4 MiB with 16 KiB page size
+		print_page(mtd, 256, 1);
 	}
 //	print_set_pagesize(mtd, SZ_2K, 0);
 //	print_set_pagesize(mtd, SZ_4K, 0);
