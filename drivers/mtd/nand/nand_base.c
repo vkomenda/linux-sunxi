@@ -1764,7 +1764,7 @@ static int nand_setup_read_retry(struct mtd_info *mtd, int retry_mode)
 {
 	struct nand_chip *chip = mtd->priv;
 
-	pr_debug("setting READ RETRY mode %d\n", retry_mode);
+	dev_info(&mtd->dev, "setting READ RETRY mode %d\n", retry_mode);
 
 	if (retry_mode >= chip->read_retries)
 		return -EINVAL;

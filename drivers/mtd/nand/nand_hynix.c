@@ -45,16 +45,19 @@ int nand_setup_read_retry_hynix(struct mtd_info *mtd, int retry_count)
 	int status;
 	int i;
 
+	DBG("%d", retry_count);
 	chip->cmdfunc(mtd, 0x36, -1, -1);
 	for (i = 0; i < hynix->read_retry.regnum; i++) {
 		// set address for writing
 		int column = hynix->read_retry.regs[i];
-		column |= column << 8;
+
+		// address is one byte only; there is only one address cycle
+		// column |= column << 8;
 
 		chip->cmdfunc(mtd, NAND_CMD_NONE, column, -1);
 		chip->write_byte(mtd, hynix->read_retry.values[offset + i]);
 	}
-	chip->cmdfunc(mtd, 0x16, -1, -1);
+	chip->cmdfunc(mtd, 0x16, 0 /* leave the OTP mode */, -1);
 
 	status = chip->waitfunc(mtd, chip);
 	if (status & NAND_STATUS_FAIL)

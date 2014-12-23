@@ -47,16 +47,21 @@ static const char* const sunxi_mtd_part_types[] = {
 
 /*
  * Default partitions that are set up if the kernel command-line "mtdparts"
- * option did not parse. Chip size is fixed to 8GiB.
+ * option did not parse. Chip size is fixed to 8 GiB.
  */
 static struct mtd_partition sunxi_mtd_partitions[] = {
+	{
+		.name   = "SPL",
+		.offset = 0,
+		.size   = SZ_4M,
+	},
 	{
 		.name   = "U-Boot",
 		.offset = SZ_4M,
 		.size   = SZ_4M,
 	},
 	{
-		.name   = "env",
+		.name   = "uEnv",
 		.offset = SZ_8M,
 		.size   = SZ_4M,
 	},
@@ -76,7 +81,7 @@ static struct mtd_partition sunxi_mtd_partitions[] = {
 		.size   = SZ_64M,
 	},
 	{
-		.name   = "root",
+		.name   = "rootfs",
 		.offset = 108 * SZ_1M,
 		// leave the last 4 erase blocks reserved, e.g., for a BBT
 		.size   = 8 * (uint64_t) SZ_1G - 112 * (uint64_t) SZ_1M,
