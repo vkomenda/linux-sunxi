@@ -343,7 +343,7 @@ static void disable_random(void)
 	if (random_switch) {
 		uint32_t ctl;
 
-		DBG("");
+//		DBG("");
 		ctl = readl(NFC_REG_ECC_CTL);
 		ctl &= ~NFC_RANDOM_EN;
 		writel(ctl, NFC_REG_ECC_CTL);
@@ -379,7 +379,7 @@ static void set_ecc_mode(int mode)
 		ctl &= ~NFC_ECC_MODE;
 		ctl |= mode << NFC_ECC_MODE_SHIFT;
 		writel(ctl, NFC_REG_ECC_CTL);
-		DBG("%d", mode);
+//		DBG("%d", mode);
 	}
 }
 
@@ -1370,8 +1370,23 @@ int nfc_second_init(struct mtd_info *mtd)
 	disable_random();
 
 	// setup ECC layout
-	nand->ecc.bytes = 0;
-	sunxi_ecclayout.eccbytes = 0;
+
+//	nand->ecc.bytes = 0;
+	nand->ecc.bytes = DIV_ROUND_UP(nand->ecc.strength * fls(mtd->writesize), 8);
+	nand->ecc.bytes = ALIGN(nand->ecc.bytes, 2);
+	DBG("ecc.strength %d yields ecc.bytes %d", nand->ecc.strength, nand->ecc.bytes);
+
+	if (mtd->oobsize < ((nand->ecc.bytes + 4) * nand->ecc.steps)) {
+		DBG("ECC does not fit into OOB");
+		err = -EINVAL;
+		goto out;
+	}
+
+//	sunxi_ecclayout.eccbytes = 0;
+	sunxi_ecclayout.eccbytes = nand->ecc.bytes * nand->ecc.steps;
+	DBG("ecc.steps %d yield eccbytes %d", nand->ecc.steps, sunxi_ecclayout.eccbytes);
+
+	// FIXME:
 	sunxi_ecclayout.oobavail = mtd->writesize / 1024 * 4 - 2;
 	sunxi_ecclayout.oobfree->offset = 1;
 	sunxi_ecclayout.oobfree->length = mtd->writesize / 1024 * 4 - 2;

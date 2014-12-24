@@ -78,13 +78,13 @@ static struct mtd_partition sunxi_mtd_partitions[] = {
 	{
 		.name   = "initramfs",
 		.offset = 44 * SZ_1M,
-		.size   = SZ_64M,
+		.size   = SZ_256M,
 	},
 	{
 		.name   = "rootfs",
-		.offset = 108 * SZ_1M,
+		.offset = 300 * SZ_1M,
 		// leave the last 4 erase blocks reserved, e.g., for a BBT
-		.size   = 8 * (uint64_t) SZ_1G - 112 * (uint64_t) SZ_1M,
+		.size   = 8 * (uint64_t) SZ_1G - 296 * (uint64_t) SZ_1M,
 	},
 };
 
