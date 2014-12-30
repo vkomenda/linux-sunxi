@@ -98,7 +98,7 @@ static struct reg_info nfc_regs[] = {
 	{NFC_REG_ECC_CNT2,      "NFC_ECC_CNT2",      1},
 	{NFC_REG_ECC_CNT3,      "NFC_ECC_CNT3",      1},
 	{NFC_REG_USER_DATA(0),  "NFC_USER_DB",      16},
-	{NFC_REG_SPARE_AREA,    "NFC_ECC_CNT0",      1},
+	{NFC_REG_SPARE_AREA,    "NFC_SPARE_AREA",    1},
 	{NFC_RAM0_BASE,         "NFC_RAM0",        256},
 	{NFC_RAM1_BASE,         "NFC_RAM1",        256},
 	{0,                     "",                  0}
@@ -393,7 +393,6 @@ int check_ecc(int block_cnt)
 		return 0;
 
 	ecc_mode = (readl(NFC_REG_ECC_CTL) & NFC_ECC_MODE) >> NFC_ECC_MODE_SHIFT;
-	DBG("%d blocks, ECC mode %u", block_cnt, ecc_mode);
 
 	if (ecc_mode < ARRAY_SIZE(ecc_bits))
 		max_ecc_bit_cnt = ecc_bits[ecc_mode];
@@ -404,9 +403,10 @@ int check_ecc(int block_cnt)
 	cfg = readl(NFC_REG_ECC_ST) & 0xffff;
 	for (i = 0; i < block_cnt; i++) {
 		if (cfg & (1<<i)) {
-			pr_err(pr_fmt("ECC status mask %x: "
-				      "Uncorrectable error in sector %d\n"),
-			       cfg, i);
+			pr_err(pr_fmt("ECC status %x: "
+				      "Uncorrectable error in sector %d "
+				      "(%d blocks, ECC mode %u)\n"),
+				      cfg, i, block_cnt, ecc_mode);
 			return -1;
 		}
 	}
@@ -419,8 +419,10 @@ int check_ecc(int block_cnt)
 		for (j = 3; j >= 0; j--, cfg >>= 8) {
 			int bits = cfg & 0xff;
 			if (bits >= max_ecc_bit_cnt - 4) {
-				DBG("ECC limit %d/%d in sector %d",
-				    bits, max_ecc_bit_cnt, i + j);
+				DBG("ECC limit %d/%d in sector %d "
+				    "(%d blocks, ECC mode %u)\n",
+				    bits, max_ecc_bit_cnt, i + j,
+				    block_cnt, ecc_mode);
 				corrected++;
 			}
 		}
@@ -722,12 +724,24 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 		break;
 	case NAND_CMD_READ0:
 		if (read_buffer) {
+			u32* oob_start = read_buffer + mtd->writesize;
 			for (i = 0; i < sector_count; i++) {
 				u32 userdata = readl(NFC_REG_USER_DATA(i));
-				*((u32*)(read_buffer + mtd->writesize) + i * 4) = userdata;
+				*(oob_start + i * 4) = userdata;
 
-				if (debug)
-					DBG("sec %d oob %x", i, userdata);
+			}
+			if (debug) {
+				// Print the userdata register first
+				print_reg(&nfc_regs[20]);
+				printk("Buffered user data:\n");
+				// Then print the buffered content in 2 rows
+				for (i = 0; i < 2; i++) {
+					u8 j;
+					// 32 bytes in a row
+					for (j = 0; j < 8; j++)
+						printk(" %.8x", *(oob_start + i * 32 + j * 4));
+					printk("\n");
+				}
 			}
 		}
 		break;
@@ -1057,7 +1071,7 @@ int nfc_first_init(struct mtd_info *mtd)
 	nand->write_byte = nfc_write_byte;
 	nand->write_buf = nfc_write_buf;
 	nand->waitfunc = nfc_wait;
-	nand->bbt_options = NAND_BBT_SCAN2NDPAGE | NAND_BBT_SCANLASTPAGE;
+	nand->bbt_options = NAND_BBT_SCANLASTPAGE; // | NAND_BBT_SCAN2NDPAGE
 	if (bbt_use_flash)
 		nand->bbt_options |= NAND_BBT_USE_FLASH | NAND_BBT_NO_OOB;
 
@@ -1361,8 +1375,6 @@ int nfc_second_init(struct mtd_info *mtd)
 	disable_random();
 
 	// setup ECC layout
-
-
 	nand->ecc.layout = &sunxi_ecclayout;
 	nand->ecc.bytes = 0;
 	sunxi_ecclayout.eccbytes = 0;
