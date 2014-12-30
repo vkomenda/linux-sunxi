@@ -435,8 +435,13 @@ static int scan_block_fast(struct mtd_info *mtd, struct nand_bbt_descr *bd,
 		if (ret && !mtd_is_bitflip_or_eccerr(ret))
 			return ret;
 
-		if (check_short_pattern(buf, bd))
-			return 1;
+		if (check_short_pattern(buf, bd)) {
+			pr_info("Bad BB marker #%d @ %012llx:"
+				" %.2x (%.2x %.2x %.2x)\n",
+				j + 1, offs,
+				buf[0], buf[1], buf[2], buf[3]);
+			return j + 1;
+		}
 
 		offs += mtd->writesize;
 	}
@@ -462,22 +467,27 @@ static int scan_first_last_pages(struct mtd_info *mtd, loff_t offs,
 	for (i = 0; i < 2; i++) {
 		ret = mtd_read_oob(mtd, page_offsets[i], &ops);
 		if (ret && !mtd_is_bitflip_or_eccerr(ret)) {
-			pr_err("OOB read ERROR %d at offset %012llx\n",
+			pr_err("OOB read ERROR %d @ %012llx\n",
 			       ret, page_offsets[i]);
 			break;
 		}
 
 		/* Check the first byte of the spare area of the page. */
-//		if (buf[0] != 0xFF) {
-
+		if (buf[0] == 0xFF)
+			continue;
 		// temporary patch to remove driver trace
-		if (!buf[0] &&
-		    page_offsets[i] < mtd->size - 4 * mtd->erasesize) {
-
+		else if (buf[0] != 0) {
+			pr_info("Dirty BB marker #%d @ %012llx:"
+				" %.2x (%.2x %.2x %.2x)",
+				i + 1, page_offsets[i],
+				buf[0], buf[1], buf[2], buf[3]);
+			continue;
+		}
+		else if (!buf[0] && page_offsets[i] < mtd->size - 4 * mtd->erasesize) {
 			ret = i + 1;
-			pr_info("Bad BB marker #%d at offset %012llx:"
+			pr_info("Bad BB marker #%d @ %012llx:"
 				" %.2x (%.2x %.2x %.2x)\n",
-				ret, page_offsets[i],
+				i + 1, page_offsets[i],
 				buf[0], buf[1], buf[2], buf[3]);
 			break;
 		}
