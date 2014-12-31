@@ -24,6 +24,7 @@
 #include <linux/platform_device.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/nand.h>
+#include <linux/mtd/partitions.h>
 #include <plat/sys_config.h>
 
 #include "defs.h"
@@ -37,6 +38,54 @@ MODULE_AUTHOR("yuq");
 struct sunxi_nand_info {
 	struct mtd_info mtd;
 	struct nand_chip nand;
+};
+
+static const char* sunxi_mtd_part_types[] = {
+	"cmdlinepart",
+	NULL
+};
+
+/*
+ * Default partitions that are set up if the kernel command-line "mtdparts"
+ * option did not parse. Chip size is fixed to 8 GiB.
+ */
+static struct mtd_partition sunxi_mtd_partitions[] = {
+	{
+		.name   = "SPL",
+		.offset = 0,
+		.size   = SZ_4M,
+	},
+	{
+		.name   = "U-Boot",
+		.offset = SZ_4M,
+		.size   = SZ_4M,
+	},
+	{
+		.name   = "uEnv",
+		.offset = SZ_8M,
+		.size   = SZ_4M,
+	},
+	{
+		.name   = "packimg",
+		.offset = 12 * SZ_1M,
+		.size   = SZ_16M,
+	},
+	{
+		.name   = "kernel",
+		.offset = 28 * SZ_1M,
+		.size   = SZ_16M,
+	},
+	{
+		.name   = "initramfs",
+		.offset = 44 * SZ_1M,
+		.size   = SZ_256M,
+	},
+	{
+		.name   = "rootfs",
+		.offset = 300 * SZ_1M,
+		// leave the last 4 erase blocks reserved, e.g., for a BBT
+		.size   = 8 * (uint64_t) SZ_1G - 296 * (uint64_t) SZ_1M,
+	},
 };
 
 static int __devinit nand_probe(struct platform_device *pdev)
@@ -84,7 +133,10 @@ static int __devinit nand_probe(struct platform_device *pdev)
 		goto out_nfc_exit;
 	}
 
-	if ((err = mtd_device_parse_register(&info->mtd, NULL, NULL, NULL, 0)) < 0) {
+	err = mtd_device_parse_register(&info->mtd, sunxi_mtd_part_types, NULL,
+					sunxi_mtd_partitions,
+					ARRAY_SIZE(sunxi_mtd_partitions));
+	if (err < 0) {
 		ERR_INFO("register mtd device fail\n");
 		goto out_release_nand;
 	}

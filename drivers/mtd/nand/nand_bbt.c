@@ -440,8 +440,13 @@ static int scan_block_fast(struct mtd_info *mtd, struct nand_bbt_descr *bd,
 		if (ret && !mtd_is_bitflip_or_eccerr(ret))
 			return ret;
 
-		if (check_short_pattern(buf, bd))
+		if (check_short_pattern(buf, bd)) {
+			pr_info("Bad BB marker #%d @ %012llx: "
+				"%.2x (%.2x %.2x %.2x)\n",
+				j + 1, page_offsets[i],
+				buf[0], buf[1], buf[2], buf[3]);
 			return 1;
+		}
 
 		offs += mtd->writesize;
 	}
