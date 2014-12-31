@@ -430,7 +430,7 @@ static int scan_block_fast(struct mtd_info *mtd, struct nand_bbt_descr *bd,
 	ops.datbuf = NULL;
 	ops.mode = MTD_OPS_PLACE_OOB;
 
-	for (j = 0; j < len; j++) {
+	for (j = 0; j < len; j++, offs += mtd->writesize) {
 		/*
 		 * Read the full oob until read_oob is fixed to handle single
 		 * byte reads for 16 bit buswidth.
@@ -440,15 +440,26 @@ static int scan_block_fast(struct mtd_info *mtd, struct nand_bbt_descr *bd,
 		if (ret && !mtd_is_bitflip_or_eccerr(ret))
 			return ret;
 
-		if (check_short_pattern(buf, bd)) {
-			pr_info("Bad BB marker #%d @ %012llx: "
-				"%.2x (%.2x %.2x %.2x)\n",
-				j + 1, page_offsets[i],
+//		if (check_short_pattern(buf, bd)) {
+		/* Check the first byte of the spare area of the page. */
+		if (buf[0] == 0xFF)
+			continue;
+		// temporary patch to remove driver trace
+		else if (buf[0] != 0) {
+			pr_info("Dirty BB marker #%d @ %012llx:"
+				" %.2x (%.2x %.2x %.2x)",
+				j + 1, offs,
 				buf[0], buf[1], buf[2], buf[3]);
-			return 1;
+			continue;
 		}
-
-		offs += mtd->writesize;
+		else if (!buf[0] && offs < mtd->size - 4 * mtd->erasesize) {
+			ret = j + 1;
+			pr_info("Bad BB marker #%d @ %012llx:"
+				" %.2x (%.2x %.2x %.2x)\n",
+				j + 1, offs,
+				buf[0], buf[1], buf[2], buf[3]);
+			break;
+		}
 	}
 	return 0;
 }
