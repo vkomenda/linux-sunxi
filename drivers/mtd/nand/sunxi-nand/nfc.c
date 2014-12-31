@@ -52,15 +52,15 @@ static int program_column = -1, program_page = -1;
 
 unsigned int hwecc_switch = 1;
 module_param(hwecc_switch, uint, 0);
-MODULE_PARM_DESC(hwecc_switch, "hardware ECC switch, 1=on, 0=off");
+MODULE_PARM_DESC(hwecc_switch, "hardware ECC: 1=on, 0=off");
 
 unsigned int bbt_use_flash = 1;
 module_param(bbt_use_flash, uint, 0);
-MODULE_PARM_DESC(bbt_use_flash, "use flash bad block table, 1=use, 0=not");
+MODULE_PARM_DESC(bbt_use_flash, "bad block table placement: 1=flash, 0=RAM");
 
 unsigned int random_seed = 0x4a80;
 module_param(random_seed, uint, 0);
-MODULE_PARM_DESC(random_seed, "random seed used");
+MODULE_PARM_DESC(random_seed, "random seed");
 
 //////////////////////////////////////////////////////////////////
 // SUNXI platform
@@ -808,78 +808,12 @@ int nfc_first_init(struct mtd_info *mtd)
 	nand->waitfunc = nfc_wait;
 
 	// FIXME: move to Hynix init
-	nand->bbt_options = NAND_BBT_SCAN2NDPAGE | NAND_BBT_SCANLASTPAGE;
+	nand->bbt_options = NAND_BBT_SCANLASTPAGE; // | NAND_BBT_SCAN2NDPAGE
 
 	if (bbt_use_flash)
 		nand->bbt_options |= NAND_BBT_USE_FLASH;
 
 	return 0;
-}
-
-static void print_page(struct mtd_info *mtd, int page)
-{
-	int i;
-	char buff[1024];
-	nfc_cmdfunc(mtd, NAND_CMD_READ0, 0, page);
-	nfc_read_buf(mtd, buff, 6);
-	DBG_INFO("READ: %x %x %x %x %x %x\n",
-			 buff[0], buff[1], buff[2], buff[3], buff[4], buff[5]);
-
-	nfc_cmdfunc(mtd, NAND_CMD_READOOB, 0, page);
-	nfc_read_buf(mtd, buff, 640);
-	for (i = 0; i < 640; i++)
-		printk("%02x ", buff[i]);
-	printk("\n");
-}
-
-static void test_nfc(struct mtd_info *mtd)
-{
-	int i, j, n=0;
-	struct nand_chip *nand = mtd->priv;
-	int page = 1280;
-	unsigned char buff[1024];
-	int blocks = 2, num_blocks = mtd->writesize / 1024;
-
-	DBG_INFO("============== TEST NFC ================\n");
-
-	// read page
-	print_page(mtd, page);
-
-	// erase block
-	nfc_cmdfunc(mtd, NAND_CMD_ERASE1, 0, page);
-	nfc_cmdfunc(mtd, NAND_CMD_ERASE2, -1, -1);
-	nfc_wait(mtd, nand);
-	print_page(mtd, page);
-
-	// write block
-	nfc_cmdfunc(mtd, NAND_CMD_SEQIN, 0, page);
-	for (i = 0; i < blocks; i++) {
-		for (j = 0; j < 1024; j++, n++)
-			buff[j] = n % 256;
-		nfc_write_buf(mtd, buff, 1024);
-	}
-	for ( ; i < num_blocks; i++) {
-		memset(buff, 0xff, 1024);
-		nfc_write_buf(mtd, buff, 1024);
-	}
-	// wrong mtd->oobsize for SAMSUNG K9GBG08U0A
-	for (i = 0, n = 128; i < 640; i++, n++)
-		buff[i] = n % 256;
-	nfc_write_buf(mtd, buff, 1024);
-	nfc_cmdfunc(mtd, NAND_CMD_PAGEPROG, -1, -1);
-	nfc_wait(mtd, nand);
-	print_page(mtd, page);
-
-/*
-	// test oob write
-	nfc_cmdfunc(mtd, NAND_CMD_SEQIN, mtd->writesize, page);
-	for (i = 0, n = 0xff; i < 640; i++, n++)
-		buff[i] = n % 256;
-	nfc_write_buf(mtd, buff, 1024);
-	nfc_cmdfunc(mtd, NAND_CMD_PAGEPROG, -1, -1);
-	nfc_wait(mtd, nand);
-	print_page(mtd, page);
-*/
 }
 
 // Test unit ops
@@ -999,9 +933,9 @@ int nfc_second_init(struct mtd_info *mtd)
 
 	// setup ECC layout
 	sunxi_ecclayout.eccbytes = 0;
-	sunxi_ecclayout.oobavail = mtd->writesize / 1024 * 4 - 2;
-	sunxi_ecclayout.oobfree->offset = 1;
-	sunxi_ecclayout.oobfree->length = mtd->writesize / 1024 * 4 - 2;
+	sunxi_ecclayout.oobavail = 30; // mtd->writesize / 1024 * 4 - 2;
+	sunxi_ecclayout.oobfree->offset = 2;
+	sunxi_ecclayout.oobfree->length = 30; // mtd->writesize / 1024 * 4 - 2;
 	nand->ecc.layout = &sunxi_ecclayout;
 	nand->ecc.size = mtd->writesize;
 	nand->ecc.bytes = 0;
@@ -1015,7 +949,7 @@ int nfc_second_init(struct mtd_info *mtd)
 	}
 
 	// alloc buffer
-	buffer_size = mtd->writesize + 1024;
+	buffer_size = mtd->writesize + mtd->oobsize;
 	read_buffer = kmalloc(buffer_size, GFP_KERNEL);
 	if (read_buffer == NULL) {
 		ERR_INFO("alloc read buffer fail\n");
@@ -1040,11 +974,6 @@ int nfc_second_init(struct mtd_info *mtd)
 
 	DBG_INFO("OOB size = %d  page size = %d  block size = %d  total size = %lld\n",
 			 mtd->oobsize, mtd->writesize, mtd->erasesize, mtd->size);
-
-	// test command
-	//test_nfc(mtd);
-	//test_ops(mtd);
-	//print_page(mtd, 0);
 
 	return 0;
 
