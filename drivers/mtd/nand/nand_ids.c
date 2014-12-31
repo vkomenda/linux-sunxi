@@ -50,6 +50,9 @@ struct nand_flash_dev nand_flash_ids[] = {
 		{ .id = {0xad, 0xde, 0x94, 0xda, 0x74, 0xc4} },
 		  SZ_8K, SZ_8K, SZ_2M, 0, 6, 640, NAND_ECC_INFO(40, SZ_1K),
 		  4 },
+	{"K9GBG08U0A 32G 3.3V 8-bit", /* Note: other IDs probably exist */
+		{ .id = {0xec, 0xd7, 0x94, 0x7a, 0x54, 0x43} },
+		  SZ_8K, SZ_4K, SZ_1M, 0, 6, 640, NAND_ECC_INFO(40, SZ_1K) },
 	{"K9GBG08U0B 32G 3.3V 8-bit",
 		{ .id = {0xec, 0xd7, 0x94, 0x7e, 0x64, 0x44} },
 		  SZ_8K, SZ_4K, SZ_1M, 0, 6, 1024, NAND_ECC_INFO(40, SZ_1K) },
