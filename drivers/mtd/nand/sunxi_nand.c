@@ -1150,6 +1150,8 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 	int i;
 	u32 tmp;
 
+	dev_info(dev, "%s\n", __FUNCTION__);
+
 	if (!of_get_property(np, "reg", &nsels))
 		return -EINVAL;
 
