@@ -416,6 +416,7 @@ static void read_abs_bbts(struct mtd_info *mtd, uint8_t *buf,
 static int scan_block_fast(struct mtd_info *mtd, struct nand_bbt_descr *bd,
 			   loff_t offs, uint8_t *buf, int numpages)
 {
+	struct nand_chip *this = mtd->priv;
 	struct mtd_oob_ops ops;
 	int j, ret;
 
@@ -435,8 +436,12 @@ static int scan_block_fast(struct mtd_info *mtd, struct nand_bbt_descr *bd,
 		if (ret && !mtd_is_bitflip_or_eccerr(ret))
 			return ret;
 
-		if (check_short_pattern(buf, bd))
-			return 1;
+		if (check_short_pattern(buf, bd)) {
+			if (this->options & NAND_INVALID_BBM)
+				pr_info("Ignoring bad block marker at at 0x%012llx.\n", offs);
+			else
+				return 1;
+		}
 
 		offs += mtd->writesize;
 	}

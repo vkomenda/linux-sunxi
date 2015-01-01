@@ -1875,6 +1875,7 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 		dev_err(dev, "could not configure chip timings: %d\n", ret);
 		return ret;
 	}
+	nand->options |= NAND_INVALID_BBM;
 
 	ret = nand_pst_create(mtd);
 	if (ret)
