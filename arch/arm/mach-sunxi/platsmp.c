@@ -121,4 +121,3 @@ static struct smp_operations sun6i_smp_ops __initdata = {
 	.smp_boot_secondary	= sun6i_smp_boot_secondary,
 };
 CPU_METHOD_OF_DECLARE(sun6i_a31_smp, "allwinner,sun6i-a31", &sun6i_smp_ops);
-CPU_METHOD_OF_DECLARE(sun6i_a31s_smp, "allwinner,sun6i-a31s", &sun6i_smp_ops);

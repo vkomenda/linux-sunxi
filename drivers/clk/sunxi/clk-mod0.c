@@ -83,8 +83,14 @@ static void __init sun4i_a10_mod0_setup(struct device_node *node)
 	void __iomem *reg;
 
 	reg = of_iomap(node, 0);
-	if (!reg)
+	if (!reg) {
+		/*
+		 * This happens with mod0 clk nodes instantiated through
+		 * mfd, as those do not have their resources assigned at
+		 * CLK_OF_DECLARE time yet, so do not print an error.
+		 */
 		return;
+	}
 
 	sunxi_factors_register(node, &sun4i_a10_mod0_data,
 			       &sun4i_a10_mod0_lock, reg);
