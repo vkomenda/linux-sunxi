@@ -68,25 +68,27 @@
 				reg = <0>;
 				allwinner,rb = <0>;
 				nand-ecc-mode = "hw";
+				#size-cells = <2>;
+				#address-cells = <1>;
 
 				boot0@0 {
 					label = "boot0";
-					reg = /bits/ 64 <0x0 0x400000>;
+					reg = <0x0 0x0 0x400000>;
 					nand-ecc-mode = "hw_syndrome";
 					nand-randomizer-seeds = /bits/ 16 <0x4a80>;
 				};
 
-				boot0-rescue@400000 {
+				boot1@400000 {
 					label = "boot1";
-					reg = /bits/ 64 <0x400000 0x400000>;
+					reg = <0x400000 0x0 0x400000>;
 					nand-ecc-mode = "hw";
 					nand-rnd-mode = "hw";
 					nand-randomizer-seeds = /bits/ 16 <0x4a80>;
 				};
 
 				kernel@800000 {
-					label = "boot1";
-					reg = /bits/ 64 <0x800000 0x1000000>;
+					label = "kernel";
+					reg = <0x800000 0x0 0x1000000>;
 					nand-ecc-mode = "hw";
 					nand-rnd-mode = "hw";
 					nand-randomizer-seeds = /bits/ 16 <
@@ -110,7 +112,7 @@
 
 				rootfs@1800000 {
 					label = "rootfs";
-					reg = /bits/ 64 <0x1800000 0x1fe800000>;
+					reg = <0x1800000 0x1 0xfe800000>;
 					nand-ecc-mode = "hw";
 					nand-rnd-mode = "hw";
 					nand-randomizer-seeds = /bits/ 16 <
