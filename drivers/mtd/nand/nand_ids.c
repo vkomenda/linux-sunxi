@@ -56,6 +56,9 @@ struct nand_flash_dev nand_flash_ids[] = {
 	{"K9GBG08U0B 32G 3.3V 8-bit",
 		{ .id = {0xec, 0xd7, 0x94, 0x7e, 0x64, 0x44} },
 		  SZ_8K, SZ_4K, SZ_1M, 0, 6, 1024, NAND_ECC_INFO(40, SZ_1K) },
+	{"H27UCG8T2ETR-BC 8GiB 3.3V 8-bit",
+		{ .id = {0xad, 0xde, 0x14, 0xa7, 0x42, 0x4a} },
+		  SZ_16K, SZ_8K, SZ_4M, 0, 6, 1664, NAND_ECC_INFO(40, SZ_1K) },
 
 	LEGACY_ID_NAND("NAND 4MiB 5V 8-bit",   0x6B, 4, SZ_8K, SP_OPTIONS),
 	LEGACY_ID_NAND("NAND 4MiB 3,3V 8-bit", 0xE3, 4, SZ_8K, SP_OPTIONS),
