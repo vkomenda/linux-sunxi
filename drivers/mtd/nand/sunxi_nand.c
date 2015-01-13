@@ -41,9 +41,11 @@
 #include <linux/interrupt.h>
 #include <linux/io.h>
 
-unsigned int ignore_bbm = 0;
-module_param(ignore_bbm, uint, 0);
-MODULE_PARM_DESC(ignore_bbm, "bad block markers on the chip: 0=respected, 1=ignored");
+#define DBG(fmt, arg...) pr_info(pr_fmt("%s: " fmt "\n"), __FUNCTION__, ##arg)
+
+unsigned int invalid_bbm = 1;
+module_param(invalid_bbm, uint, 0);
+MODULE_PARM_DESC(invalid_bbm, "skip non-0 bad block markers: 1=yes, 0=no");
 
 #define NFC_REG_CTL		0x0000
 #define NFC_REG_ST		0x0004
@@ -1729,7 +1731,13 @@ static int sunxi_nand_ecc_init(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc,
 
 static void sunxi_nand_part_release(struct nand_part *part)
 {
-	kfree(to_sunxi_nand_part(part));
+	struct sunxi_nand_part* spart;
+
+	DBG("part %p", part);
+	spart = to_sunxi_nand_part(part);
+	DBG("sunxi part %p", spart);
+
+	kfree(spart);
 }
 
 struct nand_part *sunxi_ofnandpart_parse(void *priv, struct mtd_info *master,
@@ -1896,7 +1904,7 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 		return ret;
 	}
 
-	if (ignore_bbm)
+	if (invalid_bbm)
 		nand->options |= NAND_INVALID_BBM;
 
 	ret = nand_pst_create(mtd);

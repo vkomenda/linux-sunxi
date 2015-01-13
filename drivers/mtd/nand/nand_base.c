@@ -31,6 +31,8 @@
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
+#define DBG(fmt, arg...) pr_info(pr_fmt("%s: " fmt "\n"), __FUNCTION__, ##arg)
+
 #include <linux/module.h>
 #include <linux/delay.h>
 #include <linux/errno.h>
@@ -4500,7 +4502,6 @@ static int nand_ecc_ctrl_init(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc)
 {
 	int i;
 
-
 	/*
 	 * If no default placement scheme is given, select an appropriate one.
 	 */
@@ -4707,12 +4708,31 @@ static int nand_ecc_ctrl_init(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc)
  */
 int nand_add_partition(struct mtd_info *master, struct nand_part *part)
 {
-	struct nand_chip *chip = master->priv;
-	struct mtd_info *mtd = &part->mtd;
-	struct nand_ecc_ctrl *ecc = part->ecc;
+	struct nand_chip *chip;
+	struct mtd_info *mtd;
+	struct nand_ecc_ctrl *ecc;
 	struct nand_part *pos;
 	bool inserted = false;
 	int ret;
+
+	if (master)
+		chip = master->priv;
+	else {
+		DBG("no chip");
+		BUG();
+	}
+
+	if (part) {
+		mtd = &part->mtd;
+		ecc = part->ecc;
+	}
+	else {
+		DBG("no part");
+		BUG();
+	}
+
+	DBG("chip %p, mtd %p, ecc %p",
+	    chip, mtd, ecc);
 
 	/* set up the MTD object for this partition */
 	mtd->type = master->type;
@@ -4770,12 +4790,20 @@ int nand_add_partition(struct mtd_info *master, struct nand_part *part)
 
 	mutex_lock(&chip->part_lock);
 	list_for_each_entry(pos, &chip->partitions, node) {
+		DBG("pos %p, partitions %p",
+		    (void*) pos, &chip->partitions);
+
+		DBG("pos: offset %llx, size %llx",
+		    pos->offset, pos->mtd.size);
+
 		if (part->offset >= pos->offset + pos->mtd.size) {
 			continue;
 		} else if (part->offset + mtd->size > pos->offset) {
 			ret = -EINVAL;
 			goto out;
 		}
+
+		DBG("node %p, prev %p", &part->node, pos->node.prev);
 
 		list_add(&part->node, pos->node.prev);
 		inserted = true;
@@ -4787,12 +4815,16 @@ int nand_add_partition(struct mtd_info *master, struct nand_part *part)
 
 	ret = mtd_device_register(mtd, NULL, 0);
 	if (ret) {
+		DBG("mtd_device_register ERROR %d", ret);
 		list_del(&part->node);
 		goto out;
 	}
 
 	if (master->_block_isbad) {
 		uint64_t offs = 0;
+
+		DBG("Bad block check. Offset %llx, MTD size %llx, erasesize %x",
+		    part->offset, mtd->size, mtd->erasesize);
 
 		while (offs < mtd->size) {
 			if (mtd_block_isreserved(master, offs + part->offset))
@@ -4802,6 +4834,9 @@ int nand_add_partition(struct mtd_info *master, struct nand_part *part)
 			offs += mtd->erasesize;
 		}
 	}
+	DBG("SUCCESS. bbtblocks %u, badblocks %u",
+	    mtd->ecc_stats.bbtblocks,
+	    mtd->ecc_stats.badblocks);
 
 out:
 	mutex_unlock(&chip->part_lock);

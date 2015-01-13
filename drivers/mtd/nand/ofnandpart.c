@@ -16,6 +16,8 @@
 #include <linux/slab.h>
 #include <linux/mtd/nand.h>
 
+#define DBG(fmt, arg...) pr_info(pr_fmt("%s: " fmt "\n"), __FUNCTION__, ##arg)
+
 static inline bool node_has_compatible(struct device_node *pp)
 {
 	return of_get_property(pp, "compatible", NULL);
@@ -45,6 +47,8 @@ int ofnandpart_parse(struct mtd_info *master,
 		uint32_t mask_flags = 0;
 		struct nand_part *part;
 
+		DBG("node %p, child %p", node, pp);
+
 		if (node_has_compatible(pp))
 			continue;
 
@@ -71,6 +75,10 @@ int ofnandpart_parse(struct mtd_info *master,
 			part = data->parse(data->priv, master, pp);
 		else
 			part = nandpart_alloc();
+
+		DBG("a_cells %d, s_cells %d, offset %llx, size %llx, name %s,"
+		    " part %p",
+		    a_cells, s_cells, offset, size, partname, part);
 
 		if (IS_ERR(part))
 			continue;

@@ -3,7 +3,7 @@
  * drivers and users.
  *
  * Copyright © 1999-2010 David Woodhouse <dwmw2@infradead.org>
- * Copyright © 2006      Red Hat UK Limited 
+ * Copyright © 2006      Red Hat UK Limited
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -42,6 +42,8 @@
 #include <linux/mtd/partitions.h>
 
 #include "mtdcore.h"
+
+#define DBG(fmt, arg...) pr_info(pr_fmt("%s: " fmt "\n"), __FUNCTION__, ##arg)
 
 /*
  * backing device capabilities for non-mappable devices (such as NAND flash)
@@ -437,7 +439,13 @@ int add_mtd_device(struct mtd_info *mtd)
 	mtd->dev.class = &mtd_class;
 	mtd->dev.devt = MTD_DEVT(i);
 	dev_set_name(&mtd->dev, "mtd%d", i);
+
 	dev_set_drvdata(&mtd->dev, mtd);
+
+	DBG("dev %p", &mtd->dev);
+	DBG("parent %p, init_name %s, bus %p, id %u",
+	    mtd->dev.parent, mtd->dev.init_name, mtd->dev.bus, mtd->dev.id);
+
 	if (device_register(&mtd->dev) != 0)
 		goto fail_added;
 
