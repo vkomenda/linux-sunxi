@@ -1437,7 +1437,7 @@ static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
 	 */
 	chip->clk_rate = (2 * NSEC_PER_SEC) / min_clk_period;
 
-	DBG("clock rate %u", chip->clk_rate);
+	DBG("clock rate %lu", chip->clk_rate);
 
 	/* TODO: configure T16-T19 */
 

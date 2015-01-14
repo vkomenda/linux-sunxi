@@ -4811,7 +4811,7 @@ int nand_add_partition(struct mtd_info *master, struct nand_part *part)
 	}
 
 	if (!inserted) {
-		DBG("adding partition...");
+		DBG("adding partition node %p", &part->node);
 		list_add_tail(&part->node, &chip->partitions);
 		DBG("partition added");
 	}
@@ -5079,8 +5079,10 @@ void nand_release(struct mtd_info *mtd)
 	mtd_device_unregister(mtd);
 
 	/* Free bad block table memory */
-	kfree(chip->bbt);
-	if (!(chip->options & NAND_OWN_BUFFERS))
+	if (chip->bbt)
+		kfree(chip->bbt);
+
+	if (chip->buffers && !(chip->options & NAND_OWN_BUFFERS))
 		kfree(chip->buffers);
 
 	/* Free bad block descriptor memory */
