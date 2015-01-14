@@ -20,6 +20,8 @@
 #include <linux/slab.h>
 #include <linux/mtd/partitions.h>
 
+#define DBG(fmt, arg...) pr_info(pr_fmt("%s: " fmt "\n"), __FUNCTION__, ##arg)
+
 static bool node_has_compatible(struct device_node *pp)
 {
 	return of_get_property(pp, "compatible", NULL);
@@ -34,6 +36,7 @@ static int parse_ofpart_partitions(struct mtd_info *master,
 	struct device_node *pp;
 	int nr_parts, i;
 
+	DBG("master %p, pparts %p, data %p", master, pparts, data);
 
 	if (!data)
 		return 0;
@@ -119,6 +122,8 @@ static int parse_ofoldpart_partitions(struct mtd_info *master,
 		__be32 offset, len;
 	} *part;
 	const char *names;
+
+	DBG("master %p, pparts %p, data %p", master, pparts, data);
 
 	if (!data)
 		return 0;

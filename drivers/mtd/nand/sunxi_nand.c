@@ -43,7 +43,7 @@
 
 #define DBG(fmt, arg...) pr_info(pr_fmt("%s: " fmt "\n"), __FUNCTION__, ##arg)
 
-unsigned int invalid_bbm = 1;
+unsigned int invalid_bbm = 0;
 module_param(invalid_bbm, uint, 0);
 MODULE_PARM_DESC(invalid_bbm, "skip non-0 bad block markers: 1=yes, 0=no");
 
@@ -1436,6 +1436,8 @@ static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
 	 * nand clk_rate = 2 * min_clk_rate
 	 */
 	chip->clk_rate = (2 * NSEC_PER_SEC) / min_clk_period;
+
+	DBG("clock rate %u", chip->clk_rate);
 
 	/* TODO: configure T16-T19 */
 

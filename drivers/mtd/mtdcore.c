@@ -382,6 +382,8 @@ int add_mtd_device(struct mtd_info *mtd)
 	struct mtd_notifier *not;
 	int i, error;
 
+	DBG("mtd %p", mtd);
+
 	if (!mtd->backing_dev_info) {
 		switch (mtd->type) {
 		case MTD_RAM:
@@ -554,14 +556,18 @@ int mtd_device_parse_register(struct mtd_info *mtd, const char * const *types,
 	int err;
 	struct mtd_partition *real_parts;
 
+	DBG("mtd %p", mtd);
+
 	err = parse_mtd_partitions(mtd, types, &real_parts, parser_data);
 	if (err <= 0 && nr_parts && parts) {
+		DBG("duplicating real parts from parts %p", parts);
 		real_parts = kmemdup(parts, sizeof(*parts) * nr_parts,
 				     GFP_KERNEL);
 		if (!real_parts)
 			err = -ENOMEM;
 		else
 			err = nr_parts;
+		DBG("real parts %p", real_parts);
 	}
 
 	if (err > 0) {

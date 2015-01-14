@@ -4810,8 +4810,11 @@ int nand_add_partition(struct mtd_info *master, struct nand_part *part)
 		break;
 	}
 
-	if (!inserted)
+	if (!inserted) {
+		DBG("adding partition...");
 		list_add_tail(&part->node, &chip->partitions);
+		DBG("partition added");
+	}
 
 	ret = mtd_device_register(mtd, NULL, 0);
 	if (ret) {
