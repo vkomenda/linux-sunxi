@@ -17,8 +17,6 @@
 #include <linux/err.h>
 #include "sysfs.h"
 
-#define DBG(fmt, arg...) pr_warn(pr_fmt("%s: " fmt "\n"), __FUNCTION__, ##arg)
-
 static void remove_files(struct kernfs_node *parent,
 			 const struct attribute_group *grp)
 {
@@ -158,8 +156,6 @@ int sysfs_create_groups(struct kobject *kobj,
 {
 	int error = 0;
 	int i;
-
-	DBG("kobj %p, groups %p", kobj, groups);
 
 	if (!groups)
 		return 0;

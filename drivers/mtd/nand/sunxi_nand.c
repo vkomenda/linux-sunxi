@@ -1780,6 +1780,10 @@ err:
 	return ERR_PTR(ret);
 }
 
+static const char * const mtd_unit_part_type[] = {
+	NULL
+};
+
 static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 				struct device_node *np)
 {
@@ -1933,7 +1937,7 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 	ppdata.parse = sunxi_ofnandpart_parse;
 	ret = ofnandpart_parse(mtd, &ppdata);
 	if (!ret)
-		ret = mtd_device_register(mtd, NULL, 0);
+		ret = mtd_device_parse_register(mtd, mtd_unit_part_type, NULL, NULL, 0);
 	else if (ret > 0)
 		ret = 0;
 

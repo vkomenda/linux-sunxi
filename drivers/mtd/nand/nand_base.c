@@ -3982,6 +3982,103 @@ static int nand_get_bits_per_cell(u8 cellinfo)
 }
 
 /*
+ * Parse the Hynix ID size byte and calculate the relevant physical parameters.
+ */
+static int parse_hynix_sizes(struct mtd_info *mtd, struct nand_chip* chip,
+			     u8 id_data[8])
+{
+	u8 density   = id_data[1];
+	u8 sizes     = id_data[3];
+	u8 plane_ecc = id_data[4];
+	u8 oob_code, erase_code, ecc;
+
+	mtd->writesize = 2048 << (sizes & 0x03);
+	sizes >>= 2;
+	oob_code = sizes & 0x03;
+	sizes >>= 2;
+	erase_code = sizes & 0x03;
+	sizes >>= 2;
+	oob_code |= (sizes & 0x01) << 2;
+	sizes >>= 1;
+	erase_code |= (sizes & 0x01) << 2;
+	pr_info("Hynix codes: page size %d, block size %d, oob size %d\n",
+		mtd->writesize, erase_code, oob_code);
+	if (oob_code >= 0x4 || erase_code < 0x4)
+		return -EINVAL;
+
+	if (density == 0xde /* 8GiB */ ||
+	    density == 0xd7 /* 4GiB */) {
+		switch (oob_code) {
+		case 0:
+			mtd->oobsize = 2048; break;
+		case 1:
+			mtd->oobsize = 1664; break;
+		case 2:
+			mtd->oobsize = 1024; break;
+		case 3:
+		default:
+			mtd->oobsize = 640;  break;
+		}
+	}
+	else { // for older Hynix chips: 0xd5?, 0xd3?, 0xdc?
+		switch (oob_code) {
+		case 0:
+			mtd->oobsize = 128;
+			break;
+		case 1:
+			mtd->oobsize = 224;
+			break;
+		case 2:
+			mtd->oobsize = 448;
+			break;
+		case 3:
+		default:
+			mtd->oobsize = 64;
+			break;
+		case 4:
+			mtd->oobsize = 32;
+			break;
+		case 5:
+			mtd->oobsize = 16;
+			break;
+		}
+	}
+	mtd->erasesize = 0x100000 << (erase_code & 0x3);
+
+	ecc = (plane_ecc >> 4) & 0x7;
+	switch (ecc) {
+	case 0:
+	default:
+		chip->ecc_strength_ds = 0;
+		break;
+	case 1:
+		chip->ecc_strength_ds = 4;
+		break;
+	case 2:
+		chip->ecc_strength_ds = 24;
+		break;
+	case 3:
+		chip->ecc_strength_ds = 32;
+		break;
+	case 4:
+		chip->ecc_strength_ds = 40;
+		break;
+	case 5:
+		chip->ecc_strength_ds = 50;
+		break;
+	case 6:
+		chip->ecc_strength_ds = 60;
+		break;
+	}
+	chip->ecc_step_ds  = 1024;
+	chip->ecc.strength = chip->ecc_strength_ds;
+	chip->ecc.size     = mtd->writesize;
+	chip->ecc.steps    = DIV_ROUND_UP(mtd->writesize, chip->ecc_step_ds);
+
+	return 0;
+}
+
+/*
  * Many new NAND share similar device ID codes, which represent the size of the
  * chip. The rest of the parameters must be decoded according to generic or
  * manufacturer-specific "extended ID" decoding patterns.
@@ -4043,44 +4140,7 @@ static void nand_decode_ext_id(struct mtd_info *mtd, struct nand_chip *chip,
 		*busw = 0;
 	} else if (id_len == 6 && id_data[0] == NAND_MFR_HYNIX &&
 			!nand_is_slc(chip)) {
-		unsigned int tmp;
-
-		/* Calc pagesize */
-		mtd->writesize = 2048 << (extid & 0x03);
-		extid >>= 2;
-		/* Calc oobsize */
-		switch (((extid >> 2) & 0x04) | (extid & 0x03)) {
-		case 0:
-			mtd->oobsize = 128;
-			break;
-		case 1:
-			mtd->oobsize = 224;
-			break;
-		case 2:
-			mtd->oobsize = 448;
-			break;
-		case 3:
-			mtd->oobsize = 64;
-			break;
-		case 4:
-			mtd->oobsize = 32;
-			break;
-		case 5:
-			mtd->oobsize = 16;
-			break;
-		default:
-			mtd->oobsize = 640;
-			break;
-		}
-		extid >>= 2;
-		/* Calc blocksize */
-		tmp = ((extid >> 1) & 0x04) | (extid & 0x03);
-		if (tmp < 0x03)
-			mtd->erasesize = (128 * 1024) << tmp;
-		else if (tmp == 0x03)
-			mtd->erasesize = 768 * 1024;
-		else
-			mtd->erasesize = (64 * 1024) << tmp;
+		parse_hynix_sizes(mtd, chip, id_data);
 		*busw = 0;
 	} else {
 		/* Calc pagesize */
@@ -4717,19 +4777,15 @@ int nand_add_partition(struct mtd_info *master, struct nand_part *part)
 
 	if (master)
 		chip = master->priv;
-	else {
-		DBG("no chip");
+	else
 		BUG();
-	}
 
 	if (part) {
 		mtd = &part->mtd;
 		ecc = part->ecc;
 	}
-	else {
-		DBG("no part");
+	else
 		BUG();
-	}
 
 	DBG("chip %p, mtd %p, ecc %p",
 	    chip, mtd, ecc);
@@ -4916,8 +4972,9 @@ int nand_scan_tail(struct mtd_info *mtd)
 			!(chip->bbt_options & NAND_BBT_USE_FLASH));
 
 	if (!(chip->options & NAND_OWN_BUFFERS)) {
-		nbuf = kzalloc(sizeof(*nbuf) + mtd->writesize
-				+ mtd->oobsize * 3, GFP_KERNEL);
+		uint32_t sz = sizeof(*nbuf) + mtd->writesize + mtd->oobsize * 3;
+		DBG("new buffer of size %u for mtd %p", sz, mtd);
+		nbuf = kzalloc(sz, GFP_KERNEL);
 		if (!nbuf)
 			return -ENOMEM;
 		nbuf->ecccalc = (uint8_t *)(nbuf + 1);
@@ -4938,9 +4995,10 @@ int nand_scan_tail(struct mtd_info *mtd)
 	/* Initialize ECC struct */
 	ret = nand_ecc_ctrl_init(mtd, ecc);
 	if (ret) {
-		if (!(chip->options & NAND_OWN_BUFFERS))
+		if (!(chip->options & NAND_OWN_BUFFERS)) {
+			DBG("freeing buffers of mtd %p", mtd);
 			kfree(chip->buffers);
-
+		}
 		return ret;
 	}
 
