@@ -25,6 +25,9 @@ if MTD_NAND
 config MTD_OF_NAND_PARTS
 	tristate
 	default n
+	help
+	  Type of device tree NAND flash partition table parser that
+	  understands specific configuration options for ECC and randomizer.
 
 config MTD_NAND_BCH
 	tristate

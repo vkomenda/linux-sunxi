@@ -30,8 +30,6 @@
 #include "base.h"
 #include "power/power.h"
 
-#define DBG(fmt, arg...) pr_warn(pr_fmt("%s: " fmt "\n"), __FUNCTION__, ##arg)
-
 #ifdef CONFIG_SYSFS_DEPRECATED
 #ifdef CONFIG_SYSFS_DEPRECATED_V2
 long sysfs_deprecated = 1;
@@ -654,8 +652,6 @@ static void klist_children_put(struct klist_node *n)
  */
 void device_initialize(struct device *dev)
 {
-	DBG("%p", dev);
-
 	dev->kobj.kset = devices_kset;
 	kobject_init(&dev->kobj, &device_ktype);
 	INIT_LIST_HEAD(&dev->dma_pools);

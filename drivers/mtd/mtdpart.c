@@ -33,6 +33,8 @@
 
 #include "mtdcore.h"
 
+#define DBG(fmt, arg...) pr_info(pr_fmt("%s: " fmt "\n"), __FUNCTION__, ##arg)
+
 /* Our partition linked list */
 static LIST_HEAD(mtd_partitions);
 static DEFINE_MUTEX(mtd_partitions_mutex);
@@ -670,6 +672,8 @@ static struct mtd_part_parser *get_partition_parser(const char *name)
 {
 	struct mtd_part_parser *p, *ret = NULL;
 
+	DBG("%s", name);
+
 	spin_lock(&part_parser_lock);
 
 	list_for_each_entry(p, &part_parsers, list)
@@ -745,8 +749,11 @@ int parse_mtd_partitions(struct mtd_info *master, const char *const *types,
 		parser = get_partition_parser(*types);
 		if (!parser && !request_module("%s", *types))
 			parser = get_partition_parser(*types);
-		if (!parser)
+		if (!parser) {
+			DBG("no match");
 			continue;
+		}
+		DBG("matched");
 		ret = (*parser->parse_fn)(master, pparts, data);
 		put_partition_parser(parser);
 		if (ret > 0) {

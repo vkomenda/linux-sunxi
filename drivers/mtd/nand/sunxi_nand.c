@@ -43,7 +43,7 @@
 
 #define DBG(fmt, arg...) pr_info(pr_fmt("%s: " fmt "\n"), __FUNCTION__, ##arg)
 
-unsigned int invalid_bbm = 0;
+unsigned int invalid_bbm = 1;
 module_param(invalid_bbm, uint, 0);
 MODULE_PARM_DESC(invalid_bbm, "skip non-0 bad block markers: 1=yes, 0=no");
 
@@ -1742,7 +1742,7 @@ static void sunxi_nand_part_release(struct nand_part *part)
 	kfree(spart);
 }
 
-struct nand_part *sunxi_ofnandpart_parse(void *priv, struct mtd_info *master,
+struct nand_part *sunxi_ofnandpart_parse(struct mtd_info *master,
 					 struct device_node *pp)
 {
 	struct nand_chip *chip = master->priv;
@@ -1780,7 +1780,8 @@ err:
 	return ERR_PTR(ret);
 }
 
-static const char * const mtd_unit_part_type[] = {
+static const char* const nandpart_type[] = {
+	"ofnandpart",
 	NULL
 };
 
@@ -1789,7 +1790,7 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 {
 	const struct nand_sdr_timings *timings;
 	struct sunxi_nand_chip *chip;
-	struct ofnandpart_data ppdata;
+	struct ofnandpart_data pp;
 	struct mtd_info *mtd;
 	struct nand_chip *nand;
 	int nsels;
@@ -1933,14 +1934,12 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 		return ret;
 	}
 
-	ppdata.node = np;
-	ppdata.parse = sunxi_ofnandpart_parse;
-	ret = ofnandpart_parse(mtd, &ppdata);
-	if (!ret)
-		ret = mtd_device_parse_register(mtd, mtd_unit_part_type, NULL, NULL, 0);
-	else if (ret > 0)
-		ret = 0;
-
+	// Parse nand partition table in the device tree and register
+	// per-partition MTD devices.
+	pp.gen.of_node = np;
+	pp.gen.origin = 0;
+	pp.parse = sunxi_ofnandpart_parse;
+	ret = mtd_device_parse_register(mtd, nandpart_type, &pp.gen, NULL, 0);
 	if (ret) {
 		dev_err(dev, "failed to register mtd device: %d\n", ret);
 		nand_release(mtd);

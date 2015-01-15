@@ -23,6 +23,7 @@
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/flashchip.h>
 #include <linux/mtd/bbm.h>
+#include <linux/mtd/partitions.h>
 
 struct mtd_info;
 struct nand_flash_dev;
@@ -1146,15 +1147,13 @@ static inline int jedec_feature(struct nand_chip *chip)
 /**
  * struct ofnandpart_data - struct used to retrieve NAND partitions from a DT
  *			    node
+ * @gen:                embedded MTD partition data (for containerisation)
  * @parse:		driver specific parser function
- * @priv:		driver private data
- * @node:		OF node containing NAND partitions
  */
 struct ofnandpart_data {
-	struct nand_part *(*parse)(void *priv, struct mtd_info *master,
+	struct mtd_part_parser_data gen;
+	struct nand_part *(*parse)(struct mtd_info *master,
 				   struct device_node *pp);
-	void *priv;
-	struct device_node *node;
 };
 
 int ofnandpart_parse(struct mtd_info *master,
