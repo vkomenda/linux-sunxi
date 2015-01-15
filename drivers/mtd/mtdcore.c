@@ -444,9 +444,7 @@ int add_mtd_device(struct mtd_info *mtd)
 
 	dev_set_drvdata(&mtd->dev, mtd);
 
-	DBG("dev %p", &mtd->dev);
-	DBG("parent %p, init_name %s, bus %p, id %u",
-	    mtd->dev.parent, mtd->dev.init_name, mtd->dev.bus, mtd->dev.id);
+	DBG("parent %p, init_name %s", mtd->dev.parent, mtd->dev.init_name);
 
 	if (device_register(&mtd->dev) != 0)
 		goto fail_added;
@@ -466,12 +464,16 @@ int add_mtd_device(struct mtd_info *mtd)
 	   of this try_ nonsense, and no bitching about it
 	   either. :) */
 	__module_get(THIS_MODULE);
+
+	DBG("OK");
 	return 0;
 
 fail_added:
 	idr_remove(&mtd_idr, i);
 fail_locked:
 	mutex_unlock(&mtd_table_mutex);
+
+	DBG("FAILED");
 	return 1;
 }
 
