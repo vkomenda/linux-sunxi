@@ -1765,7 +1765,7 @@ struct nand_part *sunxi_ofnandpart_parse(struct mtd_info *master,
 		ret = of_property_read_u32(pp, "write-size", &writesize);
 		if (ret)
 			goto err;
-		writesize = part->part.mtd.writesize;
+		part->part.mtd.writesize = writesize;
 	}
 
 	if (of_find_property(pp, "nand-ecc-mode", NULL)) {

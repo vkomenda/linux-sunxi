@@ -4912,8 +4912,10 @@ EXPORT_SYMBOL(nand_add_partition);
  */
 void nand_del_partition(struct nand_part *part)
 {
-	struct nand_chip *chip = part->mtd.priv;
+	struct nand_chip *chip;
 
+	BUG_ON(!part);
+	chip = part->mtd.priv;
 	mutex_lock(&chip->part_lock);
 	mtd_device_unregister(&part->mtd);
 	list_del(&part->node);
@@ -4932,8 +4934,10 @@ EXPORT_SYMBOL(nand_del_partition);
  */
 static void nandpart_release(struct nand_part *part)
 {
-	if (part)
-		kfree(part);
+	BUG_ON(!part);
+	DBG("part name %s", part->mtd.name);
+
+	kfree(part);
 }
 
 /**
