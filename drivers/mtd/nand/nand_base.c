@@ -2747,8 +2747,9 @@ static uint8_t *nand_fill_oob(struct mtd_info *mtd, uint8_t *oob, size_t len,
 }
 
 /*
- * This computation is correct for non-standard page sizes if the chip has no
- * subpages.
+ * This computation is correct for non-datasheet page sizes if the chip has no
+ * subpages. For datasheet page sizes it's correctness depends on chip and mtd
+ * info initialisation.
  */
 #define page_aligned(x)							\
 	(mtd->subpage_sft ?						\
@@ -2779,11 +2780,12 @@ static int nand_do_write_ops(struct mtd_info *mtd, loff_t to,
 	int ret;
 	int oob_required = oob ? 1 : 0;
 
+/*
 	DBG("mtd %p, name %s, to 0x%llx, writelen %u, mtd writesize %u"
             "oobwritelen %u, subpagesize %u, subpage_sft %u",
 	    mtd, mtd->name, to, writelen, mtd->writesize,
 	    oobwritelen, chip->subpagesize, mtd->subpage_sft);
-
+*/
 	ops->retlen = 0;
 	if (!writelen)
 		return 0;
@@ -2814,12 +2816,12 @@ static int nand_do_write_ops(struct mtd_info *mtd, loff_t to,
 
 	page = realpage & chip->pagemask;
 	blockmask = (1 << (chip->phys_erase_shift - chip->page_shift)) - 1;
-
+/*
 	DBG("column %d, realpage %d, page_shift %u, page %u, pagemask 0x%x,"
 	    " blockmask 0x%x, phys_erase_shift %u",
 	    column, realpage, chip->page_shift, page, chip->pagemask,
 	    blockmask, chip->phys_erase_shift);
-
+*/
 	/* Invalidate the page cache, when we write to the cached page */
 	if (to <= ((loff_t)chip->pagebuf << chip->page_shift) &&
 	    ((loff_t)chip->pagebuf << chip->page_shift) < (to + ops->len))
