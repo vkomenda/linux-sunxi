@@ -75,6 +75,7 @@
 				boot0@0 {
 					label = "boot0";
 					reg = /bits/ 64 <0x0 0x400000>;
+					write-size = <1024>;
 					nand-ecc-mode = "hw_syndrome";
 					nand-rnd-mode = "hw";
 					nand-randomizer-seeds = /bits/ 16 <0x4a80>;

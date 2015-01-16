@@ -4775,29 +4775,30 @@ int nand_add_partition(struct mtd_info *master, struct nand_part *part)
 	bool inserted = false;
 	int ret;
 
-	if (master)
-		chip = master->priv;
-	else
-		BUG();
+	BUG_ON(!master || !part);
 
-	if (part) {
-		mtd = &part->mtd;
-		ecc = part->ecc;
-	}
-	else
-		BUG();
+	chip = master->priv;
+	mtd = &part->mtd;
+	ecc = part->ecc;
 
-	DBG("chip %p, mtd %p, ecc %p",
-	    chip, mtd, ecc);
+	DBG("chip %p, mtd %p, ecc %p", chip, mtd, ecc);
 
 	/* set up the MTD object for this partition */
 	mtd->type = master->type;
 	mtd->flags = master->flags & ~mtd->flags;
-	mtd->writesize = master->writesize;
-	mtd->writebufsize = master->writebufsize;
+	mtd->subpage_sft = master->subpage_sft;
+	if (!mtd->writesize) {
+		mtd->writesize = master->writesize;
+		mtd->writebufsize = master->writebufsize;
+	}
+	else
+		mtd->writebufsize = mtd->writesize;
+
+	DBG("writesize %u, writebufsize %u, subpage_sft %u",
+	    mtd->writesize, mtd->writebufsize, mtd->subpage_sft);
+
 	mtd->oobsize = master->oobsize;
 	mtd->oobavail = master->oobavail;
-	mtd->subpage_sft = master->subpage_sft;
 	mtd->erasesize = master->erasesize;
 
 	mtd->priv = chip;
@@ -4931,7 +4932,8 @@ EXPORT_SYMBOL(nand_del_partition);
  */
 static void nandpart_release(struct nand_part *part)
 {
-	kfree(part);
+	if (part)
+		kfree(part);
 }
 
 /**

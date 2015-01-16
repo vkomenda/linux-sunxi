@@ -1277,6 +1277,7 @@ static void sunxi_nand_rnd_ctrl_cleanup(struct nand_rnd_ctrl *rnd)
 }
 
 static int sunxi_nand_rnd_ctrl_init(struct mtd_info *mtd,
+				    u32 writesize,
 				    struct nand_rnd_ctrl *rnd,
 				    struct nand_ecc_ctrl *ecc,
 				    struct device_node *np)
@@ -1323,7 +1324,7 @@ static int sunxi_nand_rnd_ctrl_init(struct mtd_info *mtd,
 			goto err;
 		}
 		layout->nranges = 1;
-		layout->ranges[0].offset = mtd->writesize;
+		layout->ranges[0].offset = writesize ? writesize : mtd->writesize;
 		layout->ranges[0].length = 2;
 		rnd->layout = layout;
 		break;
@@ -1477,6 +1478,7 @@ static int sunxi_nand_chip_init_timings(struct sunxi_nand_chip *chip,
 }
 
 static int sunxi_nand_hw_common_ecc_ctrl_init(struct mtd_info *mtd,
+					      u32 writesize,
 					      struct nand_ecc_ctrl *ecc,
 					      struct device_node *np)
 {
@@ -1515,7 +1517,7 @@ static int sunxi_nand_hw_common_ecc_ctrl_init(struct mtd_info *mtd,
 	ecc->bytes = ALIGN(ecc->bytes, 2);
 
 	layout = &data->layout;
-	nsectors = mtd->writesize / ecc->size;
+	nsectors = (writesize ? writesize : mtd->writesize) / ecc->size;
 
 	if (mtd->oobsize < ((ecc->bytes + 4) * nsectors)) {
 		ret = -EINVAL;
@@ -1541,6 +1543,7 @@ static void sunxi_nand_hw_common_ecc_ctrl_cleanup(struct nand_ecc_ctrl *ecc)
 }
 
 static int sunxi_nand_hw_ecc_ctrl_init(struct mtd_info *mtd,
+				       u32 writesize,
 				       struct nand_ecc_ctrl *ecc,
 				       struct device_node *np)
 {
@@ -1549,14 +1552,14 @@ static int sunxi_nand_hw_ecc_ctrl_init(struct mtd_info *mtd,
 	int i, j;
 	int ret;
 
-	ret = sunxi_nand_hw_common_ecc_ctrl_init(mtd, ecc, np);
+	ret = sunxi_nand_hw_common_ecc_ctrl_init(mtd, 0, ecc, np);
 	if (ret)
 		return ret;
 
 	ecc->read_page = sunxi_nfc_hw_ecc_read_page;
 	ecc->write_page = sunxi_nfc_hw_ecc_write_page;
 	layout = ecc->layout;
-	nsectors = mtd->writesize / ecc->size;
+	nsectors = (writesize ? writesize : mtd->writesize) / ecc->size;
 
 	for (i = 0; i < nsectors; i++) {
 		if (i) {
@@ -1594,6 +1597,7 @@ static int sunxi_nand_hw_ecc_ctrl_init(struct mtd_info *mtd,
 }
 
 static int sunxi_nand_hw_syndrome_ecc_ctrl_init(struct mtd_info *mtd,
+						u32 writesize,
 						struct nand_ecc_ctrl *ecc,
 						struct device_node *np)
 {
@@ -1602,7 +1606,7 @@ static int sunxi_nand_hw_syndrome_ecc_ctrl_init(struct mtd_info *mtd,
 	int i;
 	int ret;
 
-	ret = sunxi_nand_hw_common_ecc_ctrl_init(mtd, ecc, np);
+	ret = sunxi_nand_hw_common_ecc_ctrl_init(mtd, 0, ecc, np);
 	if (ret)
 		return ret;
 
@@ -1611,7 +1615,7 @@ static int sunxi_nand_hw_syndrome_ecc_ctrl_init(struct mtd_info *mtd,
 	ecc->write_page = sunxi_nfc_hw_syndrome_ecc_write_page;
 
 	layout = ecc->layout;
-	nsectors = mtd->writesize / ecc->size;
+	nsectors = (writesize ? writesize : mtd->writesize) / ecc->size;
 
 	for (i = 0; i < (ecc->bytes * nsectors); i++)
 		layout->eccpos[i] = i;
@@ -1634,6 +1638,7 @@ static void sunxi_nand_rnd_cleanup(struct nand_rnd_ctrl *rnd)
 }
 
 static int sunxi_nand_rnd_init(struct mtd_info *mtd,
+			       u32 writesize,
 			       struct nand_rnd_ctrl *rnd,
 			       struct nand_ecc_ctrl *ecc,
 			       struct device_node *np)
@@ -1648,7 +1653,7 @@ static int sunxi_nand_rnd_init(struct mtd_info *mtd,
 
 	switch (rnd->mode) {
 	case NAND_RND_HW:
-		return sunxi_nand_rnd_ctrl_init(mtd, rnd, ecc, np);
+		return sunxi_nand_rnd_ctrl_init(mtd, writesize, rnd, ecc, np);
 	default:
 		break;
 	}
@@ -1670,7 +1675,9 @@ static void sunxi_nand_ecc_cleanup(struct nand_ecc_ctrl *ecc)
 	}
 }
 
-static int sunxi_nand_ecc_init(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc,
+static int sunxi_nand_ecc_init(struct mtd_info *mtd,
+			       u32 writesize,
+			       struct nand_ecc_ctrl *ecc,
 			       struct device_node *np)
 {
 	struct nand_chip *nand = mtd->priv;
@@ -1708,12 +1715,13 @@ static int sunxi_nand_ecc_init(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc,
 					  8);
 		break;
 	case NAND_ECC_HW:
-		ret = sunxi_nand_hw_ecc_ctrl_init(mtd, ecc, np);
+		ret = sunxi_nand_hw_ecc_ctrl_init(mtd, writesize, ecc, np);
 		if (ret)
 			return ret;
 		break;
 	case NAND_ECC_HW_SYNDROME:
-		ret = sunxi_nand_hw_syndrome_ecc_ctrl_init(mtd, ecc, np);
+		ret = sunxi_nand_hw_syndrome_ecc_ctrl_init(mtd, writesize,
+							   ecc, np);
 		if (ret)
 			return ret;
 		break;
@@ -1748,12 +1756,20 @@ struct nand_part *sunxi_ofnandpart_parse(struct mtd_info *master,
 	struct nand_chip *chip = master->priv;
 	struct sunxi_nand_part *part;
 	int ret;
+	u32 writesize = 0;
 
 	part = kzalloc(sizeof(*part), GFP_KERNEL);
 	part->part.release = sunxi_nand_part_release;
 
+	if (of_find_property(pp, "write-size", NULL)) {
+		ret = of_property_read_u32(pp, "write-size", &writesize);
+		if (ret)
+			goto err;
+		writesize = part->part.mtd.writesize;
+	}
+
 	if (of_find_property(pp, "nand-ecc-mode", NULL)) {
-		ret = sunxi_nand_ecc_init(master, &part->ecc, pp);
+		ret = sunxi_nand_ecc_init(master, writesize, &part->ecc, pp);
 		if (ret)
 			goto err;
 
@@ -1761,7 +1777,7 @@ struct nand_part *sunxi_ofnandpart_parse(struct mtd_info *master,
 	}
 
 	if (of_find_property(pp, "nand-rnd-mode", NULL)) {
-		ret = sunxi_nand_rnd_init(master, &part->rnd,
+		ret = sunxi_nand_rnd_init(master, writesize, &part->rnd,
 				part->part.ecc ? part->part.ecc : &chip->ecc,
 				pp);
 		if (ret)
@@ -1918,13 +1934,13 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 	if (ret)
 		return ret;
 
-	ret = sunxi_nand_ecc_init(mtd, &nand->ecc, np);
+	ret = sunxi_nand_ecc_init(mtd, 0, &nand->ecc, np);
 	if (ret) {
 		dev_err(dev, "ECC init failed: %d\n", ret);
 		return ret;
 	}
 
-	ret = sunxi_nand_rnd_init(mtd, &nand->rnd, &nand->ecc, np);
+	ret = sunxi_nand_rnd_init(mtd, 0, &nand->rnd, &nand->ecc, np);
 	if (ret)
 		return ret;
 
