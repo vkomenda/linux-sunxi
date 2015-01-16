@@ -2746,7 +2746,14 @@ static uint8_t *nand_fill_oob(struct mtd_info *mtd, uint8_t *oob, size_t len,
 	return NULL;
 }
 
-#define NOTALIGNED(x)	((x & (chip->subpagesize - 1)) != 0)
+/*
+ * This computation is correct for non-standard page sizes if the chip has no
+ * subpages.
+ */
+#define page_aligned(x)							\
+	(mtd->subpage_sft ?						\
+	 (x & (chip->subpagesize - 1)) == 0 :				\
+	 (x & (mtd->writesize - 1)) == 0)
 
 /**
  * nand_do_write_ops - [INTERN] NAND write with ECC
@@ -2772,14 +2779,19 @@ static int nand_do_write_ops(struct mtd_info *mtd, loff_t to,
 	int ret;
 	int oob_required = oob ? 1 : 0;
 
+	DBG("mtd %p, name %s, to 0x%llx, writelen %u, mtd writesize %u"
+            "oobwritelen %u, subpagesize %u, subpage_sft %u",
+	    mtd, mtd->name, to, writelen, mtd->writesize,
+	    oobwritelen, chip->subpagesize, mtd->subpage_sft);
+
 	ops->retlen = 0;
 	if (!writelen)
 		return 0;
 
 	/* Reject writes, which are not page aligned */
-	if (NOTALIGNED(to) || NOTALIGNED(ops->len)) {
+	if (!page_aligned(to) || !page_aligned(writelen)) {
 		pr_notice("%s: attempt to write non page aligned data\n",
-			   __func__);
+			  __func__);
 		return -EINVAL;
 	}
 
@@ -2794,9 +2806,19 @@ static int nand_do_write_ops(struct mtd_info *mtd, loff_t to,
 		goto err_out;
 	}
 
-	realpage = (int)(to >> chip->page_shift);
+	/* Check if the write size equals the datasheet page size. */
+	if (1 << chip->page_shift == mtd->writesize)
+		realpage = (int) (to >> chip->page_shift);
+	else /* correction for non-datasheet page size */
+		realpage = (int) DIV_ROUND_UP_ULL(to, mtd->writesize);
+
 	page = realpage & chip->pagemask;
 	blockmask = (1 << (chip->phys_erase_shift - chip->page_shift)) - 1;
+
+	DBG("column %d, realpage %d, page_shift %u, page %u, pagemask 0x%x,"
+	    " blockmask 0x%x, phys_erase_shift %u",
+	    column, realpage, chip->page_shift, page, chip->pagemask,
+	    blockmask, chip->phys_erase_shift);
 
 	/* Invalidate the page cache, when we write to the cached page */
 	if (to <= ((loff_t)chip->pagebuf << chip->page_shift) &&
@@ -5135,7 +5157,11 @@ EXPORT_SYMBOL(nand_scan);
  */
 void nand_release(struct mtd_info *mtd)
 {
-	struct nand_chip *chip = mtd->priv;
+	struct nand_chip *chip;
+
+	BUG_ON(!mtd || !mtd->priv);
+
+	chip = mtd->priv;
 
 	if (chip->ecc.mode == NAND_ECC_SOFT_BCH)
 		nand_bch_free((struct nand_bch_control *)chip->ecc.priv);
@@ -5143,16 +5169,22 @@ void nand_release(struct mtd_info *mtd)
 	mtd_device_unregister(mtd);
 
 	/* Free bad block table memory */
-	if (chip->bbt)
+	if (chip->bbt) {
+		DBG("freeing BBT %p", chip->bbt);
 		kfree(chip->bbt);
+	}
 
-	if (chip->buffers && !(chip->options & NAND_OWN_BUFFERS))
+	if (chip->buffers && !(chip->options & NAND_OWN_BUFFERS)) {
+		DBG("freeing buffers %p", chip->buffers);
 		kfree(chip->buffers);
+	}
 
 	/* Free bad block descriptor memory */
 	if (chip->badblock_pattern && chip->badblock_pattern->options
-			& NAND_BBT_DYNAMICSTRUCT)
+	    & NAND_BBT_DYNAMICSTRUCT) {
+		DBG("freeing BB pattern %p", chip->badblock_pattern);
 		kfree(chip->badblock_pattern);
+	}
 }
 EXPORT_SYMBOL_GPL(nand_release);
 

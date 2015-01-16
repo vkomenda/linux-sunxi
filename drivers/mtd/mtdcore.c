@@ -492,6 +492,7 @@ int del_mtd_device(struct mtd_info *mtd)
 	int ret;
 	struct mtd_notifier *not;
 
+	DBG("mtd %p named %s", mtd, mtd->name);
 	mutex_lock(&mtd_table_mutex);
 
 	if (idr_find(&mtd_idr, mtd->index) != mtd) {

@@ -223,6 +223,7 @@ struct sunxi_nand_part {
 static inline struct sunxi_nand_part *
 to_sunxi_nand_part(struct nand_part *part)
 {
+	BUG_ON(!part);
 	return container_of(part, struct sunxi_nand_part, part);
 }
 
@@ -901,6 +902,8 @@ static int sunxi_nfc_hw_ecc_write_page(struct mtd_info *mtd,
 	int i;
 	int cnt;
 
+	DBG("mtd %p, chip %p, writesize %u", mtd, chip, mtd->writesize);
+
 	tmp = readl(nfc->regs + NFC_REG_ECC_CTL);
 	tmp &= ~(NFC_ECC_MODE | NFC_ECC_PIPELINE | NFC_ECC_BLOCK_SIZE);
 	tmp |= NFC_ECC_EN | (data->mode << NFC_ECC_MODE_SHIFT) |
@@ -1539,6 +1542,7 @@ err:
 
 static void sunxi_nand_hw_common_ecc_ctrl_cleanup(struct nand_ecc_ctrl *ecc)
 {
+	BUG_ON(!ecc || !ecc->priv);
 	kfree(ecc->priv);
 }
 
@@ -1741,13 +1745,7 @@ static int sunxi_nand_ecc_init(struct mtd_info *mtd,
 
 static void sunxi_nand_part_release(struct nand_part *part)
 {
-	struct sunxi_nand_part* spart;
-
-	DBG("part %p", part);
-	spart = to_sunxi_nand_part(part);
-	DBG("sunxi part %p", spart);
-
-	kfree(spart);
+	kfree(to_sunxi_nand_part(part));
 }
 
 struct nand_part *sunxi_ofnandpart_parse(struct mtd_info *master,
