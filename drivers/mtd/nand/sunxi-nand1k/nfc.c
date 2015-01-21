@@ -66,6 +66,12 @@ unsigned int random_switch = 1;
 module_param(random_switch, uint, 0);
 MODULE_PARM_DESC(random_switch, "random read/write switch: 1=on, 0=off");
 
+#define AW_RND_SEED 0x4a80
+
+unsigned int fixed_random_seed = AW_RND_SEED;
+module_param(fixed_random_seed, uint, 0);
+MODULE_PARM_DESC(fixed_random_seed, "random seed: default 0x4a80, 0=pseudorandom modulo page");
+
 unsigned int debug = 0;
 module_param(debug, uint, 0);
 MODULE_PARM_DESC(debug, "debug output: 1=on, 0=off");
@@ -300,7 +306,9 @@ static void enable_random_preset(void)
 		ctl |= NFC_RANDOM_EN;
 		ctl &= ~NFC_RANDOM_DIRECTION;
 		ctl &= ~NFC_RANDOM_SEED;
-		ctl |= 0x4a80 << 16;
+		ctl |= fixed_random_seed ?
+			(fixed_random_seed & 0x7FFF) << 16 :
+			AW_RND_SEED << 16;
 		writel(ctl, NFC_REG_ECC_CTL);
 //		DBG("+random:preset");
 	}
@@ -682,8 +690,12 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 		writel(sector_count, NFC_REG_SECTOR_NUM);
 
 	// enable random
-	if (do_enable_random)
-		enable_random(page_addr);
+	if (do_enable_random) {
+		if (!fixed_random_seed)
+			enable_random(page_addr);
+		else
+			enable_random_preset();
+	}
 
 	// enable ecc
 	if (do_enable_ecc)
@@ -1378,67 +1390,12 @@ int nfc_second_init(struct mtd_info *mtd)
 	nand->ecc.layout = &sunxi_ecclayout;
 	nand->ecc.bytes = 0;
 	sunxi_ecclayout.eccbytes = 0;
-	sunxi_ecclayout.oobavail = 30; // mtd->writesize / 1024 * 4 - 2;
-	sunxi_ecclayout.oobfree->offset = 2;
-	sunxi_ecclayout.oobfree->length = 30; // mtd->writesize / 1024 * 4 - 2;
+	sunxi_ecclayout.oobavail = mtd->writesize / 1024 * 4 - 2;
+	sunxi_ecclayout.oobfree->offset = 1;
+	sunxi_ecclayout.oobfree->length = mtd->writesize / 1024 * 4 - 2;
 	DBG("oobavail %d oobfree.offset %d oobfree.length %d",
 	    sunxi_ecclayout.oobavail, sunxi_ecclayout.oobfree->offset,
 	    sunxi_ecclayout.oobfree->length);
-
-#if 0
-	/* HW ECC always request ECC bytes for 1024 bytes blocks */
-	nand->ecc.bytes = DIV_ROUND_UP(nand->ecc.strength * fls(mtd->writesize),
-				       nand->ecc.strength);
-	/* HW ECC always work with even numbers of ECC bytes */
-	nand->ecc.bytes = ALIGN(nand->ecc.bytes, 2);
-	DBG("ecc.strength %d yields ecc.bytes %d", nand->ecc.strength, nand->ecc.bytes);
-
-	if (mtd->oobsize < ((nand->ecc.bytes + 4) * nand->ecc.steps)) {
-		DBG("ECC does not fit into OOB");
-		err = -EINVAL;
-		goto out;
-	}
-	sunxi_ecclayout.eccbytes = nand->ecc.bytes * nand->ecc.steps;
-	DBG("ecc.steps %d yield eccbytes %d", nand->ecc.steps, sunxi_ecclayout.eccbytes);
-
-	for (i = 0; i < nand->ecc.steps; i++) {
-		if (i) {
-			sunxi_ecclayout.oobfree[i].offset =
-				sunxi_ecclayout.oobfree[i - 1].offset +
-				sunxi_ecclayout.oobfree[i - 1].length +
-				nand->ecc.bytes;
-			sunxi_ecclayout.oobfree[i].length = 4;
-		} else {
-			/*
-			 * The first 2 bytes are used for BB markers, hence we
-			 * only have 2 bytes available in the first user data
-			 * section.
-			 */
-			sunxi_ecclayout.oobfree[i].length = 2;
-			sunxi_ecclayout.oobfree[i].offset = 2;
-		}
-		DBG("oobfree #%d offset %x length %x", i,
-		    sunxi_ecclayout.oobfree[i].offset,
-		    sunxi_ecclayout.oobfree[i].length);
-
-		for (j = 0; j < nand->ecc.bytes; j++) {
-			sunxi_ecclayout.eccpos[(nand->ecc.bytes * i) + j] =
-				sunxi_ecclayout.oobfree[i].offset +
-				sunxi_ecclayout.oobfree[i].length + j;
-			DBG("eccpos #%d: %x", j,
-			    sunxi_ecclayout.eccpos[(nand->ecc.bytes * i) + j]);
-		}
-	}
-
-	if (mtd->oobsize > (nand->ecc.bytes + 4) * nand->ecc.steps) {
-		sunxi_ecclayout.oobfree[nand->ecc.steps].offset =
-			sunxi_ecclayout.oobfree[nand->ecc.steps - 1].offset +
-			sunxi_ecclayout.oobfree[nand->ecc.steps - 1].length +
-			nand->ecc.bytes;
-		sunxi_ecclayout.oobfree[nand->ecc.steps].length = mtd->oobsize -
-			((nand->ecc.bytes + 4) * nand->ecc.steps);
-	}
-#endif // 0
 
 	// uninitialise the temporary DMA buffer
 	if (read_buffer) {
