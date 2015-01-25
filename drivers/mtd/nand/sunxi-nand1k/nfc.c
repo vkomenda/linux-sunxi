@@ -1346,8 +1346,11 @@ int nfc_second_init(struct mtd_info *mtd)
 	// setup ECC layout
 	nand->ecc.layout = &sunxi_ecclayout;
 	nand->ecc.bytes = 0;
+
+	// FIXME: derive from the ID in nand_base.c:parse_hynix_sizes()
 	nand->ecc.strength = 40;
 	nand->ecc.size = SZ_1K;
+
 	sunxi_ecclayout.eccbytes = 0;
 	sunxi_ecclayout.oobavail = mtd->writesize / 1024 * 4 - 2;
 	sunxi_ecclayout.oobfree->offset = 2;
