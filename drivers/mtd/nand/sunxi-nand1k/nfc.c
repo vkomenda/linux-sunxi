@@ -62,6 +62,10 @@ unsigned int bbt_use_flash = 0;
 module_param(bbt_use_flash, uint, 0);
 MODULE_PARM_DESC(bbt_use_flash, "flash bad block table placement: 1=flash, 0=RAM");
 
+unsigned int invalid_bbm = 1;
+module_param(invalid_bbm, uint, 0);
+MODULE_PARM_DESC(invalid_bbm, "skip non-0 bad block markers: 1=yes, 0=no");
+
 unsigned int random_switch = 1;
 module_param(random_switch, uint, 0);
 MODULE_PARM_DESC(random_switch, "random read/write switch: 1=on, 0=off");
@@ -736,7 +740,7 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 		break;
 	case NAND_CMD_READ0:
 		if (read_buffer) {
-			u32* oob_start = read_buffer + mtd->writesize;
+			u32* oob_start = (u32*) (read_buffer + mtd->writesize);
 			for (i = 0; i < sector_count; i++) {
 				u32 userdata = readl(NFC_REG_USER_DATA(i));
 				*(oob_start + i * 4) = userdata;
@@ -1086,7 +1090,9 @@ int nfc_first_init(struct mtd_info *mtd)
 	nand->bbt_options = NAND_BBT_SCANLASTPAGE; // | NAND_BBT_SCAN2NDPAGE
 	if (bbt_use_flash)
 		nand->bbt_options |= NAND_BBT_USE_FLASH | NAND_BBT_NO_OOB;
-
+	if (invalid_bbm)
+		nand->options |= NAND_INVALID_BBM;
+	
 	/* Set up a temporary DMA read buffer */
 	dma_hdle = dma_nand_request(1);
 	if (!dma_hdle) {
@@ -1391,7 +1397,7 @@ int nfc_second_init(struct mtd_info *mtd)
 	nand->ecc.bytes = 0;
 	sunxi_ecclayout.eccbytes = 0;
 	sunxi_ecclayout.oobavail = mtd->writesize / 1024 * 4 - 2;
-	sunxi_ecclayout.oobfree->offset = 1;
+	sunxi_ecclayout.oobfree->offset = 2;
 	sunxi_ecclayout.oobfree->length = mtd->writesize / 1024 * 4 - 2;
 	DBG("oobavail %d oobfree.offset %d oobfree.length %d",
 	    sunxi_ecclayout.oobavail, sunxi_ecclayout.oobfree->offset,
