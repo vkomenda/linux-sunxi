@@ -2,6 +2,7 @@
  * nfc.c
  *
  * Copyright (C) 2013 Qiang Yu <yuq825@gmail.com>
+ *               2015 Vladimir Komendantskiy
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -58,11 +59,11 @@ unsigned int hwecc_switch = 1;
 module_param(hwecc_switch, uint, 0);
 MODULE_PARM_DESC(hwecc_switch, "hardware ECC switch: 1=on, 0=off");
 
-unsigned int bbt_use_flash = 0;
+unsigned int bbt_use_flash = 1;
 module_param(bbt_use_flash, uint, 0);
 MODULE_PARM_DESC(bbt_use_flash, "flash bad block table placement: 1=flash, 0=RAM");
 
-unsigned int invalid_bbm = 1;
+unsigned int invalid_bbm = 0;
 module_param(invalid_bbm, uint, 0);
 MODULE_PARM_DESC(invalid_bbm, "skip non-0 bad block markers: 1=yes, 0=no");
 
@@ -228,35 +229,16 @@ static void release_nand_clock(void)
 	writel(cfg, NAND_SCLK_CFG_REG);
 }
 
-/*
-static void active_nand_clock(void)
-{
-	uint32_t cfg;
-
-	// disable bus clock
-	cfg = readl(AHB_GATING_REG0);
-	cfg |= 1 << AHB_GATING_NAND_CLK_SHIFT;
-	writel(cfg, AHB_GATING_REG0);
-
-	// disable device clock
-	cfg = readl(NAND_SCLK_CFG_REG);
-	cfg |= 1 << SCLK_GATING_SHIFT;
-	writel(cfg, NAND_SCLK_CFG_REG);
-}
-*/
-
 u32 pioc_handle;
 
 // Set PIOC pin for NAND Flash use
 static void sunxi_set_nand_pio(void)
 {
-	DBG("");
 	pioc_handle = gpio_request_ex("nand_para", NULL);
 }
 
 static void sunxi_release_nand_pio(void)
 {
-	DBG("");
 	gpio_release(pioc_handle, 1);
 }
 
@@ -355,7 +337,6 @@ static void disable_random(void)
 	if (random_switch) {
 		u32 ctl;
 
-//		DBG("");
 		ctl = readl(NFC_REG_ECC_CTL);
 		ctl &= ~NFC_RANDOM_EN;
 		writel(ctl, NFC_REG_ECC_CTL);
@@ -379,7 +360,6 @@ static void enable_ecc(int pipline)
 
 		cfg |= NFC_ECC_EN;
 		writel(cfg, NFC_REG_ECC_CTL);
-//		DBG("+ecc");
 	}
 }
 
@@ -451,7 +431,6 @@ static void disable_ecc(void)
 		u32 cfg = readl(NFC_REG_ECC_CTL);
 		cfg &= (~NFC_ECC_EN) & 0xffffffff;
 		writel(cfg, NFC_REG_ECC_CTL);
-//		DBG("-ecc");
 	}
 }
 
@@ -740,7 +719,7 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 		break;
 	case NAND_CMD_READ0:
 		if (read_buffer) {
-			u32* oob_start = (u32*) (read_buffer + mtd->writesize);
+			u32* oob_start = (u32*) read_buffer + mtd->writesize;
 			for (i = 0; i < sector_count; i++) {
 				u32 userdata = readl(NFC_REG_USER_DATA(i));
 				*(oob_start + i * 4) = userdata;
@@ -836,17 +815,6 @@ irqreturn_t nfc_interrupt_handler(int irq, void *dev_id)
 	if (st & NFC_RB_B2R) {
 		wake_up(&nand_rb_wait);
 	}
-	/*
-	if (st & NFC_CMD_INT_FLAG) {
-		DBG("CMD INT");
-	}
-	if (st & NFC_DMA_INT_FLAG) {
-		//DBG_INFO("DMA INT\n");
-	}
-	if (st & NFC_NATCH_INT_FLAG) {
-		DBG("NATCH INT\n");
-	}
-	*/
 	// clear interrupt
 	writel(st, NFC_REG_ST);
 	return IRQ_HANDLED;
@@ -1029,21 +997,6 @@ void nfc_write_set_pagesize(u32 page_addr, u32 size, void *buff)
 
 //////////////////////////////////////////////////////////////////////////////////////
 
-static void first_test_nfc(struct mtd_info *mtd)
-{
-	DBG("reset");
-	nfc_cmdfunc(mtd, NAND_CMD_RESET, -1, -1);
-	DBG("nand ctrl %x", readl(NFC_REG_CTL));
-	DBG("nand ecc ctrl %x", readl(NFC_REG_ECC_CTL));
-	DBG("nand timing %x", readl(NFC_REG_TIMING_CTL));
-	nfc_cmdfunc(mtd, NAND_CMD_READID, 0, -1);
-	DBG("readid first time: %x %x",
-	    nfc_read_byte(mtd),  nfc_read_byte(mtd));
-	nfc_cmdfunc(mtd, NAND_CMD_READID, 0, -1);
-	DBG("readid second time: %x %x",
-	    nfc_read_byte(mtd),  nfc_read_byte(mtd));
-}
-
 int nfc_first_init(struct mtd_info *mtd)
 {
 	u32 ctl;
@@ -1073,8 +1026,6 @@ int nfc_first_init(struct mtd_info *mtd)
 	ctl = (1 << 8);
 	writel(ctl, NFC_REG_TIMING_CTL);
 
-	first_test_nfc(mtd);
-
 	nand->ecc.mode = NAND_ECC_HW;
 	nand->ecc.hwctl = nfc_ecc_hwctl;
 	nand->ecc.calculate = nfc_ecc_calculate;
@@ -1092,7 +1043,7 @@ int nfc_first_init(struct mtd_info *mtd)
 		nand->bbt_options |= NAND_BBT_USE_FLASH | NAND_BBT_NO_OOB;
 	if (invalid_bbm)
 		nand->options |= NAND_INVALID_BBM;
-	
+
 	/* Set up a temporary DMA read buffer */
 	dma_hdle = dma_nand_request(1);
 	if (!dma_hdle) {
@@ -1395,6 +1346,8 @@ int nfc_second_init(struct mtd_info *mtd)
 	// setup ECC layout
 	nand->ecc.layout = &sunxi_ecclayout;
 	nand->ecc.bytes = 0;
+	nand->ecc.strength = 40;
+	nand->ecc.size = SZ_1K;
 	sunxi_ecclayout.eccbytes = 0;
 	sunxi_ecclayout.oobavail = mtd->writesize / 1024 * 4 - 2;
 	sunxi_ecclayout.oobfree->offset = 2;
@@ -1449,7 +1402,7 @@ int nfc_second_init(struct mtd_info *mtd)
 		print_page(mtd, 0, 1);
 		// start of SPL, read in 1 KiB mode
 		print_set_pagesize(mtd, SZ_1K, 0);
-		// start of U-Boot at 4 MiB with 16 KiB page size
+		// start of U-Boot at 4 MiB with datasheet page size
 		print_page(mtd, 256, 1);
 	}
 //	print_set_pagesize(mtd, SZ_2K, 0);
