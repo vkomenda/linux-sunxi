@@ -395,9 +395,8 @@ int check_ecc(int block_cnt)
 	cfg = readl(NFC_REG_ECC_ST) & 0xffff;
 	for (i = 0; i < block_cnt; i++) {
 		if (cfg & (1<<i)) {
-			pr_err(pr_fmt("ECC status %x: "
-				      "Uncorrectable error in sector %d "
-				      "(%d blocks, ECC mode %u)\n"),
+			pr_err(pr_fmt("ECC status %x: fatal error in sector %d"
+				      " (%d blocks, ECC mode %u)\n"),
 				      cfg, i, block_cnt, ecc_mode);
 			return -1;
 		}
@@ -1288,7 +1287,11 @@ int nfc_second_init(struct mtd_info *mtd)
 		}
 		if (find) {
 			chip_param = &nand_chip_param[i];
-			DBG("found chip in Sunxi database");
+			printk("found chip in Sunxi database: ");
+			for (j = 0; j < nand_chip_param[i].id_len; j++) {
+				printk("%x", nand_chip_param[i].id[j]);
+			}
+			printk(" (ECC mode %d)\n", nand_chip_param[i].ecc_mode);
 			break;
 		}
 	}
@@ -1300,8 +1303,8 @@ int nfc_second_init(struct mtd_info *mtd)
 	}
 
 	// set final NFC clock freq
-//	if (chip_param->clock_freq > 30)
-//		chip_param->clock_freq = 30;
+	if (chip_param->clock_freq > 30)
+		chip_param->clock_freq = 30;
 	sunxi_set_nand_clock(chip_param->clock_freq);
 	DBG("set clock freq to %dMHz\n", chip_param->clock_freq);
 
