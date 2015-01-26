@@ -4024,7 +4024,7 @@ static int parse_hynix_sizes(struct mtd_info *mtd, struct nand_chip* chip,
 	erase_code |= (sizes & 0x01) << 2;
 	pr_info("Hynix codes: page size %d, block size %d, oob size %d\n",
 		mtd->writesize, erase_code, oob_code);
-	if (oob_code >= 0x4 || erase_code < 0x4)
+	if (/* oob_code >= 0x4 || */ erase_code < 0x4)
 		return -EINVAL;
 
 	if (density == 0xde /* 8GiB */ ||
@@ -4069,7 +4069,6 @@ static int parse_hynix_sizes(struct mtd_info *mtd, struct nand_chip* chip,
 	ecc = (plane_ecc >> 4) & 0x7;
 	switch (ecc) {
 	case 0:
-	default:
 		chip->ecc_strength_ds = 0;
 		break;
 	case 1:
@@ -4089,6 +4088,8 @@ static int parse_hynix_sizes(struct mtd_info *mtd, struct nand_chip* chip,
 		break;
 	case 6:
 		chip->ecc_strength_ds = 60;
+		break;
+	default:
 		break;
 	}
 	chip->ecc_step_ds  = SZ_1K;

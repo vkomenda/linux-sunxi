@@ -1339,7 +1339,7 @@ int nfc_second_init(struct mtd_info *mtd)
 	writel(ctl, NFC_REG_CTL);
 
 	writel(0xff, NFC_REG_TIMING_CFG);
-	writel(1 << nand->page_shift, NFC_REG_SPARE_AREA);
+	writel((1 << nand->page_shift) + 2, NFC_REG_SPARE_AREA);
 
 	// disable random
 	disable_random();
