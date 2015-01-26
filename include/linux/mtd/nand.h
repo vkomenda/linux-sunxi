@@ -187,6 +187,11 @@ typedef enum {
  * before calling nand_scan_tail.
  */
 #define NAND_BUSWIDTH_AUTO      0x00080000
+/*
+ * Set this on devices on which FTL format used by manufacturer may use the bbm
+ * area for other data.
+ */
+#define NAND_INVALID_BBM        0x00200000
 
 /* Options set by nand scan */
 /* Nand scan has allocated controller struct */

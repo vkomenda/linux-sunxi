@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2014 Boris BREZILLON <b.brezillon.dev@gmail.com>
+ *               2015 Vladimir Komendantskiy
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -48,12 +49,8 @@ int nand_setup_read_retry_hynix(struct mtd_info *mtd, int retry_count)
 	DBG("%d", retry_count);
 	chip->cmdfunc(mtd, 0x36, -1, -1);
 	for (i = 0; i < hynix->read_retry.regnum; i++) {
-		// set address for writing
 		int column = hynix->read_retry.regs[i];
-
-		// address is one byte only; there is only one address cycle
-		// column |= column << 8;
-
+		column |= column << 8;
 		chip->cmdfunc(mtd, NAND_CMD_NONE, column, -1);
 		chip->write_byte(mtd, hynix->read_retry.values[offset + i]);
 	}
@@ -76,9 +73,13 @@ static int h27ucg8t2a_init(struct mtd_info *mtd, const uint8_t *id)
 {
 	struct nand_chip *chip = mtd->priv;
 	struct hynix_nand *hynix;
-	u8 buf[1024];  // max(RR count register count, RR set register count)
+	u8* buf = NULL;  // max(RR count register count, RR set register count)
 	int i, j;
 	int ret;
+
+	buf = kzalloc(1024, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
 
 	chip->select_chip(mtd, 0);
 	chip->cmdfunc(mtd, NAND_CMD_RESET, -1, -1);
@@ -100,8 +101,10 @@ static int h27ucg8t2a_init(struct mtd_info *mtd, const uint8_t *id)
 	// RR register count - also 1 byte x 8 times.
 	chip->read_buf(mtd, buf, 16);
 	if ((buf[0] != 8 || buf[1] != 8) &&
-	    (buf[8] != 8 || buf[9] != 8))
-		return -EINVAL;
+	    (buf[8] != 8 || buf[9] != 8)) {
+		ret = -EINVAL;
+		goto buf_dealloc;
+	}
 	// Read 8 RR register sets, each consisting of a 64-byte original and
 	// its 64-byte inverse copy. Every set stores 8 lists of values for the
 	// 8 RR registers on the flash chip.
@@ -127,8 +130,10 @@ static int h27ucg8t2a_init(struct mtd_info *mtd, const uint8_t *id)
 
 	if (!ret) {
 		hynix = kzalloc(sizeof(*hynix), GFP_KERNEL);
-		if (!hynix)
-			return -ENOMEM;
+		if (!hynix) {
+			ret = -ENOMEM;
+			goto buf_dealloc;
+		}
 
 		hynix->read_retry.regs = h27ucg8t2a_read_retry_regs;
 		hynix->read_retry.regnum = 8;
@@ -138,6 +143,10 @@ static int h27ucg8t2a_init(struct mtd_info *mtd, const uint8_t *id)
 		chip->read_retries = 8;
 		chip->manuf_cleanup = h27ucg8t2a_cleanup;
 	}
+
+buf_dealloc:
+	if (buf)
+		kfree(buf);
 
 	return ret;
 }
@@ -154,17 +163,21 @@ static int h27ucg8t2e_init(struct mtd_info *mtd, const uint8_t *id)
 {
 	struct nand_chip *chip = mtd->priv;
 	struct hynix_nand *hynix;
-	u8 rrtOTP[UCG8T2E_RRT_OTP_SIZE];
+	u8* buf = NULL;
 	int rrtReg, rrtSet, i;
 	int ret;
 
 	DBG("mtd %p, ID %.2x %.2x %.2x %.2x %.2x %.2x",
 	    mtd, id[0], id[1], id[2], id[3], id[4], id[5]);
 
+	buf = kzalloc(UCG8T2E_RRT_OTP_SIZE, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+
 	chip->select_chip(mtd, 0);
 	chip->cmdfunc(mtd, NAND_CMD_RESET, -1, -1);
 
-	/* copy RRT from OTP to rrtOTP */
+	/* copy RRT from OTP to buf */
 	chip->cmdfunc(mtd, 0x36, 0x38, -1);
 	chip->write_byte(mtd, 0x52);
 	chip->cmdfunc(mtd, 0x16, -1, -1);
@@ -181,18 +194,19 @@ static int h27ucg8t2e_init(struct mtd_info *mtd, const uint8_t *id)
 	 *  and its 32-byte inverse copy. Every set stores 8 lists of values for
 	 *  the 4 RR registers on the flash chip.
 	 */
-	chip->read_buf(mtd, rrtOTP, UCG8T2E_RRT_OTP_SIZE);
+	chip->read_buf(mtd, buf, UCG8T2E_RRT_OTP_SIZE);
 	printk("RR count (8 copies), RR reg. count (8 copies):\n");
 	for (i = 0; i < 16; i++) {
-		printk(" %.2x", rrtOTP[i]);
+		printk(" %.2x", buf[i]);
 	}
 
-	if (rrtOTP[0] != 8 || rrtOTP[1] != 8) {
-		DBG("wrong total RR count %u (%u)", rrtOTP[0], rrtOTP[1]);
-		return -EINVAL;
+	if (buf[0] != 8 || buf[1] != 8) {
+		DBG("wrong total RR count %u (%u)", buf[0], buf[1]);
+		ret = -EINVAL;
+		goto buf_dealloc;
 	}
 
-//	chip->read_buf(mtd, rrtOTP, 512);
+//	chip->read_buf(mtd, buf, 512);
 
 	/* copy RRT from OTP, command suffix */
 	chip->cmdfunc(mtd, NAND_CMD_RESET, -1, -1);
@@ -208,7 +222,7 @@ static int h27ucg8t2e_init(struct mtd_info *mtd, const uint8_t *id)
 	ret = 0;
 	printk("RRT sets in OTP: original (inverse)...\n");
 	for (rrtSet = 0; rrtSet < 8; rrtSet++) {
-		u8 *cur = rrtOTP + 16 + (64 * rrtSet);
+		u8 *cur = buf + 16 + (64 * rrtSet);
 		for (rrtReg = 0; rrtReg < 32; rrtReg++) {
 			uint8_t original = cur[rrtReg];
 			uint8_t inverse  = cur[rrtReg + 32];
@@ -232,20 +246,26 @@ static int h27ucg8t2e_init(struct mtd_info *mtd, const uint8_t *id)
 		DBG("Loading of RRT from OTP failed. Using defaults.");
 
 		hynix = kzalloc(sizeof(*hynix), GFP_KERNEL);
-		if (!hynix)
-			return -ENOMEM;
+		if (!hynix) {
+			ret = -ENOMEM;
+			goto buf_dealloc;
+		}
 
 		hynix->read_retry.regs = h27ucg8t2e_read_retry_regs;
 		hynix->read_retry.regnum = 4;
 
 		// copy the first correct RRT set (the original half)
-		memcpy(hynix->read_retry.values, &rrtOTP[rrtSet * 64], 32);
+		memcpy(hynix->read_retry.values, &buf[rrtSet * 64], 32);
 
 		chip->manuf_priv = hynix;
 		chip->setup_read_retry = nand_setup_read_retry_hynix;
 		chip->read_retries = 8;
 		chip->manuf_cleanup = h27ucg8t2e_cleanup;
 	}
+
+buf_dealloc:
+	if (buf)
+		kfree(buf);
 
 	return ret;
 }
@@ -258,6 +278,10 @@ struct hynix_nand_initializer {
 struct hynix_nand_initializer initializers[] = {
 	{
 		.id = {NAND_MFR_HYNIX, 0xde, 0x94, 0xda, 0x74, 0xc4},
+		.init = h27ucg8t2a_init,
+	},
+	{       // same RR procedure for H27UBG8T2B
+		.id = {NAND_MFR_HYNIX, 0xde, 0x94, 0xda, 0x74, 0xc3},
 		.init = h27ucg8t2a_init,
 	},
 	{
