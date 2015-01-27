@@ -375,15 +375,16 @@ static void set_ecc_mode(int mode)
 	}
 }
 
-int check_ecc(int block_cnt)
+static int check_ecc(int block_cnt)
 {
-	int i, max_ecc_bit_cnt = 16, cfg, corrected = 0;
+	int i, max_ecc_bit_cnt, cfg, corrected;
 	uint8_t ecc_mode;
-	uint8_t ecc_bits[9] = {16, 24, 28, 32, 40, 48, 56, 60, 64};
+	uint8_t ecc_bits[] = {16, 24, 28, 32, 40, 48, 56, 60, 64};
 
         if (!hwecc_switch)
 		return 0;
 
+	corrected = 0;
 	ecc_mode = (readl(NFC_REG_ECC_CTL) & NFC_ECC_MODE) >> NFC_ECC_MODE_SHIFT;
 
 	if (ecc_mode < ARRAY_SIZE(ecc_bits))

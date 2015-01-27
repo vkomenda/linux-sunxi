@@ -1541,6 +1541,8 @@ static int nand_read_page_hwecc(struct mtd_info *mtd, struct nand_chip *chip,
 	unsigned int max_bitflips = 0;
 	int column = 0;
 
+	DBG("page %x", page);
+
 	for (i = 0; eccsteps; eccsteps--, i += eccbytes, p += eccsize) {
 		chip->cur_ecc->hwctl(mtd, NAND_ECC_READ);
 		nand_rnd_config(mtd, page, column, NAND_RND_READ);
