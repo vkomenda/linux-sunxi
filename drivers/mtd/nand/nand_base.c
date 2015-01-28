@@ -4092,6 +4092,7 @@ static int parse_hynix_sizes(struct mtd_info *mtd, struct nand_chip* chip,
 		chip->ecc_strength_ds = 60;
 		break;
 	default:
+		/* uses the default setting in the controller driver */
 		break;
 	}
 	chip->ecc_step_ds  = SZ_1K;

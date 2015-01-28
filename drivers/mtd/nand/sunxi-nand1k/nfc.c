@@ -487,30 +487,17 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 		byte_count = SZ_1K;
 		wait_rb_flag = 1;
 		break;
-	case NAND_CMD_RNDOUT: // no calls have been logged; byte_count looks wrong
-		addr_cycle = 2;
-		writel(0xE0, NFC_REG_RCMD_SET);
-		byte_count = mtd->oobsize;
-		cfg |= NFC_SEQ | NFC_SEND_CMD2;
-		wait_rb_flag = 1;
-		break;
+	case NAND_CMD_RNDOUT:
+		do_enable_ecc = 1;
+		do_enable_random = 1;
+		/* otherwise the same as a regular read */
 	case NAND_CMD_READOOB:
 	case NAND_CMD_READ0:
-		if (command == NAND_CMD_READOOB) {
-			cfg = NAND_CMD_READ0;
-			// sector num to read
-			sector_count = SZ_1K / SZ_1K;
-			read_size = SZ_1K;
-			// OOB offset
-			column += mtd->writesize;
-		}
-		else {
-			if (!otp_mode) {
+		if (command != NAND_CMD_READOOB) {
+			if (likely(!otp_mode)) {
 				// DMA is already set up; normal read
 				sector_count = mtd->writesize / SZ_1K;
 				read_size = mtd->writesize;
-				do_enable_ecc = 1;
-				do_enable_random = 1;
 				//DBG_INFO("cmdfunc read %d %d\n", column, page_addr);
 			}
 			else {
@@ -518,6 +505,14 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 				// 1K raw, don't read user data NFC registers
 				read_size = SZ_1K;
 			}
+		}
+		else {
+			cfg = NAND_CMD_READ0;
+			// sector num to read
+			sector_count = 1;   /* SZ_1K / SZ_1K; */
+			read_size = SZ_1K;  /* FIXME: try mtd->oobsize */
+			// OOB offset
+			column += mtd->writesize;
 		}
 
 		if (read_buffer) {
@@ -548,14 +543,14 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 		byte_count = SZ_1K;
 		wait_rb_flag = 1;
 
-		if (!otp_mode)
+		if (!otp_mode && do_enable_random)
 			// normal operation
 			//
 			// 0x30 for 2nd cycle of read page
 			// 0x05+0xe0 is the random data output command
 			writel(0x00e00530, NFC_REG_RCMD_SET);
 		else
-			// initialisation-time operation; no random output
+			// OTP read or emptiness test: no random output
 			writel(0x00000030, NFC_REG_RCMD_SET);
 		break;
 	case NAND_CMD_ERASE1:
@@ -689,6 +684,7 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 	writel(cfg, NFC_REG_CMD);
 
 	switch (command) {
+	case NAND_CMD_RNDOUT:
 	case NAND_CMD_READ0:
 		// the OTP mode is switched off after a single read
 		otp_mode = 0;
@@ -717,6 +713,7 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 		// select rb 0 back
 //		select_rb(0);
 		break;
+	case NAND_CMD_RNDOUT:
 	case NAND_CMD_READ0:
 		if (read_buffer) {
 			u32* oob_start = (u32*) read_buffer + mtd->writesize;
@@ -995,6 +992,58 @@ void nfc_write_set_pagesize(u32 page_addr, u32 size, void *buff)
 	nfc_select_chip(NULL, -1);
 }
 
+static int nfc_read_page_hwecc(struct mtd_info *mtd, struct nand_chip *chip,
+			       uint8_t *buf, int oob_required, int page)
+{
+	int status;
+	unsigned int max_bitflips = 0;
+	int column = 0;
+
+	DBG("page %x", page);
+
+	status = nand_page_get_status(mtd, page);
+	if (status == NAND_PAGE_STATUS_UNKNOWN) {
+		/* first, try reading without either the randomizer or ECC */
+		nfc_cmdfunc(mtd, NAND_CMD_READ0, 0, page);
+		nfc_read_buf(mtd, buf, mtd->writesize);
+		if (nand_page_is_empty(mtd, buf, buf + mtd->writesize)) {
+			status = NAND_PAGE_EMPTY;
+		}
+		else {
+			status = NAND_PAGE_FILLED;
+			/* copy the main area using the randomizer or ECC */
+			nfc_cmdfunc(mtd, NAND_CMD_RNDOUT, 0, page);
+			nfc_read_buf(mtd, buf, mtd->writesize);
+		}
+	}
+
+	nand_page_set_status(mtd, page, status);
+
+	if (status == NAND_PAGE_EMPTY) {
+		memset(buf, 0xff, mtd->writesize);
+		if (oob_required)
+			memset(chip->oob_poi, 0xff, mtd->oobsize);
+		/* return having emptied the read buffer */
+		return 0;
+	}
+
+	if (oob_required) {
+		/* copy the OOB area */
+		nfc_cmdfunc(mtd, NAND_CMD_READOOB, mtd->writesize, page);
+		nfc_read_buf(mtd, chip->oob_poi, mtd->oobsize);
+	}
+
+	status = check_ecc(mtd->writesize / SZ_1K);
+	if (status < 0) {
+		mtd->ecc_stats.failed++;
+	}
+	else {
+		mtd->ecc_stats.corrected += status;
+		max_bitflips = max_t(unsigned int, max_bitflips, status);
+	}
+	return max_bitflips;
+}
+
 int nfc_first_init(struct mtd_info *mtd)
 {
 	u32 ctl;
@@ -1028,6 +1077,7 @@ int nfc_first_init(struct mtd_info *mtd)
 	nand->ecc.hwctl = nfc_ecc_hwctl;
 	nand->ecc.calculate = nfc_ecc_calculate;
 	nand->ecc.correct = nfc_ecc_correct;
+	nand->ecc.read_page = nfc_read_page_hwecc;
 	nand->select_chip = nfc_select_chip;
 	nand->dev_ready = nfc_dev_ready;
 	nand->cmdfunc = nfc_cmdfunc;
