@@ -487,12 +487,14 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 		byte_count = SZ_1K;
 		wait_rb_flag = 1;
 		break;
-	case NAND_CMD_RNDOUT:
+	case NAND_CMD_READ0: /* Implied randomised read, see
+			      * nand_base.c:do_nand_read_ops() */
 		do_enable_ecc = 1;
 		do_enable_random = 1;
 		/* otherwise the same as a regular read */
 	case NAND_CMD_READOOB:
-	case NAND_CMD_READ0:
+	case NAND_CMD_READ1: /* Non-randomised read: this interpretation is
+			      * specific to this driver. */
 		if (command != NAND_CMD_READOOB) {
 			if (likely(!otp_mode)) {
 				// DMA is already set up; normal read
@@ -507,13 +509,15 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 			}
 		}
 		else {
-			cfg = NAND_CMD_READ0;
 			// sector num to read
 			sector_count = 1;   /* SZ_1K / SZ_1K; */
 			read_size = SZ_1K;  /* FIXME: try mtd->oobsize */
 			// OOB offset
 			column += mtd->writesize;
 		}
+		cfg = NAND_CMD_READ0; /* same underlying command for randomised
+				       * page, non-randomised page and OOB
+				       * reads. */
 
 		if (read_buffer) {
 			//access NFC internal RAM by DMA bus
@@ -567,25 +571,25 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 		addr_cycle = 5;
 		column = program_column;
 		page_addr = program_page;
-		// for write OOB
-		if (column == mtd->writesize) {
-			sector_count = SZ_1K / SZ_1K;
-			write_size = SZ_1K;
-		}
-		else if (column == 0) {
-			sector_count = mtd->writesize / SZ_1K;
+		if (likely(column == 0)) {
 			do_enable_ecc = 1;
+			do_enable_random = 1;
+			sector_count = mtd->writesize / SZ_1K;
 			write_size = mtd->writesize;
 			for (i = 0; i < sector_count; i++)
 				writel(*((u32*)
 					 (write_buffer + mtd->writesize) + i * 4),
 				       NFC_REG_USER_DATA(i));
 		}
+		else if (column == mtd->writesize) {
+			/* OOB write: ECC and the randomiser are disabled */
+			sector_count = SZ_1K / SZ_1K;
+			write_size = SZ_1K;
+		}
 		else {
 			pr_err(pr_fmt("unsupported column %x\n"), column);
 			return;
 		}
-		do_enable_random = 1;
 
 		//access NFC internal RAM by DMA bus
 		writel(readl(NFC_REG_CTL) | NFC_RAM_METHOD, NFC_REG_CTL);
@@ -684,8 +688,8 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 	writel(cfg, NFC_REG_CMD);
 
 	switch (command) {
-	case NAND_CMD_RNDOUT:
 	case NAND_CMD_READ0:
+	case NAND_CMD_READ1:
 		// the OTP mode is switched off after a single read
 		otp_mode = 0;
 	case NAND_CMD_READOOB:
@@ -713,8 +717,8 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 		// select rb 0 back
 //		select_rb(0);
 		break;
-	case NAND_CMD_RNDOUT:
 	case NAND_CMD_READ0:
+	case NAND_CMD_READ1:
 		if (read_buffer) {
 			u32* oob_start = (u32*) read_buffer + mtd->writesize;
 			for (i = 0; i < sector_count; i++) {
@@ -992,55 +996,70 @@ void nfc_write_set_pagesize(u32 page_addr, u32 size, void *buff)
 	nfc_select_chip(NULL, -1);
 }
 
+/*
+ * Page read with hardware ECC and randomisation that takes into account empty
+ * pages and does not issue an ECC error when trying to read a correct empty
+ * page.
+ */
 static int nfc_read_page_hwecc(struct mtd_info *mtd, struct nand_chip *chip,
 			       uint8_t *buf, int oob_required, int page)
 {
 	int status;
 	unsigned int max_bitflips = 0;
-	int column = 0;
 
-	DBG("page %x", page);
-
-	status = nand_page_get_status(mtd, page);
-	if (status == NAND_PAGE_STATUS_UNKNOWN) {
-		/* first, try reading without either the randomizer or ECC */
-		nfc_cmdfunc(mtd, NAND_CMD_READ0, 0, page);
-		nfc_read_buf(mtd, buf, mtd->writesize);
-		if (nand_page_is_empty(mtd, buf, buf + mtd->writesize)) {
-			status = NAND_PAGE_EMPTY;
-		}
-		else {
-			status = NAND_PAGE_FILLED;
-			/* copy the main area using the randomizer or ECC */
-			nfc_cmdfunc(mtd, NAND_CMD_RNDOUT, 0, page);
-			nfc_read_buf(mtd, buf, mtd->writesize);
-		}
-	}
-
-	nand_page_set_status(mtd, page, status);
-
-	if (status == NAND_PAGE_EMPTY) {
-		memset(buf, 0xff, mtd->writesize);
-		if (oob_required)
-			memset(chip->oob_poi, 0xff, mtd->oobsize);
-		/* return having emptied the read buffer */
-		return 0;
-	}
-
-	if (oob_required) {
-		/* copy the OOB area */
-		nfc_cmdfunc(mtd, NAND_CMD_READOOB, mtd->writesize, page);
-		nfc_read_buf(mtd, chip->oob_poi, mtd->oobsize);
-	}
-
+	/* The corresponding read operation has already been issued from
+	 * nand_base.c:nand_do_read_ops() and the read buffer should contain
+	 * read data. Check ECC and, in case of error, test for emptyness. */
 	status = check_ecc(mtd->writesize / SZ_1K);
-	if (status < 0) {
-		mtd->ecc_stats.failed++;
-	}
-	else {
+
+	if (status >= 0) {
+		/* Note the page as filled because it has correct ECC codes
+		 * written by the controller. */
+		nand_page_set_status(mtd, page, NAND_PAGE_FILLED);
+
+		/* Collect ECC statistics. */
 		mtd->ecc_stats.corrected += status;
 		max_bitflips = max_t(unsigned int, max_bitflips, status);
+
+		/* Copy the output to the buffer of the main NAND driver. */
+		nfc_read_buf(mtd, buf, mtd->writesize);
+
+// FIXME: Currently OOB is not read in nfc_cmdfunc().
+//		if (oob_required) {
+//			/* copy the OOB area */
+//			nfc_read_buf(mtd, chip->oob_poi, mtd->oobsize);
+//		}
+
+		/* success */
+		return max_bitflips;
 	}
+	else {
+		/* The ECC check has failed. Check if the page is empty and
+		 * update the read buffer if so. Otherwise report ECC error. */
+		status = nand_page_get_status(mtd, page);
+		if (status == NAND_PAGE_STATUS_UNKNOWN) {
+			/* Re-read the page without the randomiser or ECC. */
+			nfc_cmdfunc(mtd, NAND_CMD_READ1, 0, page);
+			/* Copy the output to the main driver area. */
+			nfc_read_buf(mtd, buf, mtd->writesize);
+			if (nand_page_is_empty(mtd, buf, buf + mtd->writesize)) {
+				status = NAND_PAGE_EMPTY;
+				memset(buf, 0xff, mtd->writesize);
+				if (oob_required)
+					memset(chip->oob_poi, 0xff, mtd->oobsize);
+			}
+			else
+				status = NAND_PAGE_FILLED;
+		}
+
+		nand_page_set_status(mtd, page, status);
+
+		if (status == NAND_PAGE_FILLED) {
+			/* ECC error. The number of bitflips is inessential */
+			mtd->ecc_stats.failed++;
+		}
+	}
+
 	return max_bitflips;
 }
 
