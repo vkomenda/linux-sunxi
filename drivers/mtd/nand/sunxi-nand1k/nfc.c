@@ -1042,21 +1042,22 @@ static int nfc_read_page_hwecc(struct mtd_info *mtd, struct nand_chip *chip,
 			nfc_cmdfunc(mtd, NAND_CMD_READ1, 0, page);
 			/* Copy the output to the main driver area. */
 			nfc_read_buf(mtd, buf, mtd->writesize);
-			if (nand_page_is_empty(mtd, buf, buf + mtd->writesize)) {
+			if (nand_page_is_empty(mtd, buf, buf + mtd->writesize))
 				status = NAND_PAGE_EMPTY;
-				memset(buf, 0xff, mtd->writesize);
-				if (oob_required)
-					memset(chip->oob_poi, 0xff, mtd->oobsize);
-			}
 			else
 				status = NAND_PAGE_FILLED;
-		}
 
-		nand_page_set_status(mtd, page, status);
+			nand_page_set_status(mtd, page, status);
+		}
 
 		if (status == NAND_PAGE_FILLED) {
 			/* ECC error. The number of bitflips is inessential */
 			mtd->ecc_stats.failed++;
+		}
+		else if (status == NAND_PAGE_EMPTY) {
+			memset(buf, 0xff, mtd->writesize);
+			if (oob_required)
+				memset(chip->oob_poi, 0xff, mtd->oobsize);
 		}
 	}
 
