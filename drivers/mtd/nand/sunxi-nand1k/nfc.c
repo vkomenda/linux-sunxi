@@ -304,19 +304,21 @@ static void enable_random_preset(void)
 static void enable_random(u32 page)
 {
 	static const uint16_t random_seed[128] = {
-		//0        1      2       3        4      5        6       7       8       9
-		0x2b75, 0x0bd0, 0x5ca3, 0x62d1, 0x1c93, 0x07e9, 0x2162, 0x3a72, 0x0d67, 0x67f9,
-		0x1be7, 0x077d, 0x032f, 0x0dac, 0x2716, 0x2436, 0x7922, 0x1510, 0x3860, 0x5287,
-		0x480f, 0x4252, 0x1789, 0x5a2d, 0x2a49, 0x5e10, 0x437f, 0x4b4e, 0x2f45, 0x216e,
-		0x5cb7, 0x7130, 0x2a3f, 0x60e4, 0x4dc9, 0x0ef0, 0x0f52, 0x1bb9, 0x6211, 0x7a56,
-		0x226d, 0x4ea7, 0x6f36, 0x3692, 0x38bf, 0x0c62, 0x05eb, 0x4c55, 0x60f4, 0x728c,
-		0x3b6f, 0x2037, 0x7f69, 0x0936, 0x651a, 0x4ceb, 0x6218, 0x79f3, 0x383f, 0x18d9,
-		0x4f05, 0x5c82, 0x2912, 0x6f17, 0x6856, 0x5938, 0x1007, 0x61ab, 0x3e7f, 0x57c2,
-		0x542f, 0x4f62, 0x7454, 0x2eac, 0x7739, 0x42d4, 0x2f90, 0x435a, 0x2e52, 0x2064,
-		0x637c, 0x66ad, 0x2c90, 0x0bad, 0x759c, 0x0029, 0x0986, 0x7126, 0x1ca7, 0x1605,
-		0x386a, 0x27f5, 0x1380, 0x6d75, 0x24c3, 0x0f8e, 0x2b7a, 0x1418, 0x1fd1, 0x7dc1,
-		0x2d8e, 0x43af, 0x2267, 0x7da3, 0x4e3d, 0x1338, 0x50db, 0x454d, 0x764d, 0x40a3,
-		0x42e6, 0x262b, 0x2d2e, 0x1aea, 0x2e17, 0x173d, 0x3a6e, 0x71bf, 0x25f9, 0x0a5d,
+		0x2b75, 0x0bd0, 0x5ca3, 0x62d1, 0x1c93, 0x07e9, 0x2162, 0x3a72,
+		0x0d67, 0x67f9, 0x1be7, 0x077d, 0x032f, 0x0dac, 0x2716, 0x2436,
+		0x7922, 0x1510, 0x3860, 0x5287, 0x480f, 0x4252, 0x1789, 0x5a2d,
+		0x2a49, 0x5e10, 0x437f, 0x4b4e, 0x2f45, 0x216e, 0x5cb7, 0x7130,
+		0x2a3f, 0x60e4, 0x4dc9, 0x0ef0, 0x0f52, 0x1bb9, 0x6211, 0x7a56,
+		0x226d, 0x4ea7, 0x6f36, 0x3692, 0x38bf, 0x0c62, 0x05eb, 0x4c55,
+		0x60f4, 0x728c, 0x3b6f, 0x2037, 0x7f69, 0x0936, 0x651a, 0x4ceb,
+		0x6218, 0x79f3, 0x383f, 0x18d9, 0x4f05, 0x5c82, 0x2912, 0x6f17,
+		0x6856, 0x5938, 0x1007, 0x61ab, 0x3e7f, 0x57c2, 0x542f, 0x4f62,
+		0x7454, 0x2eac, 0x7739, 0x42d4, 0x2f90, 0x435a, 0x2e52, 0x2064,
+		0x637c, 0x66ad, 0x2c90, 0x0bad, 0x759c, 0x0029, 0x0986, 0x7126,
+		0x1ca7, 0x1605, 0x386a, 0x27f5, 0x1380, 0x6d75, 0x24c3, 0x0f8e,
+		0x2b7a, 0x1418, 0x1fd1, 0x7dc1, 0x2d8e, 0x43af, 0x2267, 0x7da3,
+		0x4e3d, 0x1338, 0x50db, 0x454d, 0x764d, 0x40a3, 0x42e6, 0x262b,
+		0x2d2e, 0x1aea, 0x2e17, 0x173d, 0x3a6e, 0x71bf, 0x25f9, 0x0a5d,
 		0x7c57, 0x0fbe, 0x46ce, 0x4939, 0x6b17, 0x37bb, 0x3e91, 0x76db
 	};
 
@@ -1005,64 +1007,88 @@ void nfc_write_set_pagesize(u32 page_addr, u32 size, void *buff)
 static int nfc_read_page_hwecc(struct mtd_info *mtd, struct nand_chip *chip,
 			       uint8_t *buf, int oob_required, int page)
 {
-	int eccstatus;
+	int eccstatus = 0, status = 0;
 
 	/* The corresponding read operation has already been issued from
 	 * nand_base.c:nand_do_read_ops() and the read buffer should contain
-	 * read data. Check ECC and, in case of error, test for emptyness. */
+	 * read data. Check ECC and, in case of error, test for emptiness. */
+	status = nand_page_get_status(mtd, page);
+	if (status == NAND_PAGE_EMPTY) {
+		memset(buf, 0xff, mtd->writesize);
+		if (oob_required)
+			memset(chip->oob_poi, 0xff, mtd->oobsize);
+		/* success */
+		return 0;
+	}
+
 	eccstatus = check_ecc(mtd->writesize / SZ_1K);
 
-	if (eccstatus >= 0) {
-		/* Note the page as filled because it has correct ECC codes
-		 * written by the controller. */
-		nand_page_set_status(mtd, page, NAND_PAGE_FILLED);
+	if (status == NAND_PAGE_FILLED) {
+		if (eccstatus >= 0) {
+			/* Collect ECC statistics: corrected bitflips. */
+			mtd->ecc_stats.corrected += eccstatus;
 
-		/* Collect ECC statistics: corrected bitflips. */
-		mtd->ecc_stats.corrected += eccstatus;
-
-		/* Copy the output to the buffer of the main NAND driver. */
-		nfc_read_buf(mtd, buf, mtd->writesize);
-
-// FIXME: Currently OOB is not read during NAND_CMD_READ0 in nfc_cmdfunc().
-//		if (oob_required) {
-//			/* copy the OOB area */
-//			nfc_read_buf(mtd, chip->oob_poi, mtd->oobsize);
-//		}
-
-		/* success */
-	}
-	else {
-		int status = 0;
-
-		/* The ECC check has failed. Check if the page is empty and
-		 * update the read buffer if so. Otherwise report ECC error. */
-		status = nand_page_get_status(mtd, page);
-		if (status == NAND_PAGE_STATUS_UNKNOWN) {
-			/* Re-read the page without the randomiser or ECC. */
-			nfc_cmdfunc(mtd, NAND_CMD_READ1, 0, page);
-			/* Copy the output to the main driver area. */
+			/* Copy the output to the buffer of the main NAND driver. */
 			nfc_read_buf(mtd, buf, mtd->writesize);
-			if (nand_page_is_empty(mtd, buf, buf + mtd->writesize))
-				status = NAND_PAGE_EMPTY;
-			else
-				status = NAND_PAGE_FILLED;
-
-			nand_page_set_status(mtd, page, status);
+			if (oob_required)
+				/* copy the OOB area */
+				nfc_read_buf(mtd, chip->oob_poi, mtd->oobsize);
 		}
-
-		if (status == NAND_PAGE_FILLED) {
+		else {
 			/* ECC error. The number of bitflips is inessential */
 			mtd->ecc_stats.failed++;
+			/* Then return the ECC error status. */
 		}
-		else if (status == NAND_PAGE_EMPTY) {
-			memset(buf, 0xff, mtd->writesize);
+	}
+	else {  /* status == NAND_PAGE_STATUS_UNKNOWN */
+		if (eccstatus >= 0) {
+			/* Note the page as filled because it has correct ECC
+			 * codes written by the controller. */
+			nand_page_set_status(mtd, page, NAND_PAGE_FILLED);
+
+			/* Collect ECC statistics: corrected bitflips. */
+			mtd->ecc_stats.corrected += eccstatus;
+
+			/* Copy the output to the buffer of the main NAND driver. */
+			nfc_read_buf(mtd, buf, mtd->writesize);
 			if (oob_required)
-				memset(chip->oob_poi, 0xff, mtd->oobsize);
-			/* success */
+				/* copy the OOB area */
+				nfc_read_buf(mtd, chip->oob_poi, mtd->oobsize);
+		}
+		else {
+			/* The ECC check has failed. Check if the page is empty
+			 * and update the read buffer if so. Otherwise report
+			 * ECC failure. */
 			eccstatus = 0;
+
+			/* Re-read the page without the randomiser or ECC. */
+			nfc_cmdfunc(mtd, NAND_CMD_READ1, 0, page);
+
+			/* Copy the output to the main driver area. */
+			nfc_read_buf(mtd, buf, mtd->writesize);
+			if (oob_required)
+				/* copy the OOB area */
+				nfc_read_buf(mtd, chip->oob_poi, mtd->oobsize);
+
+			if (nand_page_is_empty(mtd, buf, buf + mtd->writesize)) {
+				status = NAND_PAGE_EMPTY;
+				memset(buf, 0xff, mtd->writesize);
+				if (oob_required)
+					memset(chip->oob_poi, 0xff, mtd->oobsize);
+				/* success */
+			}
+			else {
+				status = NAND_PAGE_FILLED;
+				/* ECC error. The number of bitflips is inessential */
+				mtd->ecc_stats.failed++;
+			}
+			nand_page_set_status(mtd, page, status);
 		}
 	}
 
+	DBG("pg stat %d, ECC stat %d, ECC failed %d",
+	    nand_page_get_status(mtd, page),
+	    eccstatus, mtd->ecc_stats.failed);
 	return eccstatus;
 }
 
