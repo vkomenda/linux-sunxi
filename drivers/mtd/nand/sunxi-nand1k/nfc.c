@@ -71,11 +71,12 @@ unsigned int random_switch = 1;
 module_param(random_switch, uint, 0);
 MODULE_PARM_DESC(random_switch, "random read/write switch: 1=on, 0=off");
 
+/* This fixed seed should be used for writing the NAND SPL bootloader. */
 #define AW_RND_SEED 0x4a80
 
-unsigned int fixed_random_seed = AW_RND_SEED;
+unsigned int fixed_random_seed = 0;
 module_param(fixed_random_seed, uint, 0);
-MODULE_PARM_DESC(fixed_random_seed, "random seed: default 0x4a80, 0=pseudorandom modulo page");
+MODULE_PARM_DESC(fixed_random_seed, "random seed: default=0 (pseudorandom modulo page)");
 
 unsigned int debug = 0;
 module_param(debug, uint, 0);
@@ -343,11 +344,11 @@ static void disable_random(void)
 	}
 }
 
-static void enable_ecc(int pipline)
+static void enable_ecc(int pipeline)
 {
 	if (hwecc_switch) {
 		u32 cfg = readl(NFC_REG_ECC_CTL);
-		if (pipline)
+		if (pipeline)
 			cfg |= NFC_ECC_PIPELINE;
 		else
 			cfg &= (~NFC_ECC_PIPELINE) & 0xffffffff;
