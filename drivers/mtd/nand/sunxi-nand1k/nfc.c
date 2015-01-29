@@ -396,9 +396,9 @@ static int check_ecc(int block_cnt)
 	cfg = readl(NFC_REG_ECC_ST) & 0xffff;
 	for (i = 0; i < block_cnt; i++) {
 		if (cfg & (1<<i)) {
-			pr_err(pr_fmt("ECC status %x: fatal error in sector %d"
-				      " (%d blocks, ECC mode %u)\n"),
-				      cfg, i, block_cnt, ecc_mode);
+			DBG("ECC status %x: fatal error in sector %d"
+			    " (%d blocks, ECC mode %u)\n",
+			    cfg, i, block_cnt, ecc_mode);
 			return -1;
 		}
 	}
@@ -495,7 +495,7 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 	case NAND_CMD_READOOB:
 	case NAND_CMD_READ1: /* Non-randomised read: this interpretation is
 			      * specific to this driver. */
-		if (command != NAND_CMD_READOOB) {
+		if (likely(command != NAND_CMD_READOOB)) {
 			if (likely(!otp_mode)) {
 				// DMA is already set up; normal read
 				sector_count = mtd->writesize / SZ_1K;
@@ -1004,36 +1004,35 @@ void nfc_write_set_pagesize(u32 page_addr, u32 size, void *buff)
 static int nfc_read_page_hwecc(struct mtd_info *mtd, struct nand_chip *chip,
 			       uint8_t *buf, int oob_required, int page)
 {
-	int status;
-	unsigned int max_bitflips = 0;
+	int eccstatus;
 
 	/* The corresponding read operation has already been issued from
 	 * nand_base.c:nand_do_read_ops() and the read buffer should contain
 	 * read data. Check ECC and, in case of error, test for emptyness. */
-	status = check_ecc(mtd->writesize / SZ_1K);
+	eccstatus = check_ecc(mtd->writesize / SZ_1K);
 
-	if (status >= 0) {
+	if (eccstatus >= 0) {
 		/* Note the page as filled because it has correct ECC codes
 		 * written by the controller. */
 		nand_page_set_status(mtd, page, NAND_PAGE_FILLED);
 
-		/* Collect ECC statistics. */
-		mtd->ecc_stats.corrected += status;
-		max_bitflips = max_t(unsigned int, max_bitflips, status);
+		/* Collect ECC statistics: corrected bitflips. */
+		mtd->ecc_stats.corrected += eccstatus;
 
 		/* Copy the output to the buffer of the main NAND driver. */
 		nfc_read_buf(mtd, buf, mtd->writesize);
 
-// FIXME: Currently OOB is not read in nfc_cmdfunc().
+// FIXME: Currently OOB is not read during NAND_CMD_READ0 in nfc_cmdfunc().
 //		if (oob_required) {
 //			/* copy the OOB area */
 //			nfc_read_buf(mtd, chip->oob_poi, mtd->oobsize);
 //		}
 
 		/* success */
-		return max_bitflips;
 	}
 	else {
+		int status = 0;
+
 		/* The ECC check has failed. Check if the page is empty and
 		 * update the read buffer if so. Otherwise report ECC error. */
 		status = nand_page_get_status(mtd, page);
@@ -1058,10 +1057,12 @@ static int nfc_read_page_hwecc(struct mtd_info *mtd, struct nand_chip *chip,
 			memset(buf, 0xff, mtd->writesize);
 			if (oob_required)
 				memset(chip->oob_poi, 0xff, mtd->oobsize);
+			/* success */
+			eccstatus = 0;
 		}
 	}
 
-	return max_bitflips;
+	return eccstatus;
 }
 
 int nfc_first_init(struct mtd_info *mtd)
