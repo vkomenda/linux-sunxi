@@ -1009,80 +1009,43 @@ static int nfc_read_page_hwecc(struct mtd_info *mtd, struct nand_chip *chip,
 {
 	int eccstatus = 0, status = 0;
 
-	/* The corresponding read operation has already been issued from
-	 * nand_base.c:nand_do_read_ops() and the read buffer should contain
-	 * read data. Check ECC and, in case of error, test for emptiness. */
-	status = nand_page_get_status(mtd, page);
-	if (status == NAND_PAGE_EMPTY) {
-		memset(buf, 0xff, mtd->writesize);
-		if (oob_required)
-			memset(chip->oob_poi, 0xff, mtd->oobsize);
-		/* success */
-		return 0;
-	}
-
 	eccstatus = check_ecc(mtd->writesize / SZ_1K);
 
-	if (status == NAND_PAGE_FILLED) {
-		if (eccstatus >= 0) {
-			/* Collect ECC statistics: corrected bitflips. */
-			mtd->ecc_stats.corrected += eccstatus;
+	if (eccstatus >= 0) {
+		/* Collect ECC statistics: corrected bitflips. */
+		mtd->ecc_stats.corrected += eccstatus;
 
-			/* Copy the output to the buffer of the main NAND driver. */
-			nfc_read_buf(mtd, buf, mtd->writesize);
+		/* Copy the output to the buffer of the main NAND driver. */
+		nfc_read_buf(mtd, buf, mtd->writesize);
+		if (oob_required)
+			/* copy the OOB area */
+			nfc_read_buf(mtd, chip->oob_poi, mtd->oobsize);
+	}
+	else {
+		/* The ECC check has failed. Check if the page is empty
+		 * and update the read buffer if so. Otherwise report
+		 * ECC failure. */
+
+		/* Re-read the page without the randomiser or ECC. */
+		nfc_cmdfunc(mtd, NAND_CMD_READ1, 0, page);
+
+		/* Copy the output to the main driver area. */
+		nfc_read_buf(mtd, buf, mtd->writesize);
+		if (oob_required)
+			/* copy the OOB area */
+			nfc_read_buf(mtd, chip->oob_poi, mtd->oobsize);
+
+		if (nand_page_is_empty(mtd, buf, buf + mtd->writesize)) {
+			memset(buf, 0xff, mtd->writesize);
 			if (oob_required)
-				/* copy the OOB area */
-				nfc_read_buf(mtd, chip->oob_poi, mtd->oobsize);
+				memset(chip->oob_poi, 0xff, mtd->oobsize);
+			/* success */
+			eccstatus = 0;
 		}
 		else {
 			/* ECC error. The number of bitflips is inessential */
 			mtd->ecc_stats.failed++;
-			/* Then return the ECC error status. */
-		}
-	}
-	else {  /* status == NAND_PAGE_STATUS_UNKNOWN */
-		if (eccstatus >= 0) {
-			/* Note the page as filled because it has correct ECC
-			 * codes written by the controller. */
-			nand_page_set_status(mtd, page, NAND_PAGE_FILLED);
-
-			/* Collect ECC statistics: corrected bitflips. */
-			mtd->ecc_stats.corrected += eccstatus;
-
-			/* Copy the output to the buffer of the main NAND driver. */
-			nfc_read_buf(mtd, buf, mtd->writesize);
-			if (oob_required)
-				/* copy the OOB area */
-				nfc_read_buf(mtd, chip->oob_poi, mtd->oobsize);
-		}
-		else {
-			/* The ECC check has failed. Check if the page is empty
-			 * and update the read buffer if so. Otherwise report
-			 * ECC failure. */
-			eccstatus = 0;
-
-			/* Re-read the page without the randomiser or ECC. */
-			nfc_cmdfunc(mtd, NAND_CMD_READ1, 0, page);
-
-			/* Copy the output to the main driver area. */
-			nfc_read_buf(mtd, buf, mtd->writesize);
-			if (oob_required)
-				/* copy the OOB area */
-				nfc_read_buf(mtd, chip->oob_poi, mtd->oobsize);
-
-			if (nand_page_is_empty(mtd, buf, buf + mtd->writesize)) {
-				status = NAND_PAGE_EMPTY;
-				memset(buf, 0xff, mtd->writesize);
-				if (oob_required)
-					memset(chip->oob_poi, 0xff, mtd->oobsize);
-				/* success */
-			}
-			else {
-				status = NAND_PAGE_FILLED;
-				/* ECC error. The number of bitflips is inessential */
-				mtd->ecc_stats.failed++;
-			}
-			nand_page_set_status(mtd, page, status);
+			/* keep the same negative value for eccstatus */
 		}
 	}
 

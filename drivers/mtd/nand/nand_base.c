@@ -1187,8 +1187,10 @@ bool nand_page_is_empty(struct mtd_info *mtd, void *data, void *oob)
 				if (!(buf[i / BITS_PER_BYTE] &
 				      (1 << (i % BITS_PER_BYTE)))) {
 					bitflips++;
-					if (bitflips > mtd->ecc_strength)
+					if (bitflips > mtd->ecc_strength) {
+						DBG("bitflips %d", bitflips);
 						return false;
+					}
 				}
 			}
 		}
@@ -1207,8 +1209,10 @@ bool nand_page_is_empty(struct mtd_info *mtd, void *data, void *oob)
 				if (!(buf[i / BITS_PER_BYTE] &
 				      (1 << (i % BITS_PER_BYTE)))) {
 					bitflips++;
-					if (bitflips > mtd->ecc_strength)
+					if (bitflips > mtd->ecc_strength) {
+						DBG("bitflips %d", bitflips);
 						return false;
+					}
 				}
 			}
 		}
