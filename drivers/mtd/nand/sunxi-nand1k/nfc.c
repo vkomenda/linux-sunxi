@@ -1007,7 +1007,7 @@ void nfc_write_set_pagesize(u32 page_addr, u32 size, void *buff)
 static int nfc_read_page_hwecc(struct mtd_info *mtd, struct nand_chip *chip,
 			       uint8_t *buf, int oob_required, int page)
 {
-	int eccstatus = 0, status = 0;
+	int eccstatus = 0;
 
 	eccstatus = check_ecc(mtd->writesize / SZ_1K);
 
@@ -1035,6 +1035,9 @@ static int nfc_read_page_hwecc(struct mtd_info *mtd, struct nand_chip *chip,
 			/* copy the OOB area */
 			nfc_read_buf(mtd, chip->oob_poi, mtd->oobsize);
 
+		DBG("buf %.2x %.2x %.2x %.2x %.2x %.2x",
+		    buf[0], buf[1], buf[2], buf[3], buf[4], buf[5]);
+
 		if (nand_page_is_empty(mtd, buf, buf + mtd->writesize)) {
 			memset(buf, 0xff, mtd->writesize);
 			if (oob_required)
@@ -1049,9 +1052,7 @@ static int nfc_read_page_hwecc(struct mtd_info *mtd, struct nand_chip *chip,
 		}
 	}
 
-	DBG("pg stat %d, ECC stat %d, ECC failed %d",
-	    nand_page_get_status(mtd, page),
-	    eccstatus, mtd->ecc_stats.failed);
+	DBG("ECC stat %d, ECC failed %d", eccstatus, mtd->ecc_stats.failed);
 	return eccstatus;
 }
 
