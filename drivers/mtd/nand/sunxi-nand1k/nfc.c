@@ -1215,7 +1215,7 @@ int nfc_second_init(struct mtd_info *mtd)
 	int i, err, j;
 	u32 ctl;
 	u8 id[8];
-	struct nand_chip_param *nand_chip_param, *chip_param = NULL;
+	struct nand_chip_param *chip_cur, *chip = NULL;
 	struct nand_chip *nand = mtd->priv;
 
 	DBG("");
@@ -1230,38 +1230,34 @@ int nfc_second_init(struct mtd_info *mtd)
 	    id[0], id[1], id[2], id[3],
 	    id[4], id[5], id[6], id[7]);
 
-	// find chip
-	nand_chip_param = sunxi_get_nand_chip_param(id[0]);
-	for (i = 0; nand_chip_param[i].id_len; i++) {
-		int find = 1;
-		for (j = 0; j < nand_chip_param[i].id_len; j++) {
-			if (id[j] != nand_chip_param[i].id[j]) {
-				find = 0;
+	/* Get parameters of the chip in the database of the driver. */
+	chip_cur = sunxi_get_nand_chip_param(id[0]);
+	for (i = 0; !chip && chip_cur[i].id_len; i++)
+		for (j = 0; j < chip_cur[i].id_len; j++) {
+			if (id[j] != chip_cur[i].id[j])
+				/* ID mismatch */
 				break;
-			}
+			else if (j == chip_cur[i].id_len - 1)
+				/* all bytes of the ID matched */
+				chip = &chip_cur[i];
 		}
-		if (find) {
-			chip_param = &nand_chip_param[i];
-			printk("found chip in Sunxi database: ");
-			for (j = 0; j < nand_chip_param[i].id_len; j++) {
-				printk("%x", nand_chip_param[i].id[j]);
-			}
-			printk(" (ECC mode %d)\n", nand_chip_param[i].ecc_mode);
-			break;
-		}
-	}
 
-	// not find
-	if (chip_param == NULL) {
+	if (!chip) {
 		pr_err(pr_fmt("unknown chip"));
 		return -ENODEV;
 	}
+	else {
+		printk("found chip in Sunxi database:");
+		for (j = 0; j < chip->id_len; j++)
+			printk(" %x", chip->id[j]);
+		printk(" (ECC mode %d)\n", chip->ecc_mode);
+	}
 
 	// set final NFC clock freq
-//	if (chip_param->clock_freq > 30)
-//		chip_param->clock_freq = 30;
-	sunxi_set_nand_clock(chip_param->clock_freq);
-	DBG("set clock freq to %dMHz\n", chip_param->clock_freq);
+//	if (chip->clock_freq > 30)
+//		chip->clock_freq = 30;
+	sunxi_set_nand_clock(chip->clock_freq);
+	DBG("set clock freq to %dMHz\n", chip->clock_freq);
 
 	// disable interrupt
 	writel(0, NFC_REG_INT);
@@ -1269,7 +1265,7 @@ int nfc_second_init(struct mtd_info *mtd)
 	writel(readl(NFC_REG_ST), NFC_REG_ST);
 
 	// set ECC mode
-	set_ecc_mode(chip_param->ecc_mode);
+	set_ecc_mode(chip->ecc_mode);
 
 	// enable NFC
 	ctl = NFC_EN;
