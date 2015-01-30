@@ -596,7 +596,7 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 		writel(0x00008510, NFC_REG_WCMD_SET);
 		cfg |= NFC_SEND_CMD2 | NFC_DATA_SWAP_METHOD | NFC_ACCESS_DIR;
 		cfg |= 2 << 30;
-		if (column != 0) {
+		if (debug && column != 0) {
 			DBG("col %x pg %x program %.2x %.2x %.2x %.2x...",
 			    column, page_addr,
 			    write_buffer[0], write_buffer[1],
@@ -635,6 +635,9 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 		switch (addr_cycle) {
 		case 5:
 			high = (page_addr >> 16) & 0xff;
+		case 4:
+			low = (column & 0xffff) | (page_addr << 16);
+			break;
 		case 1:
 			low = column & 0xff;
 			break;
@@ -643,9 +646,6 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 			break;
 		case 3:
 			low = page_addr & 0xffffff;
-			break;
-		case 4:
-			low = (column & 0xffff) | (page_addr << 16);
 			break;
 		default:
 			DBG("wrong address cycle count");
