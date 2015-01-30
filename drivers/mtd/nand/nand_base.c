@@ -1188,7 +1188,7 @@ bool nand_page_is_empty(struct mtd_info *mtd, void *data, void *oob)
 				      (1 << (i % BITS_PER_BYTE)))) {
 					bitflips++;
 					if (bitflips > mtd->ecc_strength) {
-						DBG("bitflips %d", bitflips);
+						DBG("data bitflips %d", bitflips);
 						return false;
 					}
 				}
@@ -1198,6 +1198,10 @@ bool nand_page_is_empty(struct mtd_info *mtd, void *data, void *oob)
 		buf += sizeof(pattern);
 		length -= sizeof(pattern);
 	}
+
+	if (!oob)
+		/* checking the OOB is not required */
+		return true;
 
 	buf = oob;
 	length = mtd->oobsize;
@@ -1210,7 +1214,7 @@ bool nand_page_is_empty(struct mtd_info *mtd, void *data, void *oob)
 				      (1 << (i % BITS_PER_BYTE)))) {
 					bitflips++;
 					if (bitflips > mtd->ecc_strength) {
-						DBG("bitflips %d", bitflips);
+						DBG("OOB bitflips %d", bitflips);
 						return false;
 					}
 				}

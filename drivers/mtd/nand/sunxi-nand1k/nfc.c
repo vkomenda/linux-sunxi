@@ -1035,10 +1035,7 @@ static int nfc_read_page_hwecc(struct mtd_info *mtd, struct nand_chip *chip,
 			/* copy the OOB area */
 			nfc_read_buf(mtd, chip->oob_poi, mtd->oobsize);
 
-		DBG("buf %.2x %.2x %.2x %.2x %.2x %.2x",
-		    buf[0], buf[1], buf[2], buf[3], buf[4], buf[5]);
-
-		if (nand_page_is_empty(mtd, buf, buf + mtd->writesize)) {
+		if (nand_page_is_empty(mtd, buf, NULL)) {
 			memset(buf, 0xff, mtd->writesize);
 			if (oob_required)
 				memset(chip->oob_poi, 0xff, mtd->oobsize);
