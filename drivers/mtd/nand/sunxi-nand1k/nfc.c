@@ -376,7 +376,7 @@ static int check_ecc(int block_cnt)
 {
 	int i, max_ecc_bit_cnt, cfg, corrected;
 	uint8_t ecc_mode;
-	uint8_t ecc_bits[] = {16, 24, 28, 32, 40, 48, 56, 60, 64};
+	static uint8_t ecc_bits[] = {16, 24, 28, 32, 40, 48, 56, 60, 64};
 
         if (!hwecc_switch)
 		return 0;
@@ -507,7 +507,7 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 		}
 		else {
 			// sector num to read
-			sector_count = 1;   /* SZ_1K / SZ_1K; */
+			sector_count = 1;   /* FIXME: get rid of it */
 			read_size = SZ_1K;  /* FIXME: try mtd->oobsize */
 			// OOB offset
 			column += mtd->writesize;
@@ -516,7 +516,7 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 				       * page, non-randomised page and OOB
 				       * reads. */
 
-		if (read_buffer) {
+		if (likely(read_buffer)) {
 			//access NFC internal RAM by DMA bus
 			writel(readl(NFC_REG_CTL) | NFC_RAM_METHOD, NFC_REG_CTL);
 			// if the size is smaller than NFC_REG_SECTOR_NUM, read command won't finish
@@ -633,6 +633,8 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 		u32 low = 0;
 		u32 high = 0;
 		switch (addr_cycle) {
+		case 5:
+			high = (page_addr >> 16) & 0xff;
 		case 1:
 			low = column & 0xff;
 			break;
@@ -642,10 +644,11 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 		case 3:
 			low = page_addr & 0xffffff;
 			break;
-		case 5:
-			high = (page_addr >> 16) & 0xff;
 		case 4:
 			low = (column & 0xffff) | (page_addr << 16);
+			break;
+		default:
+			DBG("wrong address cycle count");
 			break;
 		}
 		writel(low, NFC_REG_ADDR_LOW);
@@ -668,7 +671,6 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 	if (sector_count)
 		writel(sector_count, NFC_REG_SECTOR_NUM);
 
-	// enable random
 	if (do_enable_random) {
 		if (!fixed_random_seed)
 			enable_random(page_addr);
@@ -676,7 +678,6 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 			enable_random_preset();
 	}
 
-	// enable ecc
 	if (do_enable_ecc)
 		enable_ecc(1);
 
@@ -695,6 +696,8 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 		break;
 	case NAND_CMD_PAGEPROG:
 		dma_nand_wait_finish();
+		break;
+	default:
 		break;
 	}
 
@@ -716,7 +719,7 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 		break;
 	case NAND_CMD_READ0:
 	case NAND_CMD_READ1:
-		if (read_buffer) {
+		if (likely(read_buffer)) {
 			u32* oob_start = (u32*) read_buffer + mtd->writesize;
 			for (i = 0; i < sector_count; i++) {
 				u32 userdata = readl(NFC_REG_USER_DATA(i));
@@ -738,13 +741,13 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 			}
 		}
 		break;
+	default:
+		break;
 	}
 
-	// disable ecc
 	if (do_enable_ecc)
 		disable_ecc();
 
-	// disable random
 	if (do_enable_random)
 		disable_random();
 
@@ -760,7 +763,7 @@ static uint8_t nfc_read_byte(struct mtd_info *mtd)
 static void nfc_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
 {
 //	DBG("mtd %p, from %p, length %d", mtd, buf, len);
-	if (read_buffer) {
+	if (likely(read_buffer)) {
 		if (read_offset + len > buffer_size) {
 			pr_err(pr_fmt("out-of-bounds read at "
 				      "offset %d, length %d, buffer size %d\n"),
@@ -1255,8 +1258,8 @@ int nfc_second_init(struct mtd_info *mtd)
 	}
 
 	// set final NFC clock freq
-	if (chip_param->clock_freq > 30)
-		chip_param->clock_freq = 30;
+//	if (chip_param->clock_freq > 30)
+//		chip_param->clock_freq = 30;
 	sunxi_set_nand_clock(chip_param->clock_freq);
 	DBG("set clock freq to %dMHz\n", chip_param->clock_freq);
 
@@ -1291,7 +1294,7 @@ int nfc_second_init(struct mtd_info *mtd)
 	writel(ctl, NFC_REG_CTL);
 
 	writel(0xff, NFC_REG_TIMING_CFG);
-	writel((1 << nand->page_shift) + 2, NFC_REG_SPARE_AREA);
+	writel((1 << nand->page_shift) + BB_MARK_SIZE, NFC_REG_SPARE_AREA);
 
 	// disable random
 	disable_random();
@@ -1305,9 +1308,9 @@ int nfc_second_init(struct mtd_info *mtd)
 	nand->ecc.size = SZ_1K;
 
 	sunxi_ecclayout.eccbytes = 0;
-	sunxi_ecclayout.oobavail = mtd->writesize / 1024 * 4 - 2;
-	sunxi_ecclayout.oobfree->offset = 2;
-	sunxi_ecclayout.oobfree->length = mtd->writesize / 1024 * 4 - 2;
+	sunxi_ecclayout.oobavail = mtd->writesize / 1024 * 4 - BB_MARK_SIZE;
+	sunxi_ecclayout.oobfree->offset = BB_MARK_SIZE;
+	sunxi_ecclayout.oobfree->length = mtd->writesize / 1024 * 4 - BB_MARK_SIZE;
 	DBG("oobavail %d oobfree.offset %d oobfree.length %d",
 	    sunxi_ecclayout.oobavail, sunxi_ecclayout.oobfree->offset,
 	    sunxi_ecclayout.oobfree->length);

@@ -22,6 +22,9 @@
 
 #define PREFIX "[MTD][NAND][SUNXI]: "
 
+/* Offset in the OOB area reserved for the bad block mark. */
+#define BB_MARK_SIZE 2
+
 #ifdef __LINUX__
 
 #include <linux/kernel.h>
