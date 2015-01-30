@@ -34,12 +34,6 @@
 #include "dma.h"
 #include "nand_id.h"
 
-// do we need to consider exclusion of offset?
-// it should be in high level that the nand_chip ops have been
-// performed with exclusion already
-// find it is:
-//   nand_get_device() & nand_release_device()
-//
 static int read_offset = 0;
 static int write_offset = 0;
 static u8 *read_buffer = NULL;
@@ -1213,108 +1207,6 @@ static void print_set_pagesize(struct mtd_info *mtd, u32 size, int page)
 	pr_info(" ===== PAGE %d READ %d BYTES END =====\n", page, size);
 }
 
-static void test_nfc(struct mtd_info *mtd)
-{
-//	int i, j, n=0;
-	struct nand_chip *nand = mtd->priv;
-	int page = 1280;
-//	u8 buff[PRINT_BUFFER_SIZE];
-//	int blocks = 2, num_blocks = mtd->writesize / 1024;
-	int saved_random_switch = random_switch;
-	int saved_hwecc_switch  = hwecc_switch;
-
-	DBG("============== TEST NFC ================\n");
-//	memset(buff, 0, 2048);
-
-	// read page
-	DBG("Test: read page %d\n", page);
-	print_page(mtd, page, 0);
-
-	// erase block
-	pr_info(" === Test: erase block of page %d ===\n", page);
-	nfc_cmdfunc(mtd, NAND_CMD_ERASE1, 0, page);
-	nfc_cmdfunc(mtd, NAND_CMD_ERASE2, -1, -1);
-	nfc_wait(mtd, nand);
-	print_page(mtd, page, 0);
-
-	pr_info(" === Test: print the erased page without randomizer or ECC ===\n");
-	hwecc_switch = 0;
-	random_switch = 0;
-	print_page(mtd, page, 0);
-	random_switch = saved_random_switch;
-	hwecc_switch = saved_hwecc_switch;
-
-	/*
-	// write block
-	nfc_cmdfunc(mtd, NAND_CMD_SEQIN, 0, page);
-	for (i = 0; i < blocks; i++) {
-		for (j = 0; j < 1024; j++, n++)
-			buff[j] = n % 256;
-		nfc_write_buf(mtd, buff, 1024);
-	}
-	for ( ; i < num_blocks; i++) {
-		memset(buff, 0xff, 1024);
-		nfc_write_buf(mtd, buff, 1024);
-	}
-	for (i = 0, n = 128; i < mtd->oobsize; i++, n++)
-		buff[i] = n % 256;
-	nfc_write_buf(mtd, buff, 1024);
-	nfc_cmdfunc(mtd, NAND_CMD_PAGEPROG, -1, -1);
-	nfc_wait(mtd, nand);
-	print_page(mtd, page);
-	*/
-
-/*
-	// test oob write
-	nfc_cmdfunc(mtd, NAND_CMD_SEQIN, mtd->writesize, page);
-	for (i = 0, n = 0xff; i < 640; i++, n++)
-		buff[i] = n % 256;
-	nfc_write_buf(mtd, buff, 1024);
-	nfc_cmdfunc(mtd, NAND_CMD_PAGEPROG, -1, -1);
-	nfc_wait(mtd, nand);
-	print_page(mtd, page);
-*/
-}
-
-/*
-// Test unit ops
-static void test_ops(struct mtd_info *mtd)
-{
-	uint32_t page = 1280;
-	uint32_t v1, v2;
-
-	// test sequence read
-	wait_cmdfifo_free();
-	// NFC_DATA_TRANS = 1, NFC fetch data to RAM0
-	// NFC_CMD_TYPE = 1,2,3 won't read out any thing
-	v1 = NAND_CMD_READ0 | NFC_SEQ | NFC_SEND_CMD1 | NFC_DATA_TRANS | NFC_SEND_ADR | NFC_SEND_CMD2 | ((5 - 1) << 16) | NFC_WAIT_FLAG | (3 << 30);
-	v2 = NAND_CMD_READSTART;
-	writel(page << 16, NFC_REG_ADDR_LOW);
-	writel(page >> 16, NFC_REG_ADDR_HIGH);
-	//writel(2, NFC_REG_SECTOR_NUM);
-	// NFC_REG_CNT = n, fetch n byte to RAM
-	writel(1, NFC_REG_CNT);
-	writel(v2, NFC_REG_RCMD_SET);
-	writel(v1, NFC_REG_CMD);
-	wait_cmdfifo_free();
-	wait_cmd_finish();
-	DBG_INFO("SEQ READ IO: %x %x %x %x %x %x\n",
-			 readb(NFC_REG_IO_DATA),
-			 readb(NFC_REG_IO_DATA),
-			 readb(NFC_REG_IO_DATA),
-			 readb(NFC_REG_IO_DATA),
-			 readb(NFC_REG_IO_DATA),
-			 readb(NFC_REG_IO_DATA));
-	DBG_INFO("SEQ READ RAM: %x %x %x %x %x %x\n",
-			 readb(NFC_RAM0_BASE),
-			 readb(NFC_RAM0_BASE + 1),
-			 readb(NFC_RAM0_BASE + 2),
-			 readb(NFC_RAM0_BASE + 3),
-			 readb(NFC_RAM0_BASE + 4),
-			 readb(NFC_RAM0_BASE + 5));
-}
-*/
-
 int nfc_second_init(struct mtd_info *mtd)
 {
 	int i, err, j;
@@ -1458,9 +1350,6 @@ int nfc_second_init(struct mtd_info *mtd)
 	    mtd->oobsize, mtd->writesize, mtd->erasesize, mtd->size,
 	    buffer_size);
 
-	// test command
-	//test_nfc(mtd);
-	///test_ops(mtd);
 	if (debug) {
 		// start of SPL, read in full mode
 		print_page(mtd, 0, 1);
