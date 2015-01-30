@@ -928,7 +928,7 @@ void nfc_read_set_pagesize(u32 page_addr, u32 size, void *buff)
 	set_pagesize(size, &save);
 
 	writel(readl(NFC_REG_CTL) | NFC_RAM_METHOD, NFC_REG_CTL);
-	dma_nand_config_start(dma_hdle, 0, (u32)buff, /* SZ_1K */ size); // FIXME: size
+	dma_nand_config_start(dma_hdle, 0, (u32)buff, size);
 
 	writel(page_addr << 16, NFC_REG_ADDR_LOW);
 	writel(page_addr >> 16, NFC_REG_ADDR_HIGH);
