@@ -84,6 +84,8 @@ static struct mtd_partition sunxi_mtd_partitions[] = {
 		.name   = "rootfs",
 		.offset = 300 * SZ_1M,
 		.size   = 4 * (uint64_t) SZ_1G - 300 * (uint64_t) SZ_1M,
+//			  /* reserve 16MiB at the end for bad block tables */
+//			  - SZ_16M,
 	},
 };
 

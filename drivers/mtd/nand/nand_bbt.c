@@ -438,9 +438,12 @@ static int scan_block_fast(struct mtd_info *mtd, struct nand_bbt_descr *bd,
 
 		if (check_short_pattern(buf, bd)) {
 			if ((this->options & NAND_INVALID_BBM) /* && buf[0] != 0 */ )
-				pr_info("Ignoring bad block marker at 0x%012llx.\n", offs);
-			else
+				pr_info("Ignoring bad block marker @ 0x%012llx\n", offs);
+			else {
+				pr_info("Bad block mark %.2x %.2x @ 0x%012llx\m",
+					buf[0], buf[1], offs);
 				return 1;
+			}
 		}
 
 		offs += mtd->writesize;
