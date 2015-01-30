@@ -376,7 +376,7 @@ static int check_ecc(int block_cnt)
 {
 	int i, max_ecc_bit_cnt, cfg, corrected;
 	uint8_t ecc_mode;
-	uint8_t ecc_bits[] = {16, 24, 28, 32, 40, 48, 56, 60, 64};
+	static uint8_t ecc_bits[] = {16, 24, 28, 32, 40, 48, 56, 60, 64};
 
         if (!hwecc_switch)
 		return 0;
@@ -492,8 +492,8 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 	case NAND_CMD_READOOB:
 	case NAND_CMD_READ1: /* Non-randomised read: this interpretation is
 			      * specific to this driver. */
-		if (command != NAND_CMD_READOOB) {
-			if (!otp_mode) {
+		if (likely(command != NAND_CMD_READOOB)) {
+			if (likely(!otp_mode)) {
 				// DMA is already set up; normal read
 				sector_count = mtd->writesize / SZ_1K;
 				read_size = mtd->writesize;
@@ -516,7 +516,7 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 				       * page, non-randomised page and OOB
 				       * reads. */
 
-		if (read_buffer) {
+		if (likely(read_buffer)) {
 			//access NFC internal RAM by DMA bus
 			writel(readl(NFC_REG_CTL) | NFC_RAM_METHOD, NFC_REG_CTL);
 			// if the size is smaller than NFC_REG_SECTOR_NUM, read command won't finish
@@ -568,7 +568,7 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 		addr_cycle = 5;
 		column = program_column;
 		page_addr = program_page;
-		if (column == 0) {
+		if (likely(column == 0)) {
 			do_enable_ecc = 1;
 			do_enable_random = 1;
 			sector_count = mtd->writesize / SZ_1K;
@@ -719,7 +719,7 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 		break;
 	case NAND_CMD_READ0:
 	case NAND_CMD_READ1:
-		if (read_buffer) {
+		if (likely(read_buffer)) {
 			u32* oob_start = (u32*) read_buffer + mtd->writesize;
 			for (i = 0; i < sector_count; i++) {
 				u32 userdata = readl(NFC_REG_USER_DATA(i));
@@ -763,7 +763,7 @@ static uint8_t nfc_read_byte(struct mtd_info *mtd)
 static void nfc_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
 {
 //	DBG("mtd %p, from %p, length %d", mtd, buf, len);
-	if (read_buffer) {
+	if (likely(read_buffer)) {
 		if (read_offset + len > buffer_size) {
 			pr_err(pr_fmt("out-of-bounds read at "
 				      "offset %d, length %d, buffer size %d\n"),
@@ -1258,8 +1258,8 @@ int nfc_second_init(struct mtd_info *mtd)
 	}
 
 	// set final NFC clock freq
-	if (chip_param->clock_freq > 30)
-		chip_param->clock_freq = 30;
+//	if (chip_param->clock_freq > 30)
+//		chip_param->clock_freq = 30;
 	sunxi_set_nand_clock(chip_param->clock_freq);
 	DBG("set clock freq to %dMHz\n", chip_param->clock_freq);
 
