@@ -72,7 +72,7 @@ unsigned int fixed_random_seed = 0;
 module_param(fixed_random_seed, uint, 0);
 MODULE_PARM_DESC(fixed_random_seed, "random seed: default=0 (pseudorandom modulo page)");
 
-unsigned int debug = 0;
+unsigned int debug = 1;
 module_param(debug, uint, 0);
 MODULE_PARM_DESC(debug, "debug output: 1=on, 0=off");
 
@@ -158,7 +158,7 @@ static u32 sunxi_get_pll5_clk(void)
 	factor_m = ((reg_val & PLL5_FACTOR_M_MASK) >> PLL5_FACTOR_M_SHIFT) + 1;
 
 	clock = 24 * factor_n * factor_k / div_p / factor_m;
-	DBG("pll5 %d MHz", clock);
+	DBG("pll5 %d MHz (PLL5 reg %x)", clock, reg_val);
 
 	return clock;
 }
