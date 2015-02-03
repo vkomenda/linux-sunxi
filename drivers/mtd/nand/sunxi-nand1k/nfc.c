@@ -486,8 +486,10 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 		break;
 	case NAND_CMD_READ0: /* Implied randomised read, see
 			      * nand_base.c:do_nand_read_ops() */
-		do_enable_ecc = 1;
-		do_enable_random = 1;
+		if (likely(!otp_mode)) {
+			do_enable_ecc = 1;
+			do_enable_random = 1;
+		}
 		/* otherwise the same as a regular read */
 	case NAND_CMD_READOOB:
 	case NAND_CMD_READ1: /* Non-randomised read: this interpretation is
