@@ -100,8 +100,14 @@ static int h27ucg8t2a_init(struct mtd_info *mtd, const uint8_t *id)
 	// Read total RR count - 1 byte x 8 times - and
 	// RR register count - also 1 byte x 8 times.
 	chip->read_buf(mtd, buf, 16);
+	printk("RR count (8 copies), RR reg. count (8 copies):\n");
+	for (i = 0; i < 16; i++) {
+		printk(" %.2x", buf[i]);
+	}
+
 	if ((buf[0] != 8 || buf[1] != 8) &&
 	    (buf[8] != 8 || buf[9] != 8)) {
+		DBG("wrong total RR count or RR register count");
 		ret = -EINVAL;
 		goto buf_dealloc;
 	}
@@ -200,8 +206,9 @@ static int h27ucg8t2e_init(struct mtd_info *mtd, const uint8_t *id)
 		printk(" %.2x", buf[i]);
 	}
 
-	if (buf[0] != 8 || buf[1] != 8) {
-		DBG("wrong total RR count %u (%u)", buf[0], buf[1]);
+	if ((buf[0] != 8 || buf[1] != 8) &&
+	    (buf[8] != 4 || buf[9] != 4)) {
+		DBG("wrong total RR count or RR register count");
 		ret = -EINVAL;
 		goto buf_dealloc;
 	}
@@ -281,7 +288,7 @@ struct hynix_nand_initializer initializers[] = {
 		.init = h27ucg8t2a_init,
 	},
 	{       // same RR procedure for H27UBG8T2B
-		.id = {NAND_MFR_HYNIX, 0xde, 0x94, 0xda, 0x74, 0xc3},
+		.id = {NAND_MFR_HYNIX, 0xd7, 0x94, 0xda, 0x74, 0xc3},
 		.init = h27ucg8t2a_init,
 	},
 	{

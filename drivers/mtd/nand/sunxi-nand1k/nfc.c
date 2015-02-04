@@ -72,7 +72,7 @@ unsigned int fixed_random_seed = 0;
 module_param(fixed_random_seed, uint, 0);
 MODULE_PARM_DESC(fixed_random_seed, "random seed: default=0 (pseudorandom modulo page)");
 
-unsigned int debug = 1;
+unsigned int debug = 0;
 module_param(debug, uint, 0);
 MODULE_PARM_DESC(debug, "debug output: 1=on, 0=off");
 
