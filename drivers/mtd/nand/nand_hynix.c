@@ -74,7 +74,7 @@ static int h27ucg8t2a_init(struct mtd_info *mtd, const uint8_t *id)
 	struct nand_chip *chip = mtd->priv;
 	struct hynix_nand *hynix;
 	u8* buf = NULL;  // max(RR count register count, RR set register count)
-	int i, j;
+	int rrtReg, rrtSet, i;
 	int ret;
 
 	buf = kzalloc(1024, GFP_KERNEL);
@@ -116,17 +116,29 @@ static int h27ucg8t2a_init(struct mtd_info *mtd, const uint8_t *id)
 	// 8 RR registers on the flash chip.
 	chip->read_buf(mtd, buf, 1024);
 
+	/* FIXME: common function - majority check, not "all correct" */
 	ret = 0;
-	for (j = 0; j < 8; j++) {
-		for (i = 0; i < 64; i++) {
-			u8 *tmp = buf + (128 * j);
-			if ((tmp[i] | tmp[i + 64]) != 0xff) {
+	printk("RRT sets in OTP...\n");
+	for (rrtSet = 0; rrtSet < 8; rrtSet++) {
+		u8 *cur = buf + 16 + (128 * rrtSet);
+		printk("%d.", rrtSet);
+		for (rrtReg = 0; rrtReg < 64; rrtReg++) {
+			uint8_t original = cur[rrtReg];
+			uint8_t inverse  = cur[rrtReg + 64];
+			printk(" %.2x", original);
+			if ((original | inverse) != 0xff) {
+				DBG("original read retry level doesn't match its inverse");
 				ret = -EINVAL;
 				break;
 			}
 		}
+		printk("\n");
 
 		if (ret)
+			// read the next set
+			continue;
+		else
+			// current set is correct
 			break;
 	}
 
@@ -143,7 +155,7 @@ static int h27ucg8t2a_init(struct mtd_info *mtd, const uint8_t *id)
 
 		hynix->read_retry.regs = h27ucg8t2a_read_retry_regs;
 		hynix->read_retry.regnum = 8;
-		memcpy(hynix->read_retry.values, buf, 64);
+		memcpy(hynix->read_retry.values, &buf[rrtSet * 128], 64);
 		chip->manuf_priv = hynix;
 		chip->setup_read_retry = nand_setup_read_retry_hynix;
 		chip->read_retries = 8;
@@ -163,7 +175,7 @@ static void h27ucg8t2e_cleanup(struct mtd_info *mtd)
 	kfree(chip->manuf_priv);
 }
 
-#define UCG8T2E_RRT_OTP_SIZE 528
+#define UCG8T2E_RRT_OTP_SIZE (16 + 8 * 64)
 
 static int h27ucg8t2e_init(struct mtd_info *mtd, const uint8_t *id)
 {
@@ -205,6 +217,7 @@ static int h27ucg8t2e_init(struct mtd_info *mtd, const uint8_t *id)
 	for (i = 0; i < 16; i++) {
 		printk(" %.2x", buf[i]);
 	}
+	printk("\n");
 
 	if ((buf[0] != 8 || buf[1] != 8) &&
 	    (buf[8] != 4 || buf[9] != 4)) {
@@ -212,8 +225,6 @@ static int h27ucg8t2e_init(struct mtd_info *mtd, const uint8_t *id)
 		ret = -EINVAL;
 		goto buf_dealloc;
 	}
-
-//	chip->read_buf(mtd, buf, 512);
 
 	/* copy RRT from OTP, command suffix */
 	chip->cmdfunc(mtd, NAND_CMD_RESET, -1, -1);
@@ -227,14 +238,16 @@ static int h27ucg8t2e_init(struct mtd_info *mtd, const uint8_t *id)
 
 	/* FIXME: common function - majority check, not "all correct" */
 	ret = 0;
-	printk("RRT sets in OTP: original (inverse)...\n");
+	printk("RRT sets in OTP...\n");
 	for (rrtSet = 0; rrtSet < 8; rrtSet++) {
 		u8 *cur = buf + 16 + (64 * rrtSet);
+		printk("%d.", rrtSet);
 		for (rrtReg = 0; rrtReg < 32; rrtReg++) {
 			uint8_t original = cur[rrtReg];
 			uint8_t inverse  = cur[rrtReg + 32];
-			printk(" %.2x (%.2x)", original, inverse);
+			printk(" %.2x", original);
 			if ((original | inverse) != 0xff) {
+				DBG("original read retry level doesn't match its inverse");
 				ret = -EINVAL;
 				break;
 			}
@@ -249,9 +262,7 @@ static int h27ucg8t2e_init(struct mtd_info *mtd, const uint8_t *id)
 			break;
 	}
 
-	if (ret) {
-		DBG("Loading of RRT from OTP failed. Using defaults.");
-
+	if (!ret) {
 		hynix = kzalloc(sizeof(*hynix), GFP_KERNEL);
 		if (!hynix) {
 			ret = -ENOMEM;
@@ -262,13 +273,15 @@ static int h27ucg8t2e_init(struct mtd_info *mtd, const uint8_t *id)
 		hynix->read_retry.regnum = 4;
 
 		// copy the first correct RRT set (the original half)
-		memcpy(hynix->read_retry.values, &buf[rrtSet * 64], 32);
+		memcpy(hynix->read_retry.values, &buf[16 + rrtSet * 64], 32);
 
 		chip->manuf_priv = hynix;
 		chip->setup_read_retry = nand_setup_read_retry_hynix;
 		chip->read_retries = 8;
 		chip->manuf_cleanup = h27ucg8t2e_cleanup;
 	}
+	else
+		DBG("Read retry initialisation failed.");
 
 buf_dealloc:
 	if (buf)

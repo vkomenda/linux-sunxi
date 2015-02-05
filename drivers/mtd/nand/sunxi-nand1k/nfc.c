@@ -1256,8 +1256,8 @@ int nfc_second_init(struct mtd_info *mtd)
 	}
 
 	// set final NFC clock freq
-//	if (chip->clock_freq > 30)
-//		chip->clock_freq = 30;
+	if (chip->clock_freq > 30)
+		chip->clock_freq = 30;
 	sunxi_set_nand_clock(chip->clock_freq);
 	DBG("set clock freq to %dMHz\n", chip->clock_freq);
 
