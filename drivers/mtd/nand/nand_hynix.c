@@ -151,7 +151,7 @@ succeed_fail_a:
 		hynix = kzalloc(sizeof(*hynix), GFP_KERNEL);
 		if (!hynix) {
 			ret = -ENOMEM;
-			goto buf_dealloc;
+			goto buf_dealloc_a;
 		}
 
 		hynix->read_retry.regs = h27ucg8t2a_read_retry_regs;
@@ -165,6 +165,7 @@ succeed_fail_a:
 	else
 		DBG("Read retry initialisation failed.");
 
+buf_dealloc_a:
 	if (buf)
 		kfree(buf);
 
@@ -269,7 +270,7 @@ succeed_fail_e:
 		hynix = kzalloc(sizeof(*hynix), GFP_KERNEL);
 		if (!hynix) {
 			ret = -ENOMEM;
-			goto buf_dealloc;
+			goto buf_dealloc_e;
 		}
 
 		hynix->read_retry.regs = h27ucg8t2e_read_retry_regs;
@@ -286,6 +287,7 @@ succeed_fail_e:
 	else
 		DBG("Read retry initialisation failed.");
 
+buf_dealloc_e:
 	if (buf)
 		kfree(buf);
 
