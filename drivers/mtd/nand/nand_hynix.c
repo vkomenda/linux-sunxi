@@ -109,7 +109,7 @@ static int h27ucg8t2a_init(struct mtd_info *mtd, const uint8_t *id)
 	    (buf[8] != 8 || buf[9] != 8)) {
 		DBG("wrong total RR count or RR register count");
 		ret = -EINVAL;
-		goto buf_dealloc;
+		goto succeed_fail_a;
 	}
 	// Read 8 RR register sets, each consisting of a 64-byte original and
 	// its 64-byte inverse copy. Every set stores 8 lists of values for the
@@ -146,6 +146,7 @@ static int h27ucg8t2a_init(struct mtd_info *mtd, const uint8_t *id)
 	chip->cmdfunc(mtd, 0x38, -1, -1);
 	chip->select_chip(mtd, -1);
 
+succeed_fail_a:
 	if (!ret) {
 		hynix = kzalloc(sizeof(*hynix), GFP_KERNEL);
 		if (!hynix) {
@@ -161,8 +162,9 @@ static int h27ucg8t2a_init(struct mtd_info *mtd, const uint8_t *id)
 		chip->read_retries = 8;
 		chip->manuf_cleanup = h27ucg8t2a_cleanup;
 	}
+	else
+		DBG("Read retry initialisation failed.");
 
-buf_dealloc:
 	if (buf)
 		kfree(buf);
 
@@ -223,7 +225,7 @@ static int h27ucg8t2e_init(struct mtd_info *mtd, const uint8_t *id)
 	    (buf[8] != 4 || buf[9] != 4)) {
 		DBG("wrong total RR count or RR register count");
 		ret = -EINVAL;
-		goto buf_dealloc;
+		goto succeed_fail_e;
 	}
 
 	/* copy RRT from OTP, command suffix */
@@ -262,6 +264,7 @@ static int h27ucg8t2e_init(struct mtd_info *mtd, const uint8_t *id)
 			break;
 	}
 
+succeed_fail_e:
 	if (!ret) {
 		hynix = kzalloc(sizeof(*hynix), GFP_KERNEL);
 		if (!hynix) {
@@ -283,7 +286,6 @@ static int h27ucg8t2e_init(struct mtd_info *mtd, const uint8_t *id)
 	else
 		DBG("Read retry initialisation failed.");
 
-buf_dealloc:
 	if (buf)
 		kfree(buf);
 
