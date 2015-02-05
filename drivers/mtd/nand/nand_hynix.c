@@ -120,7 +120,7 @@ static int h27ucg8t2a_init(struct mtd_info *mtd, const uint8_t *id)
 	ret = 0;
 	printk("RRT sets in OTP...\n");
 	for (rrtSet = 0; rrtSet < 8; rrtSet++) {
-		u8 *cur = buf + 16 + (128 * rrtSet);
+		u8 *cur = buf + (128 * rrtSet);
 		printk("%d.", rrtSet);
 		for (rrtReg = 0; rrtReg < 64; rrtReg++) {
 			uint8_t original = cur[rrtReg];
