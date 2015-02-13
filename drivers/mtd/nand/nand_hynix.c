@@ -304,10 +304,10 @@ struct hynix_nand_initializer initializers[] = {
 		.id = {NAND_MFR_HYNIX, 0xde, 0x94, 0xda, 0x74, 0xc4},
 		.init = h27ucg8t2a_init,
 	},
-	{       // same RR procedure for H27UBG8T2B
-		.id = {NAND_MFR_HYNIX, 0xd7, 0x94, 0xda, 0x74, 0xc3},
-		.init = h27ucg8t2a_init,
-	},
+//	{       // same RR procedure for H27UBG8T2B
+//		.id = {NAND_MFR_HYNIX, 0xd7, 0x94, 0xda, 0x74, 0xc3},
+//		.init = h27ucg8t2a_init,
+//	},
 	{
 		.id = {NAND_MFR_HYNIX, 0xde, 0x14, 0xa7, 0x42, 0x4a},
 		.init = h27ucg8t2e_init,
