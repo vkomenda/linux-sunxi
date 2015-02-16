@@ -1824,6 +1824,7 @@ static int nand_do_read_ops(struct mtd_info *mtd, loff_t from,
 
 	while (1) {
 		unsigned int ecc_failures = mtd->ecc_stats.failed;
+		unsigned int ecc_new_failures;
 
 		bytes = min(mtd->writesize - col, readlen);
 		aligned = (bytes == mtd->writesize);
@@ -1876,12 +1877,16 @@ read_retry:
 				break;
 			}
 
+			ecc_new_failures = mtd->ecc_stats.failed - ecc_failures;
+			if (ecc_new_failures) {
+				DBG("%d ECC failures", ecc_new_failures);
+			}
 			max_bitflips = max_t(unsigned int, max_bitflips, ret);
 
 			/* Transfer not aligned data */
 			if (use_bufpoi) {
 				if (!NAND_HAS_SUBPAGE_READ(chip) && !oob &&
-				    !(mtd->ecc_stats.failed - ecc_failures) &&
+				    !ecc_new_failures &&
 				    (ops->mode != MTD_OPS_RAW)) {
 					chip->pagebuf = realpage;
 					chip->pagebuf_bitflips = ret;
@@ -1910,13 +1915,15 @@ read_retry:
 					nand_wait_ready(mtd);
 			}
 
-			if (mtd->ecc_stats.failed - ecc_failures) {
+			if (ecc_new_failures) {
 				if (retry_mode + 1 < chip->read_retries) {
 					retry_mode++;
 					ret = nand_setup_read_retry(mtd,
 							retry_mode);
-					if (ret < 0)
+					if (ret < 0) {
+						DBG("nand_setup_read_retry ERROR %d", ret);
 						break;
+					}
 
 					/* Reset failures; retry */
 					mtd->ecc_stats.failed = ecc_failures;
