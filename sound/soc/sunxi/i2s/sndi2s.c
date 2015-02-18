@@ -46,7 +46,7 @@ static int sunxi_i2s_slave = 0;
 #define sndi2s_FORMATS (SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_LE)
 #else
 #define sndi2s_FORMATS (SNDRV_PCM_FMTBIT_S8 | SNDRV_PCM_FMTBIT_S16_LE | \
-		                     SNDRV_PCM_FMTBIT_S18_3LE | SNDRV_PCM_FMTBIT_S20_LE)
+		                     SNDRV_PCM_FMTBIT_S18_3LE | SNDRV_PCM_FMTBIT_S20_3LE)
 #endif
 
 /* cleaning code
@@ -75,7 +75,7 @@ static int sndi2s_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_dai *dai)
 {
 /*
-	switch (params_format(params)) 
+	switch (params_format(params))
 	{
 	case SNDRV_PCM_FORMAT_S16_LE:
 		printk("[IIS-0] sndi2s_hw_params: format 16 bit\n");
@@ -90,7 +90,7 @@ static int sndi2s_hw_params(struct snd_pcm_substream *substream,
 		printk("[IIS-0] sndi2s_hw_params: Unsupported format (%d)\n", (int)params_format(params));
 		//return -EINVAL;
 	}
-*/	
+*/
 /* cleaning code
 	hdmi_parameter.sample_rate = params_rate(params);
 */
@@ -116,7 +116,7 @@ static int sndi2s_set_dai_fmt(struct snd_soc_dai *codec_dai,
 {
 /*
 	printk("[IIS-0] sndi2s_set_dai_fmt: format (%u)\n", fmt);
-*/	
+*/
 	return 0;
 }
 
@@ -178,7 +178,7 @@ static int __devinit sndi2s_codec_probe(struct platform_device *pdev)
 		sndi2s_dai.playback.rates = sndi2s_RATES_SLAVE;
 		printk("[I2S-0] sndi2s_codec_probe I2S used in slave mode\n");
 	}
-	else 
+	else
 		printk("[I2S-0] sndi2s_codec_probe I2S used in master mode\n");
 	return snd_soc_register_codec(&pdev->dev, &soc_codec_dev_sndi2s, &sndi2s_dai, 1);
 }
@@ -223,7 +223,7 @@ static int __init sndi2s_codec_init(void)
 			sunxi_i2s_slave = 0;
 			printk("[I2S-0] sndi2s_codec_init I2S used in master mode\n");
 		}
-	
+
 		if((err = platform_device_register(&sndi2s_codec_device)) < 0)
 			return err;
 
@@ -251,4 +251,3 @@ MODULE_DESCRIPTION("SNDI2S ALSA soc codec driver");
 MODULE_AUTHOR("Zoltan Devai, Christian Pellegrin <chripell@evolware.org>");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("platform:sunxi-i2s-codec");
-

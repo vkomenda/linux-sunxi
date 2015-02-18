@@ -146,6 +146,7 @@ static struct resource mali_gpu_resources_m400_mp1[] =
 		SW_INT_IRQNO_GPU_PP0, SW_INT_IRQNO_GPU_PPMMU0)
 };
 
+#if defined CONFIG_ARCH_SUN7I
 static struct resource mali_gpu_resources_m400_mp2[] =
 {
 	MALI_GPU_RESOURCES_MALI400_MP2_PMU(
@@ -154,6 +155,7 @@ static struct resource mali_gpu_resources_m400_mp2[] =
 		SW_INT_IRQNO_GPU_PP0, SW_INT_IRQNO_GPU_PPMMU0,
 		SW_INT_IRQNO_GPU_PP1, SW_INT_IRQNO_GPU_PPMMU1)
 };
+#endif
 
 static struct mali_gpu_device_data mali_gpu_data =
 {
@@ -183,13 +185,17 @@ int mali_platform_device_register(void)
 
 	mali_platform_init();
 
+#if defined CONFIG_ARCH_SUN7I
 	if (sunxi_is_a20()) {
 		MALI_DEBUG_PRINT(4, ("Registering Mali-400 MP2 device\n"));
 		err = platform_device_add_resources(
 				&mali_gpu_device,
 				mali_gpu_resources_m400_mp2,
 				ARRAY_SIZE(mali_gpu_resources_m400_mp2));
-	} else {
+	}
+	else
+#endif
+	{
 		MALI_DEBUG_PRINT(4, ("Registering Mali-400 MP1 device\n"));
 		err = platform_device_add_resources(
 				&mali_gpu_device,
