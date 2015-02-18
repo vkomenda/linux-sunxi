@@ -1038,14 +1038,13 @@ static int nfc_read_page_hwecc(struct mtd_info *mtd, struct nand_chip *chip,
 			memset(buf, 0xff, mtd->writesize);
 			if (oob_required)
 				memset(chip->oob_poi, 0xff, mtd->oobsize);
-			/* success */
-			eccstatus = 0;
 		}
 		else {
 			/* ECC error. The number of bitflips is inessential */
 			mtd->ecc_stats.failed++;
-			/* keep the same negative value for eccstatus */
 		}
+		/* success or allow nand_do_read_ops() proceed to read retry */
+		eccstatus = 0;
 	}
 
 	DBG("ECC stat %d, ECC failed %d", eccstatus, mtd->ecc_stats.failed);

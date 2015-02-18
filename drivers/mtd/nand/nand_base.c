@@ -1159,7 +1159,10 @@ int nand_rnd_is_activ(struct mtd_info *mtd, int page, int column, int *len)
 EXPORT_SYMBOL(nand_rnd_is_activ);
 
 /**
- * nand_page_is_empty - check wether a NAND page contains only FFs
+ * nand_page_is_empty - check wether a NAND page contains only FFs. Correct only
+ * either for pages containing randomised data or for clean pages. This is
+ * because of having to use bitflip counting instead of error correction.
+ *
  * @mtd:	mtd info
  * @data:	data buffer
  * @oob:	oob buffer
@@ -1171,14 +1174,16 @@ EXPORT_SYMBOL(nand_rnd_is_activ);
  */
 bool nand_page_is_empty(struct mtd_info *mtd, void *data, void *oob)
 {
+	struct nand_chip *chip = mtd->priv;
 	u8 *buf;
 	int length;
 	u32 pattern = 0xffffffff;
-	int bitflips = 0;
+	int bitflips = 0, max_bitflips;
 	int cnt;
 
 	buf = data;
 	length = mtd->writesize;
+	max_bitflips = chip->ecc.strength * chip->ecc.steps;
 	while (length) {
 		cnt = length < sizeof(pattern) ? length : sizeof(pattern);
 		if (memcmp(&pattern, buf, cnt)) {
@@ -1187,8 +1192,8 @@ bool nand_page_is_empty(struct mtd_info *mtd, void *data, void *oob)
 				if (!(buf[i / BITS_PER_BYTE] &
 				      (1 << (i % BITS_PER_BYTE)))) {
 					bitflips++;
-					if (bitflips > mtd->ecc_strength) {
-						DBG("data bitflips %d", bitflips);
+					if (bitflips > max_bitflips) {
+						DBG("not empty, %d bitflips", bitflips);
 						return false;
 					}
 				}
@@ -1213,8 +1218,8 @@ bool nand_page_is_empty(struct mtd_info *mtd, void *data, void *oob)
 				if (!(buf[i / BITS_PER_BYTE] &
 				      (1 << (i % BITS_PER_BYTE)))) {
 					bitflips++;
-					if (bitflips > mtd->ecc_strength) {
-						DBG("OOB bitflips %d", bitflips);
+					if (bitflips > chip->ecc.strength) {
+						DBG("OOB not empty, %d bitflips", bitflips);
 						return false;
 					}
 				}
@@ -1879,7 +1884,7 @@ read_retry:
 
 			ecc_new_failures = mtd->ecc_stats.failed - ecc_failures;
 			if (ecc_new_failures) {
-				DBG("%d ECC failures", ecc_new_failures);
+				DBG("%d new ECC failure(s)", ecc_new_failures);
 			}
 			max_bitflips = max_t(unsigned int, max_bitflips, ret);
 
@@ -1930,6 +1935,8 @@ read_retry:
 					goto read_retry;
 				} else {
 					/* No more retry modes; real failure */
+					DBG("all read retries failed for page 0x%x",
+					    page);
 					ecc_fail = true;
 				}
 			}
