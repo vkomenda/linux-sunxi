@@ -4788,8 +4788,10 @@ static int nand_ecc_ctrl_init(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc)
 
 	/* ECC sanity check: warn if it's too weak */
 	if (!nand_ecc_strength_good(mtd))
-		pr_warn("WARNING: %s: the ECC used on your system is too weak compared to the one required by the NAND chip\n",
-			mtd->name);
+		pr_warn("WARNING: %s: ECC strength of %d bits/%d Bytes as "
+			"used on your system is too weak compared to the one "
+			"required by the NAND chip\n",
+			mtd->name, ecc->strength, ecc->size);
 
 	/*
 	 * Set the number of read / write steps for one page depending on ECC
