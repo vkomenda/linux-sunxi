@@ -1296,7 +1296,7 @@ int nfc_second_init(struct mtd_info *mtd)
 	nand->ecc.bytes = 0;
 
 	// FIXME: derive from the ID in nand_base.c:parse_hynix_sizes()
-	nand->ecc.strength = 64;
+	nand->ecc.strength = 48;
 	nand->ecc.size = SZ_1K;
 
 	sunxi_ecclayout.eccbytes = 0;
