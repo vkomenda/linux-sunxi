@@ -713,11 +713,6 @@ static void nfc_cmdfunc(struct mtd_info *mtd, unsigned command, int column,
 		// wait rb0 ready
 		select_rb(0);
 		while (!check_rb_ready(0));
-		// wait rb1 ready
-//		select_rb(1);
-//		while (!check_rb_ready(1));
-		// select rb 0 back
-//		select_rb(0);
 		break;
 	case NAND_CMD_READ0:
 	case NAND_CMD_READ1:
@@ -791,7 +786,7 @@ static void nfc_write_byte(struct mtd_info *mtd, const uint8_t b)
 static void nfc_write_buf(struct mtd_info *mtd, const uint8_t *buf, int len)
 {
 //	DBG("mtd %p, from %p, length %d", mtd, buf, len);
-	if (write_buffer) {
+	if (likely(write_buffer)) {
 		if (write_offset + len > buffer_size) {
 			pr_err(pr_fmt("out-of-bounds write at "
 				      "offset %d, length %d, buffer size %d\n"),
@@ -1301,7 +1296,7 @@ int nfc_second_init(struct mtd_info *mtd)
 	nand->ecc.bytes = 0;
 
 	// FIXME: derive from the ID in nand_base.c:parse_hynix_sizes()
-	nand->ecc.strength = 40;
+	nand->ecc.strength = 64;
 	nand->ecc.size = SZ_1K;
 
 	sunxi_ecclayout.eccbytes = 0;
